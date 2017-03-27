@@ -526,6 +526,166 @@ struct
        ([Sig_modty (id, mty)], Ident.name id :: seen)
 end
 
+module type CORE_NORM = sig
+  module Core : CORE_SYNTAX
+
+  val subst_term : Core.term -> Subst.t -> Core.term
+end
+
+module Mod_normalise
+    (Mod : MOD_SYNTAX)
+    (CN  : CORE_NORM with module Core = Mod.Core) =
+struct
+  (* normalise module expressions by replacing functors with the
+     substituted versions. *)
+
+  open Mod
+
+  let rec subst_modterm modl sub = match modl with
+    | Longident lid -> Longident (Subst.path lid sub)
+    | Structure str -> Structure (List.map (subst_def sub) str)
+    | Functor (id, mty, modl) ->
+       Functor (id, subst_modtype mty sub, subst_modterm modl sub)
+    | Apply (modl1, modl2) ->
+       Apply (subst_modterm modl1 sub, subst_modterm modl2 sub)
+    | Constraint (modl, mty) ->
+       Constraint (subst_modterm modl sub, subst_modtype mty sub)
+  and subst_def sub = function
+    | Str_value tm -> Str_value (CN.subst_term tm sub)
+    | Str_type (id, kind, dty) ->
+       Str_type (id, Core.subst_kind kind sub, Core.subst_deftype dty sub)
+    | Str_module (id, modl) ->
+       Str_module (id, subst_modterm modl sub)
+    | Str_modty (id, mty) ->
+       Str_modty (id, subst_modtype mty sub)
+
+  module Env : sig
+    type t
+    val empty : t
+    val find : path -> t -> mod_term option
+    val add : Ident.t -> mod_term -> t -> t
+  end = struct
+    type t = mod_term Ident.Table.t
+
+    let empty = Ident.Table.empty
+
+    let add id mtm env = Ident.Table.add id mtm env
+
+    let add_item item env =
+      match item with
+        | Str_value _ | Str_type _ | Str_modty _ -> env
+        | Str_module (id, modl) -> add id modl env
+
+    let add_structure = List.fold_right add_item
+
+    let rec find path env =
+      match path with
+        | Pident id ->
+           (match Ident.Table.find id env with
+             | exception Not_found -> None
+             | modl -> Some modl)
+        | Pdot (root, field) ->
+           match find root env with
+             | Some (Structure str) ->
+                Some (find_field root field Subst.identity str)
+             | None ->
+                None
+             | _ ->
+                failwith "structure expected in dot access"
+
+    and find_field p field sub = function
+      | [] ->
+         failwith "no such field in structure"
+      | Str_value _ :: rem ->
+         find_field p field sub rem
+      | Str_type (id, _, _) :: rem
+      | Str_modty (id, _) :: rem ->
+         if Ident.name id = field
+         then failwith "expecting to find a module"
+         else find_field p field (Subst.add id (Pdot (p, Ident.name id)) sub) rem
+      | Str_module (id, modl) :: rem ->
+         if Ident.name id = field
+         then subst_modterm modl sub
+         else find_field p field (Subst.add id (Pdot (p, Ident.name id)) sub) rem
+  end
+
+  let rec norm_modterm env = function
+    | Longident lid ->
+       (match Env.find lid env with
+         | None ->
+            (* If not found, must be abstract *)
+            Longident lid
+         | Some modl ->
+            modl)
+    | Structure items ->
+       let _, defs = List.fold_left norm_def (env,[]) items in
+       Structure (List.rev defs)
+    | Functor (id, mty, modl) ->
+       Functor (id, mty, norm_modterm env modl)
+    | Apply (modl, (Longident lid as arg)) ->
+       (match norm_modterm env modl with
+         | Longident _ as modl ->
+            Apply (modl, arg)
+         | Functor (id, _, modl) ->
+            norm_modterm env (subst_modterm modl Subst.(add id lid identity))
+         | _ ->
+            failwith "internal error: type error in module normalisation")
+    | Apply (_, _) ->
+       failwith "Application to non path"
+    | Constraint (modl, _) ->
+       modl
+
+  and norm_def (env, defs) = function
+    | (Str_value _ | Str_type _ | Str_modty _) as def ->
+       (* FIXME: delete modtys? could be referred to in functors, but
+          functors could be deleted too. *)
+       (* FIXME: substitute out the types in values and types? so that
+          everything is as concrete as possible? Then also delete
+          Str_type entries. *)
+       (env, def :: defs)
+    | Str_module (id, modl) ->
+       let modl = norm_modterm env modl in
+       let env  = Env.add id modl env in
+       (env, Str_module (id, modl) :: defs)
+end
+
+module Test_syn = struct
+  type term = path
+  type val_type = path
+  type def_type = path
+  type kind = unit
+  let subst_valtype = Subst.path
+  let subst_deftype = Subst.path
+  let subst_kind () _ = ()
+end
+
+module Test_syn_norm = struct
+  module Core = Test_syn
+  let subst_term = Subst.path
+end
+
+module Test_mod = Mod_Syntax (Test_syn)
+module Test_norm = Mod_normalise (Test_mod) (Test_syn_norm)
+
+let test =
+  let open Test_mod in
+  let id = Ident.create in
+  let a = id"a" in
+  Structure begin
+    let f = id"F" in
+    let y = id"Y" in
+    let z = id"z" in
+    [ Str_module (f,
+                  let t = id"t" in
+                  let x = id"X" in
+                  Functor (x,
+                           Signature [Sig_type (t, {kind=();manifest=None})],
+                           Structure [Str_type (id"u", (), Pdot (Pident x, "t"))]))
+    ; Str_module (y, Structure [Str_type (id"t", (), Pident a)])
+    ; Str_module (z, Apply (Longident (Pident f), Longident (Pident y)))
+    ]
+  end
+
 (*
 module type Edges = sig
   type vertex
