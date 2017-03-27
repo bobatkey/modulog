@@ -1,0 +1,37 @@
+{
+open Datalog_parser
+}
+
+rule token = parse
+  [' ''\t']  { token lexbuf }
+| '\n'       { Lexing.new_line lexbuf; token lexbuf }
+| "(*"       { comment lexbuf; token lexbuf }
+| ','        { COMMA }
+| ":-"       { COLON_DASH }
+| ":"        { COLON }
+| "*"        { STAR }
+| "."        { DOT }
+| "->"       { ARROW }
+| "="        { EQUALS }
+| "module"   { MODULE }
+| "type"     { TYPE }
+| "struct"   { STRUCT }
+| "sig"      { SIG }
+| "end"      { END }
+| "functor"  { FUNCTOR }
+| "int"      { INT }
+| "and"      { AND }
+| "def"      { DEF }
+| '('        { LPAREN }
+| ')'        { RPAREN }
+| ['0'-'9']+ { INT_LITERAL (Int32.of_string (Lexing.lexeme lexbuf)) }
+| ['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9']*
+             { IDENT (Lexing.lexeme lexbuf) }
+| '_'        { UNDERSCORE }
+| eof        { EOF }
+
+and comment = parse
+  "*)"       { }
+| '\n'       { Lexing.new_line lexbuf; comment lexbuf }
+| "(*"       { comment lexbuf; comment lexbuf }
+| _          { comment lexbuf }
