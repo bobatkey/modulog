@@ -50,6 +50,10 @@ module Ident : IDENT = struct
   module Set = Set.Make (OT)
 end
 
+let pp_ident pp ident = Format.pp_print_string pp (Ident.name ident);;
+
+#install_printer pp_ident
+
 type path =
   | Pident of Ident.t
   | Pdot   of path * string
