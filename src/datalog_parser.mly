@@ -1,4 +1,9 @@
 %{
+open Datalog_syntax
+
+let mk_loc loc_start loc_end =
+  { Location.loc_start; loc_end }
+
 %}
 
 %token COMMA
@@ -11,83 +16,163 @@
 %token<string> IDENT
 %token EOF
 
-%start <rule list> program
+%start <Datalog_syntax.structure> program
 
 %%
 
 program:
-  d=list(str_item); EOF { d }
+| d=list(str_item); EOF
+    { d }
+
+%inline
+in_parens(X):
+| LPAREN; x=X; RPAREN
+    { x }
+
+/* Long identifiers */
+
+longident:
+| id=IDENT
+    { Lid_ident id }
+| lid=longident; DOT; f=IDENT
+    { Lid_dot (lid, f) }
+
+/* Datalog rules */
 
 expr:
-  v=IDENT       { Var v }
-| i=INT_LITERAL { Lit i }
-| UNDERSCORE    { Underscore }
+| v=IDENT
+    { { expr_loc  = mk_loc $startpos $endpos
+      ; expr_data = Expr_var v } }
+| i=INT_LITERAL
+    { { expr_loc  = mk_loc $startpos $endpos
+      ; expr_data = Expr_literal i } }
+| UNDERSCORE
+    { { expr_loc  = mk_loc $startpos $endpos
+      ; expr_data = Expr_underscore } }
+| es=in_parens(separated_list(COMMA,expr))
+    { { expr_loc  = mk_loc $startpos $endpos
+      ; expr_data = Expr_tuple es } }
 
 atom:
-  pred=IDENT; LPAREN; exprs=separated_list(COMMA,expr); RPAREN
-   { { atm_pred=pred; atm_args=exprs } }
+| pred=longident; args=in_parens(separated_list(COMMA,expr))
+    { { atom_loc  = mk_loc $startpos $endpos
+      ; atom_data = Atom_predicate { pred; args } } }
 
-rule_decl:
-  head=atom; COLON_DASH; rhs=separated_nonempty_list(COMMA, atom)
-    { { head ; rhs } }
-| head=atom
-    { { head; rhs = [] } }
+decl_head:
+| name=IDENT; exprs=in_parens(separated_list(COMMA,expr))
+    { (name, exprs) }
+
+rule:
+| head=decl_head; COLON_DASH; rhs=separated_nonempty_list(COMMA, atom)
+    { { rule_loc  = mk_loc $startpos $endpos
+      ; rule_pred = fst head
+      ; rule_args = snd head
+      ; rule_rhs  = rhs } }
+| head=decl_head
+    { { rule_loc  = mk_loc $startpos $endpos
+      ; rule_pred = fst head
+      ; rule_args = snd head
+      ; rule_rhs  = [] } }
 
 pred_decl:
-  name=IDENT; COLON; types=separated_nonempty_list(STAR, typ);
-  rules=list(rule_decl)
-    { (name, types, rules) }
+| name=IDENT; COLON; types=predicate_type; rules=list(rule)
+    { { decl_loc   = mk_loc $startpos $endpos
+      ; decl_name  = name
+      ; decl_type  = types
+      ; decl_rules = rules } }
 
 decl:
-  DEF; d=pred_decl; ds=list(mutual_decl) { (d, ds) }
+| DEF; d=pred_decl; ds=list(AND; d=pred_decl {d})
+    { d :: ds }
 
-mutual_decl:
-  AND; d=pred_decl { d }
+/* types */
 
-typ:
-  INT                                          { Int }
-| lid=longident                                { Typename lid }
-| LPAREN; ts=separated_list(STAR, typ); RPAREN { Tuple ts }
+domain_type:
+| dtys=separated_nonempty_list(STAR, domain_type0)
+    { match dtys with
+        | []    -> assert false
+        | [dty] -> dty
+        | dtys  -> { domtype_loc  = mk_loc $startpos $endpos
+                   ; domtype_data = Type_tuple dtys } }
+
+domain_type0:
+| INT
+    { { domtype_loc  = mk_loc $startpos $endpos
+      ; domtype_data = Type_int } }
+| lid=longident
+    { { domtype_loc  = mk_loc $startpos $endpos
+      ; domtype_data = Type_typename lid } }
+| LPAREN; dty=domain_type; RPAREN
+    { dty }
+
+predicate_type:
+| dtys=separated_nonempty_list(STAR, domain_type0)
+    { { predty_loc  = mk_loc $startpos $endpos
+      ; predty_data = dtys } }
 
 /* the module language */
 
-longident:
-  id=IDENT                    { Pident id }
-| lid=longident; DOT; f=IDENT { Pdot (lid, f) }
-
 mod_type:
-  p=longident                { Mty_longident p }
-| SIG; s=list(sig_item); END { Signature s }
+| lid=longident
+    { { modtype_loc  = mk_loc $startpos $endpos
+      ; modtype_data = Modtype_longident lid } }
+| SIG; s=list(sig_item); END
+    { { modtype_loc  = mk_loc $startpos $endpos
+      ; modtype_data = Modtype_signature s } }
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
-                             { Functor_type (id, mty1, mty2) }
+    { { modtype_loc  = mk_loc $startpos $endpos
+      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
 
 sig_item:
-  id=IDENT; COLON; ty=typ         { Sig_value (id, ty) }
-| TYPE; id=IDENT                  { Sig_type (id, { kind = (); decl = None }) }
-| TYPE; id=IDENT; EQUALS; ty=typ  { Sig_type (id, { kind = (); decl = Some ty}) }
+| id=IDENT; COLON; ty=predicate_type
+    { { sigitem_loc  = mk_loc $startpos $endpos
+      ; sigitem_data = Sig_value (id, ty) } }
+| TYPE; id=IDENT
+    { { sigitem_loc  = mk_loc $startpos $endpos
+      ; sigitem_data = Sig_type (id, None) } }
+| TYPE; id=IDENT; EQUALS; ty=domain_type
+    { { sigitem_loc  = mk_loc $startpos $endpos
+      ; sigitem_data = Sig_type (id, Some ty) } }
 | MODULE; id=IDENT; COLON; mty=mod_type
-                                  { Sig_module (id, mty) }
+    { { sigitem_loc  = mk_loc $startpos $endpos
+      ; sigitem_data = Sig_module (id, mty) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-                                  { Sig_modty (id, mty) }
+    { { sigitem_loc  = mk_loc $startpos $endpos
+      ; sigitem_data = Sig_modty (id, mty) } }
 
 mod_term:
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
-                                    { Functor (id, mty, modl) }
-| m=mod_term2                       { m }
+    { { modterm_loc  = mk_loc $startpos $endpos
+      ; modterm_data = Mod_functor (id, mty, modl) } }
+| m=mod_term2
+    { m }
 
 mod_term2:
 | mod1=mod_term2; LPAREN; mod2=mod_term; RPAREN
-                                    { Apply (mod1, mod2) }
-| lid=longident                     { Longident lid }
-| STRUCT; items=list(str_item); END { Structure items }
+    { { modterm_loc  = mk_loc $startpos $endpos
+      ; modterm_data = Mod_apply (mod1, mod2) } }
+| lid=longident
+    { { modterm_loc  = mk_loc $startpos $endpos
+      ; modterm_data = Mod_longident lid } }
+| STRUCT; items=list(str_item); END
+    { { modterm_loc  = mk_loc $startpos $endpos
+      ; modterm_data = Mod_structure items } }
 | LPAREN; modl=mod_term; COLON; mty=mod_type; RPAREN
-                                    { Constraint (modl, mty) }
-| LPAREN; m=mod_term; RPAREN        { m }
+    { { modterm_loc  = mk_loc $startpos $endpos
+      ; modterm_data = Mod_constraint (modl, mty) } }
+| LPAREN; m=mod_term; RPAREN
+    { m }
 
 str_item:
-  d=decl                          { Str_value d }
-| TYPE; id=IDENT; EQUALS; ty=typ  { Str_type (id, (), ty) }
+| d=decl
+    { { stritem_loc  = mk_loc $startpos $endpos
+      ; stritem_data = Str_value d } }
+| TYPE; id=IDENT; EQUALS; ty=domain_type
+    { { stritem_loc  = mk_loc $startpos $endpos
+      ; stritem_data = Str_type (id, ty) } }
 | MODULE; id=IDENT; EQUALS; modl=mod_term
-                                  { Str_module (id, modl) }
+    { { stritem_loc  = mk_loc $startpos $endpos
+      ; stritem_data = Str_module (id, modl) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-                                  { Str_modty (id, mty) }
+    { { stritem_loc  = mk_loc $startpos $endpos
+      ; stritem_data = Str_modty (id, mty) } }

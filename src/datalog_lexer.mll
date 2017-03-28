@@ -25,7 +25,7 @@ rule token = parse
 | '('        { LPAREN }
 | ')'        { RPAREN }
 | ['0'-'9']+ { INT_LITERAL (Int32.of_string (Lexing.lexeme lexbuf)) }
-| ['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9']*
+| ['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']*
              { IDENT (Lexing.lexeme lexbuf) }
 | '_'        { UNDERSCORE }
 | eof        { EOF }
