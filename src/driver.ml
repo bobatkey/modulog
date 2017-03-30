@@ -1,13 +1,18 @@
 let () =
   let filename  = Sys.argv.(1) in
   let lexbuf    = Lexing.from_channel (open_in filename) in
+  lexbuf.Lexing.lex_curr_p <- { Lexing.pos_fname = filename
+                              ; pos_lnum = 1
+                              ; pos_cnum = 0
+                              ; pos_bol = 0
+                              };
   let structure = Datalog_parser.program Datalog_lexer.token lexbuf in
-  let _str, sg  = Datalog_checker.(Typing.type_structure Env.empty structure)
-  in
-  Format.pp_open_vbox Format.std_formatter 0;
-  Datalog_checker.Mod.pp_signature
-    Format.std_formatter
-    sg;
-  Format.pp_close_box Format.std_formatter ();
-  Format.pp_print_newline Format.std_formatter ();
-  Format.pp_flush_formatter Format.std_formatter
+  match Datalog_checker.(Typing.type_structure Env.empty structure) with
+    | Ok (_, sg) ->
+       Format.printf
+         "@[<v>%a@]@\n"
+         Datalog_checker.Mod.pp_signature sg
+    | Error err ->
+       Format.printf
+         "@[<v>%a@]\n"
+         Datalog_checker.Typing.pp_error err

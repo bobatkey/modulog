@@ -27,30 +27,84 @@ module Core_typing = struct
 
   module Env = Env
 
+  open Rresult
+
+  type core_error_detail =
+    | Lookup_error of Modules.env_lookup_error
+    | Type_mismatch of { expected : Core.def_type
+                       ; actual   : Core.def_type }
+    | Expr_is_tuple of { expected : Core.def_type }
+    | Tuple_too_short
+    | Tuple_too_long
+    | Unsafe of [`Unbound_var | `Catch_all]
+    | Name_mismatch of { expected : string
+                       ; actual   : string
+                       }
+
+  type core_error = Location.t * core_error_detail
+
+  let pp_error pp (loc, detail) =
+    Format.fprintf pp "at %a:@ "
+      Location.pp_without_filename loc;
+    match detail with
+      | Lookup_error lookup_error ->
+         Modules.pp_lookup_error pp lookup_error
+      | Type_mismatch { expected; actual } ->
+         Format.fprintf pp
+           "@[<hv 0>This expression has type@[<4>@ %a@]@ but was expected to have type@[<4>@ %a@]@]@;"
+           Core.pp_def_type actual
+           Core.pp_def_type expected
+      | Expr_is_tuple { expected } ->
+         Format.fprintf pp
+           "@[<v 4>This expression is a tuple, but was expected to have type@,%a@]@;"
+           Core.pp_def_type expected
+      | Tuple_too_short ->
+         Format.fprintf pp "Not enough elements in tuple expression"
+      | Tuple_too_long ->
+         Format.fprintf pp "Too many elements in tuple expression"
+      | Unsafe `Unbound_var ->
+         Format.fprintf pp "Rule is unsafe: unbound variable in head"
+      | Unsafe `Catch_all ->
+         Format.fprintf pp "Rule is unsafe: catch all expression in head"
+      | Name_mismatch { expected; actual } ->
+         Format.fprintf pp "Predicate declaration has name %S, but this rule is given name %S"
+           expected
+           actual
+
+  let lift_lookup_error loc r =
+    R.reword_error (fun e -> (loc, Lookup_error e)) r
+
   let rec kind_deftype env = function
     | Src.{ domtype_loc; domtype_data=Type_int} ->
-       Core.{ domtype_loc
-            ; domtype_data = Type_int
-            },
-       ()
+       Ok ( Core.{ domtype_loc
+                 ; domtype_data = Type_int
+                 }
+          , ()
+          )
+
     | Src.{domtype_loc; domtype_data=Type_typename path} ->
-       let path, _ = Env.find_type path env in
+       lift_lookup_error domtype_loc (Env.find_type path env)
+       >>| fun (path, _) ->
        Core.{ domtype_loc
             ; domtype_data = Type_typename path
             },
        ()
     | Src.{domtype_loc; domtype_data=Type_tuple tys} ->
-       let tys = List.map (fun ty -> fst (kind_deftype env ty)) tys in
-       Core.{ domtype_loc
-            ; domtype_data = Type_tuple tys
-            },
-       ()
+       kind_deftypes env [] tys >>= fun tys ->
+       Ok (Core.{ domtype_loc
+                ; domtype_data = Type_tuple tys
+                },
+           ())
+
+  and kind_deftypes env rev_tys = function
+    | [] -> Ok (List.rev rev_tys)
+    | ty :: tys ->
+       kind_deftype env ty >>= fun (ty, ()) ->
+       kind_deftypes env (ty :: rev_tys) tys
 
   let check_valtype env Src.{predty_loc; predty_data} =
-    Core.{ predty_loc
-         ; predty_data =
-             List.map (fun dty -> fst (kind_deftype env dty)) predty_data
-         }
+    kind_deftypes env [] predty_data >>| fun tys ->
+    Core.{ predty_loc; predty_data = tys }
 
   let rec deftype_equiv env () domty1 domty2 =
     let open Core in
@@ -100,43 +154,42 @@ module Core_typing = struct
     | Src.{ expr_loc; expr_data = Expr_var vnm } ->
        (match LocalEnv.find vnm local_env with
          | exception Not_found ->
-            (Core.{ expr_loc; expr_data = Expr_var vnm },
-             LocalEnv.add vnm expected_ty local_env)
+            Ok (Core.{ expr_loc; expr_data = Expr_var vnm },
+                LocalEnv.add vnm expected_ty local_env)
          | ty ->
             if deftype_equiv env () expected_ty ty then
-              (Core.{ expr_loc; expr_data = Expr_var vnm },
-               local_env)
+              Ok (Core.{ expr_loc; expr_data = Expr_var vnm },
+                  local_env)
             else
-              failwith "type mismatch in expression")
+              Error (expr_loc, Type_mismatch { expected = expected_ty
+                                             ; actual   = ty
+                                             }))
     | Src.{ expr_loc; expr_data = Expr_literal i } ->
        if deftype_equiv env () expected_ty ty_int then
-         (Core.{ expr_loc; expr_data = Expr_literal i }, local_env)
+         Ok (Core.{ expr_loc; expr_data = Expr_literal i }, local_env)
        else
-         (Format.fprintf Format.err_formatter
-            "Type mismatch on integer literal %ld, expected type is " i;
-          Core_syntax.pp_domaintype Format.err_formatter expected_ty;
-          Format.pp_flush_formatter Format.err_formatter;
-          failwith "checker error")
+         Error (expr_loc, Type_mismatch { expected = expected_ty; actual = ty_int })
     | Src.{ expr_loc; expr_data = Expr_underscore } ->
-       (Core.{ expr_loc; expr_data = Expr_underscore }, local_env)
+       Ok (Core.{ expr_loc; expr_data = Expr_underscore }, local_env)
     | Src.{ expr_loc; expr_data = Expr_tuple exprs } ->
        (match domtype_is_tuple env expected_ty with
          | Some tys ->
-            let e, local_env = type_exprs env local_env tys exprs in
-            (Core.{ expr_loc; expr_data = Expr_tuple e }, local_env)
+            type_exprs env local_env expr_loc tys exprs >>= fun (e, local_env) ->
+            Ok (Core.{ expr_loc; expr_data = Expr_tuple e }, local_env)
          | None ->
-            failwith "tuple expression expected to have tuple type")
+            Error (expr_loc, Expr_is_tuple { expected = expected_ty }))
 
-  and type_exprs env local_env tys exprs =
+  and type_exprs env local_env loc tys exprs =
     let rec check local_env rev_exprs exprs tys =
       match exprs, tys with
         | [], [] ->
-           List.rev rev_exprs, local_env
-        | [], _
+           Ok (List.rev rev_exprs, local_env)
+        | [], _ ->
+           Error (loc, Tuple_too_short)
         | _,  [] ->
-           failwith "length mismatch"
+           Error (loc, Tuple_too_long)
         | e::exprs, t::tys ->
-           let e, local_env = type_expr env local_env t e in
+           type_expr env local_env t e >>= fun (e, local_env) ->
            check local_env (e::rev_exprs) exprs tys
     in
     check local_env [] exprs tys
@@ -144,40 +197,44 @@ module Core_typing = struct
 
   let type_atom env local_env = function
     | Src.{atom_loc; atom_data = Atom_predicate { pred; args }} ->
-       let pred, predty    = Env.find_value pred env in
-       let args, local_env =
-         type_exprs env local_env predty.Core.predty_data args
-       in
-       (Core.{ atom_loc
-             ; atom_data = Atom_predicate {pred;args}},
+       lift_lookup_error atom_loc (Env.find_value pred env)
+       >>= fun (pred, predty) ->
+       type_exprs env local_env atom_loc predty.Core.predty_data args
+       >>| fun (args, local_env) ->
+       (Core.{ atom_loc; atom_data = Atom_predicate {pred;args}},
         local_env)
 
 
   let rec type_atoms env local_env rev_atoms = function
     | [] ->
-       List.rev rev_atoms, local_env
+       Ok (List.rev rev_atoms, local_env)
     | atom :: atoms ->
-       let atom, local_env = type_atom env local_env atom in
+       type_atom env local_env atom >>= fun (atom, local_env) ->
        type_atoms env local_env (atom :: rev_atoms) atoms
 
 
   let rec bind_decls env rev_decls = function
-    | [] -> List.rev rev_decls, env
+    | [] ->
+       Ok (List.rev rev_decls, env)
     | Src.{decl_name; decl_type} :: decls ->
-       let decl_type  = check_valtype env decl_type in
+       check_valtype env decl_type >>= fun decl_type ->
        let ident, env = Env.add_value decl_name decl_type env in
        bind_decls env ((decl_name, ident, decl_type) :: rev_decls) decls
 
 
-  let rec check_safe local_env = List.iter (safe_expr local_env)
+  let rec check_safe local_env = function
+    | [] -> Ok ()
+    | expr :: exprs ->
+       safe_expr local_env expr >>= fun () ->
+       check_safe local_env exprs
   and safe_expr local_env = function
-    | Src.{ expr_data = Expr_var vnm } ->
-       if not (LocalEnv.mem vnm local_env) then
-         failwith "variable in head unbound in body"
+    | Src.{ expr_loc; expr_data = Expr_var vnm } ->
+       if LocalEnv.mem vnm local_env then Ok ()
+       else Error (expr_loc, Unsafe `Unbound_var)
     | Src.{ expr_data = Expr_literal _ } ->
-       ()
-    | Src.{ expr_data = Expr_underscore } ->
-       failwith "rule is unsafe: catch-all pattern in rule head"
+       Ok ()
+    | Src.{ expr_loc; expr_data = Expr_underscore } ->
+       Error (expr_loc, Unsafe `Catch_all)
     | Src.{ expr_data = Expr_tuple exprs } ->
        check_safe local_env exprs
   
@@ -185,34 +242,50 @@ module Core_typing = struct
   let type_rule env expected_name ident tys
       Src.{rule_loc;rule_pred;rule_args;rule_rhs} =
     if rule_pred <> expected_name then
-      failwith "all rules should have the same name";
-    let local_env = LocalEnv.empty in
-    let rule_rhs, local_env = type_atoms env local_env [] rule_rhs in
-    check_safe local_env rule_args;
-    let rule_args, _ = type_exprs env local_env tys rule_args in
-    Core.{ rule_loc
-         ; rule_pred = ident
-         ; rule_args
-         ; rule_rhs }
+      Error (rule_loc, Name_mismatch { expected = expected_name; actual = rule_pred })
+    else
+      let local_env = LocalEnv.empty in
+      type_atoms env local_env [] rule_rhs            >>= fun (rule_rhs, local_env) ->
+      check_safe local_env rule_args                  >>= fun () ->
+      type_exprs env local_env rule_loc tys rule_args >>| fun (rule_args, _) ->
+      Core.{ rule_loc
+           ; rule_pred = ident
+           ; rule_args
+           ; rule_rhs }
 
+  let rec type_rules env decl_name ident tys rev_rules = function
+    | [] -> Ok (List.rev rev_rules)
+    | rule :: rules ->
+       type_rule env decl_name ident tys rule >>= fun rule ->
+       type_rules env decl_name ident tys (rule :: rev_rules) rules
 
   let type_decl env (id, ident, predty) Src.{decl_name; decl_loc; decl_rules} =
+    type_rules env decl_name ident predty.Core.predty_data [] decl_rules >>| fun decl_rules ->
     Core.{ decl_loc
          ; decl_name  = ident
          ; decl_type  = predty
-         ; decl_rules =
-             List.map (type_rule env decl_name ident predty.predty_data) decl_rules
+         ; decl_rules
          }
 
+  let rec type_decls env rev_decls idents decls =
+    match idents, decls with
+      | [], [] -> Ok (List.rev rev_decls)
+      | ident :: idents, decl :: decls ->
+         type_decl env ident decl >>= fun decl ->
+         type_decls env (decl :: rev_decls) idents decls
+      | _ ->
+         assert false
+  
   let type_term env decls =
-    let idents, env = bind_decls env [] decls in
-    ( List.map2 (type_decl env) idents decls
-    , List.map (fun (id, _, ty) -> (id, ty)) idents
-    )
+    bind_decls env [] decls >>= fun (idents, env) ->
+    type_decls env [] idents decls >>= fun decls ->
+    Ok ( decls
+       , List.map (fun (id, _, ty) -> (id, ty)) idents
+       )
 
 
   let check_kind env () =
-    ()
+    Ok ()
 
 
   let valtype_match env predty1 predty2 =

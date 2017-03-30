@@ -13,9 +13,10 @@ module String_names = struct
     | Lid_dot   of longident * string
 
   let pp_ident = Format.pp_print_string
-  
+
   let rec pp_longident pp = function
-    | Lid_ident id -> Format.pp_print_string pp id
+    | Lid_ident id ->
+       Format.pp_print_string pp id
     | Lid_dot (lid, f) ->
        pp_longident pp lid;
        Format.pp_print_string pp ".";
@@ -43,6 +44,7 @@ module type MOD_SYNTAX_RAW = sig
     ; manifest : Core.def_type option
     }
 
+  val pp_type_decl : Format.formatter -> Core.Names.ident * type_decl -> unit
 
   type mod_type =
     { modtype_loc  : Location.t
@@ -131,6 +133,28 @@ module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW) : MOD_SYNTAX_RAW with module Core
     | Sig_module of Core.Names.ident * mod_type
     | Sig_modty  of Core.Names.ident * mod_type
 
+  let pp_type_decl pp = function
+    | (id, { kind; manifest = None }) ->
+       (match Core.pp_kind with
+         | None ->
+            Format.fprintf pp "type %a" Core.Names.pp_ident id
+         | Some pp_kind ->
+            Format.fprintf pp "type %a :: %a"
+              Core.Names.pp_ident id
+              pp_kind kind)
+    | (id, { kind; manifest = Some ty }) ->
+       (match Core.pp_kind with
+         | None ->
+            Format.fprintf pp "type %a = %a"
+              Core.Names.pp_ident id
+              Core.pp_def_type ty
+         | Some pp_kind ->
+            Format.fprintf pp "@[<hv 2>type %a :: %a =@ %a@]"
+              Core.Names.pp_ident id
+              pp_kind kind
+              Core.pp_def_type ty)
+
+
   let rec pp_modtype pp = function
     | {modtype_data = Modtype_longident lid} ->
        Core.Names.pp_longident pp lid
@@ -157,25 +181,8 @@ module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW) : MOD_SYNTAX_RAW with module Core
        Format.fprintf pp "%a : %a"
          Core.Names.pp_ident id
          Core.pp_val_type vty
-    | { sigitem_data = Sig_type (id, { kind; manifest = None }) } ->
-       (match Core.pp_kind with
-         | None ->
-            Format.fprintf pp "type %a" Core.Names.pp_ident id
-         | Some pp_kind ->
-            Format.fprintf pp "type %a :: %a"
-              Core.Names.pp_ident id
-              pp_kind kind)
-    | { sigitem_data = Sig_type (id, { kind; manifest = Some ty })} ->
-       (match Core.pp_kind with
-         | None ->
-            Format.fprintf pp "type %a = %a"
-              Core.Names.pp_ident id
-              Core.pp_def_type ty
-         | Some pp_kind ->
-            Format.fprintf pp "@[<hv 2>type %a :: %a =@ %a@]"
-              Core.Names.pp_ident id
-              pp_kind kind
-              Core.pp_def_type ty)
+    | { sigitem_data = Sig_type (id, decl) } ->
+       pp_type_decl pp (id, decl)
     | { sigitem_data = Sig_module (id, mty) } ->
        Format.fprintf pp "@[<hv 2>module %a :@ %a@]"
          Core.Names.pp_ident id
@@ -222,7 +229,9 @@ module Bound_names = struct
   type ident = Ident.t
   type longident = Path.t
 
-  let pp_ident pp id = Format.pp_print_string pp (Ident.name id)
+  let pp_ident pp id =
+    Format.pp_print_string pp (Ident.name id)
+
   let rec pp_longident pp = function
     | Path.Pident id -> pp_ident pp id
     | Path.Pdot (lid, f) ->
@@ -290,6 +299,32 @@ struct
     }
 end
 
+type env_lookup_error =
+  { path    : String_names.longident
+  ; subpath : String_names.longident
+  ; reason  : [`not_found | `not_a_structure | `not_a_module | `not_a_value | `not_a_type | `not_a_module_type]
+  }
+
+let pp_lookup_error pp { path; subpath; reason } =
+  let reason =
+    match reason with
+      | `not_found -> "not found"
+      | `not_a_structure -> "not a structure"
+      | `not_a_module    -> "not a module"
+      | `not_a_value     -> "not a value" (* 'value' doesn't always make sense *)
+      | `not_a_type      -> "not a type"
+      | `not_a_module_type -> "not a module type"
+  in
+  if path = subpath then
+    Format.fprintf pp "The name %a was %s"
+      String_names.pp_longident path
+      reason
+  else
+    Format.fprintf pp "While looking up %a, the sub path %a was %s"
+      String_names.pp_longident path
+      String_names.pp_longident subpath
+      reason
+
 module type ENV = sig
   module Mod : MOD_SYNTAX
 
@@ -312,15 +347,16 @@ module type ENV = sig
   val add_module_by_ident : Ident.t -> Mod.mod_type -> t -> t
 
   
-  val find_value : String_names.longident -> t -> Path.t * Mod.Core.val_type
+  val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, env_lookup_error) result
 
-  val find_type : String_names.longident -> t -> Path.t * Mod.type_decl
+  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, env_lookup_error) result
 
-  val find_module : String_names.longident -> t -> Path.t * Mod.mod_type
+  val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
 
-  val find_modtype : String_names.longident -> t -> Path.t * Mod.mod_type
+  val find_modtype : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
 
   val lookup_modtype : Path.t -> t -> Mod.mod_type
+
   val lookup_type : Path.t -> t -> Mod.type_decl
 end
 
@@ -378,32 +414,49 @@ struct
   let add_signature =
     List.fold_right add_sigitem
 
+
+  let rec lid_of_path = function
+    | Path.Pident id   -> String_names.Lid_ident (Ident.name id)
+    | Path.Pdot (p, f) -> String_names.Lid_dot (lid_of_path p, f)
+
+
   let rec transl_path names = function
-    | String_names.Lid_ident ident -> Path.Pident (NameMap.find ident names)
-    | String_names.Lid_dot (p, f)  -> Path.Pdot (transl_path names p, f)
+    | String_names.Lid_ident ident as path ->
+       (match NameMap.find ident names with
+         | exception Not_found -> Error (path, `not_found)
+         | ident -> Ok (Path.Pident ident))
+    | String_names.Lid_dot (p, f) ->
+       (match transl_path names p with
+         | Error _ as err -> err
+         | Ok p -> Ok (Path.Pdot (p, f)))
 
   let rec find path env = match path with
     | Path.Pident id ->
        (match Ident.Table.find id env with
          | None ->
-            Error "identifier not found"
-         | Some p ->
-            Ok p)
+            failwith "internal error: path unresolvable"
+         | Some binding ->
+            Ok binding)
     | Path.Pdot (root, field) ->
-       let rec resolve = function
-         | Mod.{modtype_data=Modtype_signature sg} ->
-            find_field root field Subst.identity sg
-         | Mod.{modtype_data=Modtype_longident lid} ->
-            resolve (find_modty lid env)
-         | _ ->
-            Error "structure expected in dot access"
-       in
-       resolve (find_module root env)
+       match find root env with
+         | Ok (Module mty) ->
+            let rec resolve = function
+              | Mod.{modtype_data=Modtype_signature sg} ->
+                 find_field root field Subst.identity sg
+              | Mod.{modtype_data=Modtype_longident lid} ->
+                 resolve (lookup_modtype lid env)
+              | _ ->
+                 Error (lid_of_path root, `not_a_structure)
+            in
+            resolve mty
+         | Ok _ ->
+            Error (lid_of_path root, `not_a_module)
+         | Error err ->
+            Error err
 
-  
   and find_field p field sub = function
     | [] ->
-       Error (Printf.sprintf "no such field '%s' in structure" field)
+       Error (lid_of_path (Path.Pdot (p, field)), `not_found)
     | Mod.{sigitem_data=Sig_value (id, vty)} :: rem ->
        if Ident.name id = field
        then Ok (Value (Mod.Core.subst_valtype sub vty))
@@ -424,66 +477,55 @@ struct
        else
          find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
 
-  and find_module path env =
-    match find path env with
-      | Ok (Module mty) -> mty
-      | Ok _ -> failwith "module field expected"
-      | Error msg -> failwith msg
-
-  and find_modty path env =
+  and lookup_modtype path env =
     match find path env with
       | Ok (Modty mty) -> mty
-      | Ok _ -> failwith "module type expected"
-      | Error msg -> failwith msg
-    
-  
-  let find_value lid {bindings;names} =
-    let path = transl_path names lid in
-    match find path bindings with
-      | Ok (Value vty) ->
-         path, vty
-      | Ok _ ->
-         failwith "value field expected"
-      | Error msg ->
-         failwith msg
-
-  let find_type lid {bindings;names} =
-    let path = transl_path names lid in
-    match find path bindings with
-      | Ok (Type decl) ->
-         path, decl
-      | Ok _ -> failwith "type field expected"
-      | Error msg -> failwith msg
-
-  let find_module lid {bindings;names} =
-    let path = transl_path names lid in
-    match find path bindings with
-      | Ok (Module mty) ->
-         path, mty
-      | Ok _ -> failwith "module field expected"
-      | Error msg -> failwith msg
-
-  let find_modtype lid {bindings;names} =
-    let path = transl_path names lid in
-    match find path bindings with
-      | Ok (Modty mty) ->
-         path, mty
-      | Ok _ -> failwith "module type field expected"
-      | Error msg -> failwith msg
+      | _ -> failwith "internal: module type lookup failed"
 
   let lookup_modtype path {bindings} =
-    match find path bindings with
-      | Ok (Modty mty) ->
-         mty
-      | Ok _ -> failwith "module type field expected"
-      | Error msg -> failwith msg
-
+    lookup_modtype path bindings
+  
   let lookup_type path {bindings} =
     match find path bindings with
-      | Ok (Type ty) ->
-         ty
-      | Ok _ -> failwith "module type field expected"
-      | Error msg -> failwith msg
+      | Ok (Type ty) -> ty
+      | _ -> failwith "internal: type lookup failed"
+
+  open Rresult
+
+  let reword_lookup_error ~target_path result =
+    R.reword_error (fun (subpath, reason) -> { path = target_path; subpath; reason }) result
+
+  let find_value lid {bindings;names} =
+    reword_lookup_error ~target_path:lid begin
+      transl_path names lid >>= fun path ->
+      find path bindings >>= function
+      | Value vty -> Ok (path, vty)
+      | _         -> Error (lid, `not_a_value)
+    end
+
+  let find_type lid {bindings;names} =
+    reword_lookup_error ~target_path:lid begin
+      transl_path names lid >>= fun path ->
+      find path bindings >>= function
+      | Type decl -> Ok (path, decl)
+      | _         -> Error (lid, `not_a_type)
+    end
+
+  let find_module lid {bindings;names} =
+    reword_lookup_error ~target_path:lid begin
+      transl_path names lid >>= fun path ->
+      find path bindings >>= function
+      | Module mty -> Ok (path, mty)
+      | _          -> Error (lid, `not_a_module)
+    end
+
+  let find_modtype lid {bindings;names} =
+    reword_lookup_error ~target_path:lid begin
+      transl_path names lid >>= fun path ->
+      find path bindings >>= function
+      | Modty mty -> Ok (path, mty)
+      | _         -> Error (lid, `not_a_module_type)
+    end
 end
 
 module type CORE_TYPING = sig
@@ -493,13 +535,17 @@ module type CORE_TYPING = sig
 
   module Env : ENV with module Mod.Core = Core
 
-  val type_term : Env.t -> Src.term -> Core.term * (string * Core.val_type) list
+  type core_error
 
-  val kind_deftype : Env.t -> Src.def_type -> Core.def_type * Core.kind
+  val pp_error : Format.formatter -> core_error -> unit
 
-  val check_valtype : Env.t -> Src.val_type -> Core.val_type
+  val type_term : Env.t -> Src.term -> (Core.term * (string * Core.val_type) list, core_error) result
 
-  val check_kind : Env.t -> Src.kind -> Core.kind
+  val kind_deftype : Env.t -> Src.def_type -> (Core.def_type * Core.kind, core_error) result
+
+  val check_valtype : Env.t -> Src.val_type -> (Core.val_type, core_error) result
+
+  val check_kind : Env.t -> Src.kind -> (Core.kind, core_error) result
 
   val valtype_match : Env.t -> Core.val_type -> Core.val_type -> bool
 
@@ -511,15 +557,23 @@ module type CORE_TYPING = sig
 end
 
 module type MOD_TYPING = sig
-  module Src : MOD_SYNTAX_RAW with type Core.Names.ident = String_names.ident
-                               and type Core.Names.longident = String_names.longident
+  module Src : MOD_SYNTAX_RAW
+    with type Core.Names.ident     = String_names.ident
+     and type Core.Names.longident = String_names.longident
+
   module Tgt : MOD_SYNTAX
 
   module Env : ENV with module Mod = Tgt
 
-  val type_modterm : Env.t -> Src.mod_term -> Tgt.mod_term * Tgt.mod_type
+  type error
 
-  val type_structure : Env.t -> Src.structure -> Tgt.structure * Tgt.signature
+  val pp_error : Format.formatter -> error -> unit
+
+  val type_modterm :
+    Env.t -> Src.mod_term -> (Tgt.mod_term * Tgt.mod_type, error) result
+
+  val type_structure :
+    Env.t -> Src.structure -> (Tgt.structure * Tgt.signature, error) result
 end
 
 module Mod_typing
@@ -539,7 +593,62 @@ struct
   module Tgt = Tgt
   module Env = CT.Env
 
-  let rec modtype_match env mty1 mty2 =
+  open Rresult
+
+  let rec check_list f = function
+    | [] -> Ok ()
+    | x :: xs ->
+       match f x with
+         | Error _ as err -> err
+         | Ok () -> check_list f xs
+
+  type match_error_detail =
+    | Signature_vs_functor
+    | Unmatched       of Tgt.sig_item
+    | Value_mismatch  of Ident.t * Tgt.Core.val_type * Tgt.Core.val_type
+    | Type_mismatch   of Ident.t * Tgt.type_decl * Tgt.type_decl
+    | Module_mismatch of Ident.t * match_error
+    | Module_eq_mismatch of Ident.t * match_error
+
+  and match_error =
+    { mty1   : Tgt.mod_type
+    ; mty2   : Tgt.mod_type
+    ; detail : match_error_detail
+    }
+
+  let rec pp_match_error pp {mty1; mty2; detail} =
+    Format.fprintf pp
+      "the module type@ @[<hv 2>@,%a@,@]@ does not match the module type@ @[<hv 2>@,%a@,@]@ because %a"
+      Tgt.pp_modtype mty1
+      Tgt.pp_modtype mty2
+      pp_match_error_detail detail
+
+  and pp_match_error_detail pp = function
+    | Signature_vs_functor ->
+       Format.fprintf pp "one is signature and one is a functor."
+    | Unmatched item ->
+       Format.fprintf pp "the item@ @[<v 2>@,%a@,@]@ is unmatched."
+         Tgt.pp_sig_item item
+    | Value_mismatch (id, vty1, vty2) ->
+       Format.fprintf pp "the entry %S has type@ @[<v 2>@,%a@,@]@ in the former, and@ @[<v 2>@,%a@,@]@ in the latter, and these are not equal."
+         (Ident.name id)
+         Tgt.Core.pp_val_type vty1
+         Tgt.Core.pp_val_type vty2
+    | Type_mismatch (id, decl1, decl2) ->
+       Format.fprintf pp "the type %a is declared as@ %a@ in the former, and @ %a@ in the latter, and these do not match."
+         Ident.pp id
+         Tgt.pp_type_decl (id, decl1)
+         Tgt.pp_type_decl (id, decl2)
+    | Module_mismatch (id, err) ->
+       Format.fprintf pp "the modules named %a do not match. Specifically, %a."
+         Ident.pp id
+         pp_match_error err
+    | Module_eq_mismatch (id, err) ->
+       Format.fprintf pp "the modules named %a are not equal. Specifically, %a/"
+         Ident.pp id
+         pp_match_error err
+
+  let rec modtype_match env mty1 mty2 : (unit, match_error) result =
     let open Tgt in
     match mty1, mty2 with
       (* Expand out module type names *)
@@ -551,31 +660,34 @@ struct
       (* Check signatures via subsumption *)
       | {modtype_data=Modtype_signature sig1},
         {modtype_data=Modtype_signature sig2} ->
-         let paired_components, sub = pair_signature_components sig1 sig2 in
-         let ext_env = Env.add_signature sig1 env in
-         List.iter (specification_match ext_env sub) paired_components
+         R.reword_error (fun detail -> {mty1;mty2;detail}) begin
+           pair_signature_components sig1 sig2 >>= fun (paired_components, sub) ->
+           let ext_env = Env.add_signature sig1 env in
+           check_list (specification_match ext_env sub) paired_components
+         end
 
       (* *)
       | {modtype_data=Modtype_functor (param1, arg1, res1)},
         {modtype_data=Modtype_functor (param2, arg2, res2)} ->
          let sub   = Subst.add param1 (Path.Pident param2) Subst.identity in
          let res1' = Tgt.subst_modtype sub res1 in
-         modtype_match env arg2 arg1;
+         modtype_match env arg2 arg1
+         >>= fun () ->
          modtype_match (Env.add_module_by_ident param2 arg2 env) res1' res2
 
       | _, _ ->
-         failwith "module type mismatch"
+         Error {mty1;mty2;detail=Signature_vs_functor}
 
   and pair_signature_components sig1 sig2 =
     let open Tgt in
     match sig2 with
       | [] ->
-         [], Subst.identity
+         Ok ([], Subst.identity)
 
-      | {sigitem_data=item2} :: rem2 ->
+      | {sigitem_data=item2} as item2' :: rem2 ->
          let rec find_matching_component = function
            | [] ->
-              failwith "unmatched signature component"
+              Error (Unmatched item2')
            | {sigitem_data=item1} :: rem1 ->
               match item1, item2 with
                 | Sig_value (id1, _),  Sig_value (id2, _)
@@ -583,31 +695,39 @@ struct
                 | Sig_module (id1, _), Sig_module (id2, _)
                 | Sig_modty (id1, _),  Sig_modty (id2, _)
                   when Ident.name id1 = Ident.name id2 ->
-                   (id1, id2, item1)
+                   Ok (id1, id2, item1)
                 | _ ->
                    find_matching_component rem1
          in
-         let id1, id2, item1 = find_matching_component sig1 in
-         let pairs, sub = pair_signature_components sig1 rem2 in
-         ((item1, item2) :: pairs, Subst.add id2 (Path.Pident id1) sub)
+         find_matching_component sig1 >>= fun (id1, id2, item1) ->
+         pair_signature_components sig1 rem2 >>= fun (pairs, sub) ->
+         Ok ((item1, item2) :: pairs, Subst.add id2 (Path.Pident id1) sub)
 
   and specification_match env sub = function
-    | Tgt.Sig_value (_, vty1), Tgt.Sig_value (_, vty2) ->
-       if not (CT.valtype_match env vty1 (Tgt.Core.subst_valtype sub vty2))
-       then failwith "value components do not match"
+    | Tgt.Sig_value (id, vty1), Tgt.Sig_value (_, vty2) ->
+       if CT.valtype_match env vty1 (Tgt.Core.subst_valtype sub vty2) then
+         Ok ()
+       else
+         Error (Value_mismatch (id, vty1, vty2))
 
     | Tgt.Sig_type (id, decl1), Tgt.Sig_type (_, decl2) ->
-       if not (typedecl_match env id decl1 (Tgt.subst_typedecl sub decl2))
-       then failwith "type components do not match"
+       if typedecl_match env id decl1 (Tgt.subst_typedecl sub decl2) then
+         Ok ()
+       else
+         Error (Type_mismatch (id, decl1, decl2))
 
-    | Tgt.Sig_module (_, mty1), Tgt.Sig_module (_, mty2) ->
-       modtype_match env mty1 (Tgt.subst_modtype sub mty2)
+    | Tgt.Sig_module (id, mty1), Tgt.Sig_module (_, mty2) ->
+       R.reword_error (fun e -> Module_mismatch (id, e)) begin
+         modtype_match env mty1 (Tgt.subst_modtype sub mty2)
+       end
 
-    | Tgt.Sig_modty (_, mty1), Tgt.Sig_modty (_, mty2) ->
+    | Tgt.Sig_modty (id, mty1), Tgt.Sig_modty (_, mty2) ->
        (* FIXME: not sure this is right? matching both ways =>
           equality up to permutation? *)
-       modtype_match env mty1 (Tgt.subst_modtype sub mty2);
-       modtype_match env (Tgt.subst_modtype sub mty2) mty1
+       R.reword_error (fun e -> Module_eq_mismatch (id, e)) begin
+         modtype_match env mty1 (Tgt.subst_modtype sub mty2) >>= fun () ->
+         modtype_match env (Tgt.subst_modtype sub mty2) mty1
+       end
 
     | _, _ ->
        assert false
@@ -668,109 +788,169 @@ struct
   
   module SeenSet = Set.Make (String)
 
+  type core_error = CT.core_error
+
+  type error_detail =
+    | Application_of_nonfunctor
+    | Application_to_non_path
+    | Core_error of CT.core_error
+    | Kind_mismatch
+    | Lookup_error of env_lookup_error
+    | Match_error of string * match_error
+    | Repeated_name of Src.Core.Names.ident
+  
+  type error = Location.t * error_detail
+
+  let pp_error pp (location, detail) =
+    match detail with
+      | Application_of_nonfunctor ->
+         Format.fprintf pp "In %a@,Error: Application of non-functor"
+           Location.pp location
+      | Application_to_non_path ->
+         Format.fprintf pp "In %a@,Error: Application of functor to non-path"
+           Location.pp location
+      | Core_error core_error ->
+         Format.fprintf pp "In the declaration at %a@,Error @[<v>%a@]"
+           Location.pp location
+           CT.pp_error core_error
+      | Kind_mismatch ->
+         Format.fprintf pp "In %a@, kind mismatch"
+           Location.pp location
+      | Lookup_error lookup_error ->
+         Format.fprintf pp "In %a@,%a"
+           Location.pp location
+           pp_lookup_error lookup_error
+      | Match_error (reason, err) ->
+         Format.fprintf pp "In %a@,In the %s, %a"
+           Location.pp location
+           reason
+           pp_match_error err
+      | Repeated_name id ->
+         Format.fprintf pp "In declaration at %a@, repeated name: %S"
+           Location.pp location
+           id
+
+  let lift_lookup_error loc r =
+    R.reword_error (fun err -> (loc, Lookup_error err)) r
+  let lift_core_error loc r =
+    R.reword_error (fun err -> (loc, Core_error err)) r
+  let lift_match_error loc reason r =
+    R.reword_error (fun err -> (loc, Match_error (reason, err))) r
+
+  let check_manifest env loc kind = function
+    | None -> Ok None
+    | Some dty ->
+       lift_core_error loc @@ CT.kind_deftype env dty
+       >>= fun (dty, kind') ->
+       if CT.kind_match env kind' kind then
+         Ok (Some dty)
+       else
+         Error (loc, Kind_mismatch)
+
   let rec check_modtype env = function
     | Src.{modtype_loc;modtype_data=Modtype_longident path} ->
-       let path, _ = Env.find_modtype path env in
+       lift_lookup_error modtype_loc @@ Env.find_modtype path env
+       >>| fun (path, _) ->
        Tgt.{ modtype_loc
            ; modtype_data = Modtype_longident path
            }
 
     | Src.{modtype_loc;modtype_data=Modtype_signature items} ->
+       check_signature env [] SeenSet.empty items >>| fun sg ->
        Tgt.{ modtype_loc
-           ; modtype_data = Modtype_signature (check_signature env [] SeenSet.empty items)
+           ; modtype_data = Modtype_signature sg
            }
 
     | Src.{modtype_loc;modtype_data=Modtype_functor (param, arg, res)} ->
-       let arg        = check_modtype env arg in
+       check_modtype env arg >>= fun arg ->
        let param, env = Env.add_module param arg env in
-       let res        = check_modtype env res in
+       check_modtype env res >>| fun res ->
        Tgt.{ modtype_loc
            ; modtype_data = Modtype_functor (param, arg, res)
            }
 
   and check_signature env rev_sig seen = function
     | [] ->
-       List.rev rev_sig
+       Ok (List.rev rev_sig)
 
     | Src.{sigitem_loc; sigitem_data=Sig_value (id, vty)} :: rem ->
-       if SeenSet.mem id seen
-       then failwith "repeated value name";
-       let seen = SeenSet.add id seen in
-       let vty = CT.check_valtype env vty in
-       let id, env = Env.add_value id vty env in
-       check_signature
-         env
-         (Tgt.{sigitem_loc; sigitem_data=Sig_value (id, vty)} :: rev_sig)
-         seen
-         rem
+       if SeenSet.mem id seen then
+         Error (sigitem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         lift_core_error sigitem_loc @@ CT.check_valtype env vty >>= fun vty ->
+         let id, env = Env.add_value id vty env in
+         check_signature
+           env
+           (Tgt.{sigitem_loc; sigitem_data=Sig_value (id, vty)} :: rev_sig)
+           seen
+           rem
 
     | Src.{sigitem_loc; sigitem_data=Sig_type (id, {Src.kind; manifest})} :: rem ->
-       if SeenSet.mem id seen
-       then failwith "repeated type name";
-       let kind = CT.check_kind env kind in
-       let manifest = 
-         match manifest with
-           | None -> None
-           | Some typ ->
-              match CT.kind_deftype env typ with
-                | typ, kind' when CT.kind_match env kind' kind ->
-                   Some typ
-                | _ ->
-                   failwith "kind mismatch in manifest type specification"
-       in
-       let seen = SeenSet.add id seen in
-       let decl = { Tgt.kind; manifest } in
-       let id, env = Env.add_type id decl env in
-       let item =
-         Tgt.{ sigitem_loc
-             ; sigitem_data = Sig_type (id, decl)
-             }
-       in
-       check_signature env (item :: rev_sig) seen rem
+       if SeenSet.mem id seen then
+         Error (sigitem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         lift_core_error sigitem_loc @@ CT.check_kind env kind >>= fun kind ->
+         check_manifest env sigitem_loc kind manifest >>= fun manifest ->
+         let decl    = Tgt.{ kind; manifest } in
+         let id, env = Env.add_type id decl env in
+         let item =
+           Tgt.{ sigitem_loc
+               ; sigitem_data = Sig_type (id, decl)
+               }
+         in
+         check_signature env (item :: rev_sig) seen rem
 
     | Src.{sigitem_loc;sigitem_data=Sig_module (id, mty)} :: rem ->
-       if SeenSet.mem id seen
-       then failwith "repeated module name";
-       let mty = check_modtype env mty in
-       let seen = SeenSet.add id seen in
-       let id, env = Env.add_module id mty env in
-       let item =
-         Tgt.{ sigitem_loc
-             ; sigitem_data = Sig_module (id, mty)
-             }
-       in
-       check_signature env (item :: rev_sig) seen rem
+       if SeenSet.mem id seen then
+         Error (sigitem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         check_modtype env mty >>= fun mty ->
+         let id, env = Env.add_module id mty env in
+         let item =
+           Tgt.{ sigitem_loc
+               ; sigitem_data = Sig_module (id, mty)
+               }
+         in
+         check_signature env (item :: rev_sig) seen rem
 
     | Src.{sigitem_loc; sigitem_data=Sig_modty (id, mty)} :: rem ->
-       let mty = check_modtype env mty in
-       let seen = SeenSet.add id seen in
-       let id, env = Env.add_modty id mty env in
-       let item =
-         Tgt.{ sigitem_loc
-             ; sigitem_data = Sig_modty (id, mty)
-             }
-       in
-       check_signature env (item :: rev_sig) seen rem
+       if SeenSet.mem id seen then
+         Error (sigitem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         check_modtype env mty >>= fun mty ->
+         let id, env = Env.add_modty id mty env in
+         let item =
+           Tgt.{ sigitem_loc
+               ; sigitem_data = Sig_modty (id, mty)
+               }
+         in
+         check_signature env (item :: rev_sig) seen rem
 
 
   
   let rec type_modterm env = function
     | Src.{modterm_loc; modterm_data=Mod_longident path} ->
-       let path, mty = Env.find_module path env in
+       lift_lookup_error modterm_loc (Env.find_module path env)
+       >>| fun (path, mty) ->
        Tgt.{modterm_loc; modterm_data=Mod_longident path},
        strengthen_modtype env path mty
 
     | Src.{modterm_loc; modterm_data=Mod_structure str} ->
-       let structure, signature = type_structure env [] [] SeenSet.empty str in
+       type_structure env [] [] SeenSet.empty str
+       >>| fun (structure, signature) ->
        Tgt.{ modterm_loc; modterm_data=Mod_structure structure},
        Tgt.{ modtype_loc  = Location.Generated
            ; modtype_data = Modtype_signature signature
            }
 
     | Src.{modterm_loc; modterm_data=Mod_functor (param, mty, body)} ->
-       let mty = check_modtype env mty in
+       check_modtype env mty >>= fun mty ->
        let param, env = Env.add_module param mty env in
-       let body, body_ty = type_modterm env body in
+       type_modterm env body >>| fun (body, body_ty) ->
        Tgt.{modterm_loc; modterm_data=Mod_functor (param, mty, body)},
        Tgt.{ modtype_loc  = Location.Generated
            ; modtype_data = Modtype_functor (param, mty, body_ty)
@@ -779,33 +959,38 @@ struct
     | Src.{modterm_loc; modterm_data=Mod_apply (funct, arg)} ->
        (match arg with
          | Src.{modterm_loc=arg_loc;modterm_data=Mod_longident path} ->
-            (match type_modterm env funct with
+            (type_modterm env funct >>= function
               | funct,
                 Tgt.{modtype_data=Modtype_functor (param, mty_param, mty_res)} ->
-                 let path, mty_arg = Env.find_module path env in
-                 modtype_match env mty_arg mty_param;
+                 lift_lookup_error arg_loc (Env.find_module path env) >>= fun (path, mty_arg) ->
+                 lift_match_error arg_loc "functor application" (modtype_match env mty_arg mty_param) >>| fun () ->
                  let arg = Tgt.{ modterm_loc = arg_loc; modterm_data = Mod_longident path } in
-                 Tgt.{ modterm_loc; modterm_data = Mod_apply (funct, arg) },
-                 Tgt.subst_modtype (Subst.add param path Subst.identity) mty_res
+                 ( Tgt.{ modterm_loc
+                       ; modterm_data = Mod_apply (funct, arg) }
+                 , Tgt.subst_modtype (Subst.add param path Subst.identity) mty_res
+                 )
               | _ ->
-                 failwith "application of a non-functor")
+                 Error (funct.Src.modterm_loc, Application_of_nonfunctor))
          | Src.{modterm_loc=arg_loc} ->
-            failwith "application of a functor to a non-path")
+            Error (arg.Src.modterm_loc, Application_to_non_path))
 
     | Src.{modterm_loc; modterm_data=Mod_constraint (modl, mty)} ->
-       let mty = check_modtype env mty in
-       let modl, mty' = type_modterm env modl in
-       modtype_match env mty' mty;
-       Tgt.{ modterm_loc; modterm_data = Mod_constraint (modl, mty) },
-       mty
+       check_modtype env mty >>= fun mty ->
+       type_modterm env modl >>= fun (modl, mty') ->
+       lift_match_error modterm_loc "module type constraint" (modtype_match env mty' mty) >>| fun () ->
+       ( Tgt.{ modterm_loc; modterm_data = Mod_constraint (modl, mty) }
+       , mty
+       )
 
   and type_structure env rev_sig rev_str seen = function
     | [] ->
-       List.rev rev_str,
-       List.rev rev_sig
+       Ok ( List.rev rev_str
+          , List.rev rev_sig
+          )
 
     | Src.{stritem_loc; stritem_data=Str_value term} :: items ->
-       let term, val_items = CT.type_term env term in
+       lift_core_error stritem_loc (CT.type_term env term)
+       >>= fun (term, val_items) ->
        (* FIXME: also do 'seen' *)
        let rec collect env rev_sigitems = function
          | [] -> env, rev_sigitems
@@ -831,45 +1016,49 @@ struct
          items
 
     | Src.{stritem_loc; stritem_data=Str_module (id, modl)} :: items ->
-       if SeenSet.mem id seen
-       then failwith "repeated module name";
-       let seen = SeenSet.add id seen in
-       let modl, modty = type_modterm env modl in
-       let id, env = Env.add_module id modty env in
-       let sigitem =
-         Tgt.{ sigitem_loc  = Location.Generated
-             ; sigitem_data = Sig_module (id, modty)
-             }
-       and stritem =
-         Tgt.{ stritem_loc
-             ; stritem_data = Str_module (id, modl)
-             }
-       in
-       type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
+       if SeenSet.mem id seen then
+         Error (stritem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         type_modterm env modl >>= fun (modl, modty) ->
+         let id, env = Env.add_module id modty env in
+         let sigitem =
+           Tgt.{ sigitem_loc  = Location.Generated
+               ; sigitem_data = Sig_module (id, modty)
+               }
+         and stritem =
+           Tgt.{ stritem_loc
+               ; stritem_data = Str_module (id, modl)
+               }
+         in
+         type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
 
     | Src.{stritem_loc; stritem_data=Str_type (id, kind, typ)} :: items ->
-       if SeenSet.mem id seen
-       then failwith "repeated type name";
-       let seen = SeenSet.add id seen in
-       let kind = CT.check_kind env kind in
-       let typ, kind' = CT.kind_deftype env typ in
-       if not (CT.kind_match env kind' kind)
-       then failwith "kind mismatch in type definition";
-       let tydecl = {Tgt.kind = kind; manifest = Some typ} in
-       let id, env = Env.add_type id tydecl env in
-       let sigitem =
-         Tgt.{ sigitem_loc = Location.Generated
-             ; sigitem_data = Sig_type (id, tydecl)
-             }
-       and stritem =
-         Tgt.{ stritem_loc
-             ; stritem_data = Str_type (id, kind, typ)
-             }
-       in
-       type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
+       if SeenSet.mem id seen then
+         Error (stritem_loc, Repeated_name id)
+       else
+         let seen = SeenSet.add id seen in
+         lift_core_error stritem_loc (CT.check_kind env kind) >>= fun kind ->
+         lift_core_error stritem_loc (CT.kind_deftype env typ)
+         >>= fun (typ, kind') ->
+         if not (CT.kind_match env kind' kind) then
+           Error (stritem_loc, Kind_mismatch)
+         else
+           let tydecl = {Tgt.kind = kind; manifest = Some typ} in
+           let id, env = Env.add_type id tydecl env in
+           let sigitem =
+             Tgt.{ sigitem_loc = Location.Generated
+                 ; sigitem_data = Sig_type (id, tydecl)
+                 }
+           and stritem =
+             Tgt.{ stritem_loc
+                 ; stritem_data = Str_type (id, kind, typ)
+                 }
+           in
+           type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
 
     | Src.{stritem_loc; stritem_data=Str_modty (id, mty)} :: items ->
-       let mty = check_modtype env mty in
+       check_modtype env mty >>= fun mty ->
        let id, env = Env.add_modty id mty env in
        let sigitem =
          Tgt.{ sigitem_loc  = Location.Generated

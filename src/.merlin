@@ -1,4 +1,5 @@
 PKG ocamlgraph
 PKG containers.data
+PKG rresult
 S .
 B ../_build/src
