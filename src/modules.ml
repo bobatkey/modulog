@@ -31,6 +31,7 @@ module type CORE_SYNTAX_RAW = sig
   type def_type
   type kind
 
+  val pp_term : Format.formatter -> term -> unit
   val pp_val_type : Format.formatter -> val_type -> unit
   val pp_def_type : Format.formatter -> def_type -> unit
   val pp_kind : (Format.formatter -> kind -> unit) option
@@ -99,6 +100,9 @@ module type MOD_SYNTAX_RAW = sig
     | Str_type   of Core.Names.ident * Core.kind * Core.def_type
     | Str_module of Core.Names.ident * mod_term
     | Str_modty  of Core.Names.ident * mod_type
+
+  val pp_modterm : Format.formatter -> mod_term -> unit
+  val pp_structure : Format.formatter -> structure -> unit
 end
 
 module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW) : MOD_SYNTAX_RAW with module Core = Core = struct
@@ -217,6 +221,49 @@ module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW) : MOD_SYNTAX_RAW with module Core
     | Str_type   of Core.Names.ident * Core.kind * Core.def_type
     | Str_module of Core.Names.ident * mod_term
     | Str_modty  of Core.Names.ident * mod_type
+
+  let rec pp_modterm pp = function
+    | {modterm_data=Mod_longident lid} ->
+       Core.Names.pp_longident pp lid
+    | {modterm_data=Mod_structure items} ->
+       Format.fprintf pp "@[<v 2>struct@ %a@]@ end"
+         pp_structure items
+    | {modterm_data = Mod_functor (id, mty, modl)} ->
+       Format.fprintf pp "functor(%a : %a) ->@ %a"
+         Core.Names.pp_ident id
+         pp_modtype mty
+         pp_modterm modl
+    | {modterm_data = Mod_apply (modl1, modl2)} ->
+       Format.fprintf pp "APPLY"
+    | {modterm_data = Mod_constraint (modl, mty)} ->
+       Format.fprintf pp "(%a :@ %a)"
+         pp_modterm modl
+         pp_modtype mty
+
+  and pp_structure pp = function
+    | [] -> ()
+    | [item] ->
+       pp_str_item pp item
+    | item :: items ->
+       pp_str_item pp item;
+       Format.pp_print_space pp ();
+       pp_structure pp items
+
+  and pp_str_item pp = function
+    | {stritem_data = Str_value term} ->
+       Core.pp_term pp term
+    | {stritem_data = Str_type (id, kind, def_type)} ->
+       Format.fprintf pp "type %a = %a"
+         Core.Names.pp_ident id
+         Core.pp_def_type def_type
+    | {stritem_data = Str_module (id, modl)} ->
+       Format.fprintf pp "@[<hv 2>module %a =@ %a@]"
+         Core.Names.pp_ident id
+         pp_modterm modl
+    | {stritem_data = Str_modty (id, mty)} ->
+       Format.fprintf pp "@[<hv 2>module type %a =@ %a@]"
+         Core.Names.pp_ident id
+         pp_modtype mty
 end
 
 module Ident = Modules_ident
@@ -1076,11 +1123,10 @@ struct
   
 end
 
-(*
 module type CORE_NORM = sig
   module Core : CORE_SYNTAX
 
-  val subst_term : Core.term -> Subst.t -> Core.term
+  val subst_term : Subst.t -> Core.term -> Core.term
 end
 
 module Mod_normalise
@@ -1096,25 +1142,48 @@ struct
   open Mod
 
   let rec subst_modterm sub = function
-    | Mod_longident lid ->
-       Mod_longident (Subst.path sub lid)
-    | Mod_structure str ->
-       Mod_structure (List.map (subst_def sub) str)
-    | Mod_functor (id, mty, modl) ->
-       Mod_functor (id, subst_modtype sub mty, subst_modterm sub modl)
-    | Mod_apply (modl1, modl2) ->
-       Mod_apply (subst_modterm sub modl1, subst_modterm sub modl2)
-    | Mod_constraint (modl, mty) ->
-       Mod_constraint (subst_modterm sub modl, subst_modtype sub mty)
+    | {modterm_loc; modterm_data=Mod_longident lid} ->
+       { modterm_loc
+       ; modterm_data = Mod_longident (Subst.path sub lid)
+       }
+    | {modterm_loc; modterm_data=Mod_structure str} ->
+       { modterm_loc
+       ; modterm_data = Mod_structure (List.map (subst_def sub) str)
+       }
+    | {modterm_loc; modterm_data=Mod_functor (id, mty, modl)} ->
+       { modterm_loc
+       ; modterm_data =
+           Mod_functor (id, subst_modtype sub mty, subst_modterm sub modl)
+       }
+    | {modterm_loc; modterm_data=Mod_apply (modl1, modl2)} ->
+       { modterm_loc
+       ; modterm_data =
+           Mod_apply (subst_modterm sub modl1, subst_modterm sub modl2)
+       }
+    | {modterm_loc; modterm_data=Mod_constraint (modl, mty)} ->
+       { modterm_loc
+       ; modterm_data =
+           Mod_constraint (subst_modterm sub modl, subst_modtype sub mty)
+       }
 
   and subst_def sub = function
-    | Str_value tm -> Str_value (CN.subst_term tm sub)
-    | Str_type (id, kind, dty) ->
-       Str_type (id, Core.subst_kind sub kind, Core.subst_deftype sub dty)
-    | Str_module (id, modl) ->
-       Str_module (id, subst_modterm sub modl)
-    | Str_modty (id, mty) ->
-       Str_modty (id, subst_modtype sub mty)
+    | {stritem_loc; stritem_data=Str_value tm} ->
+       { stritem_loc
+       ; stritem_data = Str_value (CN.subst_term sub tm)
+       }
+    | {stritem_loc; stritem_data = Str_type (id, kind, dty)} ->
+       { stritem_loc
+       ; stritem_data =
+           Str_type (id, Core.subst_kind sub kind, Core.subst_deftype sub dty)
+       }
+    | {stritem_loc; stritem_data=Str_module (id, modl)} ->
+       { stritem_loc
+       ; stritem_data = Str_module (id, subst_modterm sub modl)
+       }
+    | {stritem_loc; stritem_data=Str_modty (id, mty)} ->
+       { stritem_loc
+       ; stritem_data = Str_modty (id, subst_modtype sub mty)
+       }
 
   module Env : sig
     type t
@@ -1126,10 +1195,11 @@ struct
 
     let empty = Ident.Table.empty
 
-    let add id mtm env = Ident.Table.add id mtm env
+    let add id mtm env =
+      Ident.Table.add id mtm env
 
     let add_item item env =
-      match item with
+      match item.stritem_data with
         | Str_value _ | Str_type _ | Str_modty _ -> env
         | Str_module (id, modl) -> add id modl env
 
@@ -1141,7 +1211,7 @@ struct
            Ident.Table.find id env
         | Path.Pdot (root, field) ->
            match find root env with
-             | Some (Mod_structure str) ->
+             | Some {modterm_data=Mod_structure str} ->
                 Some (find_field root field Subst.identity str)
              | None ->
                 None
@@ -1151,90 +1221,63 @@ struct
     and find_field p field sub = function
       | [] ->
          failwith "no such field in structure"
-      | Str_value _ :: rem ->
+      | {stritem_data=Str_value _} :: rem ->
          find_field p field sub rem
-      | Str_type (id, _, _) :: rem
-      | Str_modty (id, _) :: rem ->
+      | {stritem_data=Str_type (id, _, _)} :: rem
+      | {stritem_data=Str_modty (id, _)} :: rem ->
          if Ident.name id = field
          then failwith "expecting to find a module"
          else find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
-      | Str_module (id, modl) :: rem ->
+      | {stritem_data=Str_module (id, modl)} :: rem ->
          if Ident.name id = field
          then subst_modterm sub modl
          else find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
   end
 
   let rec norm_modterm env = function
-    | Mod_longident lid ->
+    | {modterm_loc; modterm_data=Mod_longident lid} as modl ->
        (match Env.find lid env with
          | None ->
             (* If not found, must be abstract *)
-            Mod_longident lid
+            modl
          | Some modl ->
             modl)
-    | Mod_structure items ->
+    | {modterm_loc; modterm_data=Mod_structure items} ->
        let _, defs = List.fold_left norm_def (env,[]) items in
-       Mod_structure (List.rev defs)
-    | Mod_functor (id, mty, modl) ->
-       Mod_functor (id, mty, norm_modterm env modl)
-    | Mod_apply (modl, (Mod_longident lid as arg)) ->
-       (match norm_modterm env modl with
-         | Mod_longident _ as modl ->
-            Mod_apply (modl, arg)
-         | Mod_functor (id, _, modl) ->
+       { modterm_loc
+       ; modterm_data = Mod_structure (List.rev defs)
+       }
+    | {modterm_loc; modterm_data=Mod_functor (id, mty, modl)} ->
+       { modterm_loc
+       ; modterm_data =
+           Mod_functor (id, mty, norm_modterm env modl)
+       }
+    | {modterm_loc; modterm_data=Mod_apply (modl, arg)} ->
+       (match norm_modterm env modl, arg with
+         | {modterm_data=Mod_longident _} as modl, arg ->
+            {modterm_loc; modterm_data=Mod_apply (modl, arg)}
+         | {modterm_data=Mod_functor (id, _, modl)},
+           {modterm_data=Mod_longident lid} ->
             norm_modterm env (subst_modterm Subst.(add id lid identity) modl)
-         | _ ->
+         | modl, arg ->
+            Format.fprintf
+              Format.err_formatter
+              "Failed application: %a and %a@;"
+              Mod.pp_modterm modl
+              Mod.pp_modterm arg;
             failwith "internal error: type error in module normalisation")
-    | Mod_apply (_, _) ->
-       failwith "Application to non path"
-    | Mod_constraint (modl, _) ->
+    | {modterm_data=Mod_constraint (modl, _)} ->
        modl
 
   and norm_def (env, defs) = function
-    | (Str_value _ | Str_type _ | Str_modty _) as def ->
+    | {stritem_data=(Str_value _ | Str_type _ | Str_modty _)} as def ->
        (env, def :: defs)
-    | Str_module (id, modl) ->
+    | {stritem_loc; stritem_data=Str_module (id, modl)} ->
        let modl = norm_modterm env modl in
        let env  = Env.add id modl env in
-       (env, Str_module (id, modl) :: defs)
+       (env, {stritem_loc; stritem_data=Str_module (id, modl)} :: defs)
+
+  let norm_structure env items =
+    let _, defs = List.fold_left norm_def (env,[]) items in
+    List.rev defs
 end
-*)
-
-(*
-module Test_syn = struct
-  type term = Path.t
-  type val_type = Path.t
-  type def_type = Path.t
-  type kind = unit
-  let subst_valtype = Subst.path
-  let subst_deftype = Subst.path
-  let subst_kind () _ = ()
-end
-
-module Test_syn_norm = struct
-  module Core = Test_syn
-  let subst_term = Subst.path
-end
-
-module Test_mod = Mod_Syntax (Test_syn)
-module Test_norm = Mod_normalise (Test_mod) (Test_syn_norm)
-
-let test =
-  let open Test_mod in
-  let id = Ident.create in
-  let a = id"a" in
-  Structure begin
-    let f = id"F" in
-    let y = id"Y" in
-    let z = id"z" in
-    [ Str_module (f,
-                  let t = id"t" in
-                  let x = id"X" in
-                  Functor (x,
-                           Signature [Sig_type (t, {kind=();manifest=None})],
-                           Structure [Str_type (id"u", (), Path.Pdot (Path.Pident x, "t"))]))
-    ; Str_module (y, Structure [Str_type (id"t", (), Path.Pident a)])
-    ; Str_module (z, Apply (Longident (Path.Pident f), Longident (Path.Pident y)))
-    ]
-  end
-*)

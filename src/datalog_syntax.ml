@@ -89,6 +89,17 @@ module Make_syntax (Names : Modules.NAMES) = struct
   let pp_val_type pp {predty_data=tys} =
     Format.fprintf pp "@[<hv 1>%a@]"
       pp_domaintypes tys
+
+  let pp_decl pp {decl_name; decl_type} =
+    Format.fprintf pp "%a : %a"
+      Names.pp_ident decl_name
+      pp_val_type decl_type
+
+  let pp_term pp = function
+    | [] -> ()
+    | decl :: decls ->
+       Format.fprintf pp "def %a" pp_decl decl;
+       List.iter (Format.fprintf pp "@,and %a" pp_decl) decls
 end
 
 module Syntax = Make_syntax (Modules.String_names)

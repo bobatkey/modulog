@@ -7,3 +7,4 @@ Datalog_syntax
 Datalog_parser
 Datalog_lexer
 Datalog_checker
+Datalog_normalisation

@@ -8,10 +8,14 @@ let () =
                               };
   let structure = Datalog_parser.program Datalog_lexer.token lexbuf in
   match Datalog_checker.(Typing.type_structure Env.empty structure) with
-    | Ok (_, sg) ->
+    | Ok (str, sg) ->
        Format.printf
          "@[<v>%a@]@\n"
-         Datalog_checker.Mod.pp_signature sg
+         Datalog_checker.Mod.pp_signature sg;
+       let str = Datalog_normalisation.(norm_structure Env.empty str) in
+       Format.printf
+         "@[<v>%a@]@\n"
+         Datalog_checker.Mod.pp_structure str
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
