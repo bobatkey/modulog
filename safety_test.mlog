@@ -1,0 +1,5 @@
+(* a non safe predicate definition *)
+
+def
+  nonsafe : int
+  nonsafe (_)

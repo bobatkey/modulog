@@ -1,0 +1,27 @@
+module type Edges = sig
+  type vertex
+
+  edge : vertex * vertex
+end
+
+module MyEdges = struct
+  type vertex = int
+
+  def
+    edge : vertex * vertex
+    edge(1, 2)
+    edge(2, 3)
+end
+
+module Path = functor (E : Edges) -> struct
+
+  type vertex = E.vertex
+
+  def
+    path : E.vertex * E.vertex
+    path(X,Y) :- E.edge(X,Y)
+    path(X,Z) :- path(X,Y), E.edge(Y,Z)
+
+end
+
+module P = Path (MyEdges)

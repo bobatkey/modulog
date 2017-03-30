@@ -1,3 +1,5 @@
 *~
 *.o
 *.s
+/_build
+/driver.native

@@ -1,9 +1,6 @@
 %{
 open Datalog_syntax
 
-let mk_loc loc_start loc_end =
-  { Location.loc_start; loc_end }
-
 %}
 
 %token COMMA
@@ -41,21 +38,21 @@ longident:
 
 expr:
 | v=IDENT
-    { { expr_loc  = mk_loc $startpos $endpos
+    { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_var v } }
 | i=INT_LITERAL
-    { { expr_loc  = mk_loc $startpos $endpos
+    { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_literal i } }
 | UNDERSCORE
-    { { expr_loc  = mk_loc $startpos $endpos
+    { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_underscore } }
 | es=in_parens(separated_list(COMMA,expr))
-    { { expr_loc  = mk_loc $startpos $endpos
+    { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_tuple es } }
 
 atom:
 | pred=longident; args=in_parens(separated_list(COMMA,expr))
-    { { atom_loc  = mk_loc $startpos $endpos
+    { { atom_loc  = Location.mk $startpos $endpos
       ; atom_data = Atom_predicate { pred; args } } }
 
 decl_head:
@@ -64,19 +61,19 @@ decl_head:
 
 rule:
 | head=decl_head; COLON_DASH; rhs=separated_nonempty_list(COMMA, atom)
-    { { rule_loc  = mk_loc $startpos $endpos
+    { { rule_loc  = Location.mk $startpos $endpos
       ; rule_pred = fst head
       ; rule_args = snd head
       ; rule_rhs  = rhs } }
 | head=decl_head
-    { { rule_loc  = mk_loc $startpos $endpos
+    { { rule_loc  = Location.mk $startpos $endpos
       ; rule_pred = fst head
       ; rule_args = snd head
       ; rule_rhs  = [] } }
 
 pred_decl:
 | name=IDENT; COLON; types=predicate_type; rules=list(rule)
-    { { decl_loc   = mk_loc $startpos $endpos
+    { { decl_loc   = Location.mk $startpos $endpos
       ; decl_name  = name
       ; decl_type  = types
       ; decl_rules = rules } }
@@ -92,87 +89,87 @@ domain_type:
     { match dtys with
         | []    -> assert false
         | [dty] -> dty
-        | dtys  -> { domtype_loc  = mk_loc $startpos $endpos
+        | dtys  -> { domtype_loc  = Location.mk $startpos $endpos
                    ; domtype_data = Type_tuple dtys } }
 
 domain_type0:
 | INT
-    { { domtype_loc  = mk_loc $startpos $endpos
+    { { domtype_loc  = Location.mk $startpos $endpos
       ; domtype_data = Type_int } }
 | lid=longident
-    { { domtype_loc  = mk_loc $startpos $endpos
+    { { domtype_loc  = Location.mk $startpos $endpos
       ; domtype_data = Type_typename lid } }
 | LPAREN; dty=domain_type; RPAREN
     { dty }
 
 predicate_type:
 | dtys=separated_nonempty_list(STAR, domain_type0)
-    { { predty_loc  = mk_loc $startpos $endpos
+    { { predty_loc  = Location.mk $startpos $endpos
       ; predty_data = dtys } }
 
 /* the module language */
 
 mod_type:
 | lid=longident
-    { { modtype_loc  = mk_loc $startpos $endpos
+    { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_longident lid } }
 | SIG; s=list(sig_item); END
-    { { modtype_loc  = mk_loc $startpos $endpos
+    { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_signature s } }
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
-    { { modtype_loc  = mk_loc $startpos $endpos
+    { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_functor (id, mty1, mty2) } }
 
 sig_item:
 | id=IDENT; COLON; ty=predicate_type
-    { { sigitem_loc  = mk_loc $startpos $endpos
+    { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_value (id, ty) } }
 | TYPE; id=IDENT
-    { { sigitem_loc  = mk_loc $startpos $endpos
-      ; sigitem_data = Sig_type (id, None) } }
+    { { sigitem_loc  = Location.mk $startpos $endpos
+      ; sigitem_data = Sig_type (id, { kind = (); manifest = None }) } }
 | TYPE; id=IDENT; EQUALS; ty=domain_type
-    { { sigitem_loc  = mk_loc $startpos $endpos
-      ; sigitem_data = Sig_type (id, Some ty) } }
+    { { sigitem_loc  = Location.mk $startpos $endpos
+      ; sigitem_data = Sig_type (id, { kind = (); manifest = Some ty }) } }
 | MODULE; id=IDENT; COLON; mty=mod_type
-    { { sigitem_loc  = mk_loc $startpos $endpos
+    { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_module (id, mty) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-    { { sigitem_loc  = mk_loc $startpos $endpos
+    { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_modty (id, mty) } }
 
 mod_term:
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
-    { { modterm_loc  = mk_loc $startpos $endpos
+    { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_functor (id, mty, modl) } }
 | m=mod_term2
     { m }
 
 mod_term2:
 | mod1=mod_term2; LPAREN; mod2=mod_term; RPAREN
-    { { modterm_loc  = mk_loc $startpos $endpos
+    { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_apply (mod1, mod2) } }
 | lid=longident
-    { { modterm_loc  = mk_loc $startpos $endpos
+    { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_longident lid } }
 | STRUCT; items=list(str_item); END
-    { { modterm_loc  = mk_loc $startpos $endpos
+    { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_structure items } }
 | LPAREN; modl=mod_term; COLON; mty=mod_type; RPAREN
-    { { modterm_loc  = mk_loc $startpos $endpos
+    { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_constraint (modl, mty) } }
 | LPAREN; m=mod_term; RPAREN
     { m }
 
 str_item:
 | d=decl
-    { { stritem_loc  = mk_loc $startpos $endpos
+    { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_value d } }
 | TYPE; id=IDENT; EQUALS; ty=domain_type
-    { { stritem_loc  = mk_loc $startpos $endpos
-      ; stritem_data = Str_type (id, ty) } }
+    { { stritem_loc  = Location.mk $startpos $endpos
+      ; stritem_data = Str_type (id, (), ty) } }
 | MODULE; id=IDENT; EQUALS; modl=mod_term
-    { { stritem_loc  = mk_loc $startpos $endpos
+    { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_module (id, modl) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-    { { stritem_loc  = mk_loc $startpos $endpos
+    { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_modty (id, mty) } }

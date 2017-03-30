@@ -1,112 +1,99 @@
-type ident =
-  string
+module Make_syntax (Names : Modules.NAMES) = struct
 
-type longident =
-  | Lid_ident of ident
-  | Lid_dot   of longident * string
+  module Names = Names
 
+  open Names
+  
+  type expr =
+    { expr_loc : Location.t
+    ; expr_data : expr_data
+    }
 
-type expr =
-  { expr_loc : Location.t
-  ; expr_data : expr_data
-  }
+  and expr_data =
+    | Expr_var of string
+    | Expr_literal of int32
+    | Expr_underscore
+    | Expr_tuple of expr list
 
-and expr_data =
-  | Expr_var of string
-  | Expr_literal of int32
-  | Expr_underscore
-  | Expr_tuple of expr list
+  type domaintype =
+    { domtype_loc  : Location.t
+    ; domtype_data : domaintype_data
+    }
 
-type domaintype =
-  { domtype_loc  : Location.t
-  ; domtype_data : domaintype_data
-  }
+  and domaintype_data =
+    | Type_int
+    | Type_typename of longident
+    | Type_tuple    of domaintype list
 
-and domaintype_data =
-  | Type_int
-  | Type_typename of longident
-  | Type_tuple    of domaintype list
+  let rec pp_domaintype pp = function
+    | { domtype_data = Type_int } ->
+       Format.pp_print_string pp "int"
+    | { domtype_data = Type_typename lid } ->
+       Names.pp_longident pp lid
+    | { domtype_data = Type_tuple tys } ->
+       Format.fprintf pp "(@[<hov>%a@])" pp_domaintypes tys
 
-type predicate_type =
-  { predty_loc  : Location.t
-  ; predty_data : domaintype list
-  }
+  and pp_domaintypes pp tys =
+    let rec lp = function
+      | [] ->
+         ()
+      | [ty] ->
+         pp_domaintype pp ty
+      | ty::tys ->
+         Format.fprintf pp "%a *@ " pp_domaintype ty;
+         lp tys
+    in
+    lp tys
 
-type atom =
-  { atom_loc  : Location.t
-  ; atom_data : atom_data
-  }
+  type predicate_type =
+    { predty_loc  : Location.t
+    ; predty_data : domaintype list
+    }
 
-and atom_data =
-  | Atom_predicate of { pred : longident
-                      ; args : expr list
-                      }
+  type atom =
+    { atom_loc  : Location.t
+    ; atom_data : atom_data
+    }
+
+  and atom_data =
+    | Atom_predicate of { pred : longident
+                        ; args : expr list
+                        }
   (* FIXME: equality, inequality, negation *)
 
-type rule =
-  { rule_loc  : Location.t
-  ; rule_pred : ident
-  ; rule_args : expr list
-  ; rule_rhs  : atom list
-  }
+  type rule =
+    { rule_loc  : Location.t
+    ; rule_pred : ident
+    ; rule_args : expr list
+    ; rule_rhs  : atom list
+    }
 
-type declaration =
-  { decl_loc   : Location.t
-  ; decl_name  : ident
-  ; decl_type  : predicate_type
-  ; decl_rules : rule list
-  }
+  type declaration =
+    { decl_loc   : Location.t
+    ; decl_name  : ident
+    ; decl_type  : predicate_type
+    ; decl_rules : rule list
+    }
 
-type term = declaration list
+  type kind = unit
+  type val_type = predicate_type
+  type def_type = domaintype
+  type term = declaration list
 
-(***********************************************************************)
-(* Module language *)
+  let pp_kind =
+    None
 
-type modtype =
-  { modtype_loc  : Location.t
-  ; modtype_data : modtype_data
-  }
+  let pp_def_type =
+    pp_domaintype
 
-and modtype_data =
-  | Modtype_longident of longident
-  | Modtype_signature of signature
-  | Modtype_functor   of ident * modtype * modtype
+  let pp_val_type pp {predty_data=tys} =
+    Format.fprintf pp "@[<hv 1>%a@]"
+      pp_domaintypes tys
+end
 
-and signature = sig_item list
+module Syntax = Make_syntax (Modules.String_names)
+module Mod    = Modules.Mod_Syntax_Raw (Syntax)
 
-and sig_item =
-  { sigitem_loc  : Location.t
-  ; sigitem_data : sigitem_data
-  }
-
-and sigitem_data =
-  | Sig_value  of ident * predicate_type
-  | Sig_type   of ident * domaintype option
-  | Sig_module of ident * modtype
-  | Sig_modty  of ident * modtype
-
-
-type modterm =
-  { modterm_loc  : Location.t
-  ; modterm_data : modterm_data
-  }
-
-and modterm_data =
-  | Mod_longident  of longident
-  | Mod_functor    of ident * modtype * modterm
-  | Mod_apply      of modterm * modterm
-  | Mod_structure  of structure
-  | Mod_constraint of modterm * modtype
-
-and structure = str_item list
-
-and str_item =
-  { stritem_loc  : Location.t
-  ; stritem_data : stritem_data
-  }
-
-and stritem_data =
-  | Str_value  of declaration list
-  | Str_type   of ident * domaintype
-  | Str_module of ident * modterm
-  | Str_modty  of ident * modtype
+include Modules.String_names
+include Syntax
+include Mod

@@ -1,0 +1,11 @@
+type vertex = int
+
+def
+    edge : vertex * vertex
+    edge(1, 2)
+    edge(2, 3)
+
+def
+    path : vertex * vertex
+    path(X,Y) :- edge(X,Y)
+    path(X,Z) :- path(X,Y), edge(Y,Z)

@@ -1,5 +1,9 @@
+Modules_ident
+Modules_path
+Modules_subst
 Modules
 Location
 Datalog_syntax
 Datalog_parser
 Datalog_lexer
+Datalog_checker
