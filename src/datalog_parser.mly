@@ -99,6 +99,9 @@ domain_type0:
 | lid=longident
     { { domtype_loc  = Location.mk $startpos $endpos
       ; domtype_data = Type_typename lid } }
+| LPAREN; RPAREN
+    { { domtype_loc  = Location.mk $startpos $endpos
+      ; domtype_data = Type_tuple [] } }
 | LPAREN; dty=domain_type; RPAREN
     { dty }
 

@@ -23,4 +23,5 @@ module Norm = struct
 
 end
 
-include Modules.Mod_normalise (Datalog_checker.Mod) (Norm)
+include Modules_normalisation.Mod_normalise (Datalog_checker.Mod) (Norm)
+
