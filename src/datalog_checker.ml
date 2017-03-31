@@ -161,16 +161,19 @@ module Core_typing = struct
               Ok (Core.{ expr_loc; expr_data = Expr_var vnm },
                   local_env)
             else
-              Error (expr_loc, Type_mismatch { expected = expected_ty
-                                             ; actual   = ty
-                                             }))
+              Error (expr_loc,
+                     Type_mismatch { expected = expected_ty ; actual = ty }))
+
     | Src.{ expr_loc; expr_data = Expr_literal i } ->
        if deftype_equiv env () expected_ty ty_int then
          Ok (Core.{ expr_loc; expr_data = Expr_literal i }, local_env)
        else
-         Error (expr_loc, Type_mismatch { expected = expected_ty; actual = ty_int })
+         Error (expr_loc,
+                Type_mismatch { expected = expected_ty; actual = ty_int })
+
     | Src.{ expr_loc; expr_data = Expr_underscore } ->
        Ok (Core.{ expr_loc; expr_data = Expr_underscore }, local_env)
+
     | Src.{ expr_loc; expr_data = Expr_tuple exprs } ->
        (match domtype_is_tuple env expected_ty with
          | Some tys ->
@@ -242,11 +245,12 @@ module Core_typing = struct
   let type_rule env expected_name ident tys
       Src.{rule_loc;rule_pred;rule_args;rule_rhs} =
     if rule_pred <> expected_name then
-      Error (rule_loc, Name_mismatch { expected = expected_name; actual = rule_pred })
+      Error (rule_loc,
+             Name_mismatch { expected = expected_name; actual = rule_pred })
     else
       let local_env = LocalEnv.empty in
-      type_atoms env local_env [] rule_rhs            >>= fun (rule_rhs, local_env) ->
-      check_safe local_env rule_args                  >>= fun () ->
+      type_atoms env local_env [] rule_rhs >>= fun (rule_rhs, local_env) ->
+      check_safe local_env rule_args >>= fun () ->
       type_exprs env local_env rule_loc tys rule_args >>| fun (rule_args, _) ->
       Core.{ rule_loc
            ; rule_pred = ident
@@ -260,7 +264,8 @@ module Core_typing = struct
        type_rules env decl_name ident tys (rule :: rev_rules) rules
 
   let type_decl env (id, ident, predty) Src.{decl_name; decl_loc; decl_rules} =
-    type_rules env decl_name ident predty.Core.predty_data [] decl_rules >>| fun decl_rules ->
+    type_rules env decl_name ident predty.Core.predty_data [] decl_rules
+    >>| fun decl_rules ->
     Core.{ decl_loc
          ; decl_name  = ident
          ; decl_type  = predty

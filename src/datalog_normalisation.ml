@@ -5,8 +5,9 @@ module Norm = struct
 
   let subst_atom sub = function
     | {atom_data = Atom_predicate { pred; args }} as atom ->
-       { atom with atom_data = Atom_predicate { pred = Modules_subst.path sub pred
-                                              ; args }
+       { atom with
+           atom_data = Atom_predicate { pred = Modules_subst.path sub pred
+                                      ; args }
        }
 
   let subst_rule sub rule =
