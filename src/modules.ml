@@ -126,7 +126,9 @@ module type MOD_SYNTAX_RAW = sig
   val pp_structure : Format.formatter -> structure -> unit
 end
 
-module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW) : MOD_SYNTAX_RAW with module Core = Core = struct
+module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW)
+  : MOD_SYNTAX_RAW with module Core = Core =
+struct
   module Core = Core
 
   type type_decl =
@@ -312,7 +314,8 @@ module Mod_Syntax (Core_syntax : CORE_SYNTAX)
 struct
   module Core = Core_syntax
 
-  include (Mod_Syntax_Raw (Core_syntax) : MOD_SYNTAX_RAW with module Core := Core_syntax)
+  include (Mod_Syntax_Raw (Core_syntax)
+           : MOD_SYNTAX_RAW with module Core := Core_syntax)
 
   let subst_typedecl sub decl =
     { kind =
@@ -349,17 +352,18 @@ end
 type env_lookup_error =
   { path    : String_names.longident
   ; subpath : String_names.longident
-  ; reason  : [`not_found | `not_a_structure | `not_a_module | `not_a_value | `not_a_type | `not_a_module_type]
+  ; reason  : [`not_found | `not_a_structure | `not_a_module
+              | `not_a_value | `not_a_type | `not_a_module_type]
   }
 
 let pp_lookup_error pp { path; subpath; reason } =
   let reason =
     match reason with
-      | `not_found -> "not found"
-      | `not_a_structure -> "not a structure"
-      | `not_a_module    -> "not a module"
-      | `not_a_value     -> "not a value" (* 'value' doesn't always make sense *)
-      | `not_a_type      -> "not a type"
+      | `not_found         -> "not found"
+      | `not_a_structure   -> "not a structure"
+      | `not_a_module      -> "not a module"
+      | `not_a_value       -> "not a value" (* 'value' doesn't always make sense *)
+      | `not_a_type        -> "not a type"
       | `not_a_module_type -> "not a module type"
   in
   if path = subpath then
@@ -540,7 +544,9 @@ struct
   open Rresult
 
   let reword_lookup_error ~target_path result =
-    R.reword_error (fun (subpath, reason) -> { path = target_path; subpath; reason }) result
+    R.reword_error
+      (fun (subpath, reason) -> { path = target_path; subpath; reason })
+      result
 
   let find_value lid {bindings;names} =
     reword_lookup_error ~target_path:lid begin
@@ -1009,9 +1015,14 @@ struct
             (type_modterm env funct >>= function
               | funct,
                 Tgt.{modtype_data=Modtype_functor (param, mty_param, mty_res)} ->
-                 lift_lookup_error arg_loc (Env.find_module path env) >>= fun (path, mty_arg) ->
-                 lift_match_error arg_loc "functor application" (modtype_match env mty_arg mty_param) >>| fun () ->
-                 let arg = Tgt.{ modterm_loc = arg_loc; modterm_data = Mod_longident path } in
+                 lift_lookup_error arg_loc (Env.find_module path env)
+                 >>= fun (path, mty_arg) ->
+                 lift_match_error arg_loc "functor application"
+                   (modtype_match env mty_arg mty_param)
+                 >>| fun () ->
+                 let arg = Tgt.{ modterm_loc = arg_loc
+                               ; modterm_data = Mod_longident path }
+                 in
                  ( Tgt.{ modterm_loc
                        ; modterm_data = Mod_apply (funct, arg) }
                  , Tgt.subst_modtype (Subst.add param path Subst.identity) mty_res
@@ -1024,7 +1035,8 @@ struct
     | Src.{modterm_loc; modterm_data=Mod_constraint (modl, mty)} ->
        check_modtype env mty >>= fun mty ->
        type_modterm env modl >>= fun (modl, mty') ->
-       lift_match_error modterm_loc "module type constraint" (modtype_match env mty' mty) >>| fun () ->
+       lift_match_error modterm_loc "module type constraint"
+         (modtype_match env mty' mty) >>| fun () ->
        ( Tgt.{ modterm_loc; modterm_data = Mod_constraint (modl, mty) }
        , mty
        )
