@@ -13,6 +13,7 @@ let () =
          "@[<v>%a@]@\n"
          Datalog_checker.Mod.pp_signature sg;
        let str = Datalog_normalisation.(norm_structure Env.empty str) in
+       Format.print_newline ();
        Format.printf
          "@[<v>%a@]@\n"
          Datalog_checker.Mod.pp_structure str

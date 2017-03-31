@@ -90,16 +90,52 @@ module Make_syntax (Names : Modules.NAMES) = struct
     Format.fprintf pp "@[<hv 1>%a@]"
       pp_domaintypes tys
 
-  let pp_decl pp {decl_name; decl_type} =
-    Format.fprintf pp "%a : %a"
+  let rec pp_expr pp = function
+    | {expr_data = Expr_var nm}     -> Format.pp_print_string pp nm
+    | {expr_data = Expr_literal i}  -> Format.fprintf pp "%ld" i
+    | {expr_data = Expr_underscore} -> Format.pp_print_string pp "_"
+    | {expr_data = Expr_tuple es}   -> Format.fprintf pp "(%a)" pp_exprs es
+
+  and pp_exprs pp = function
+    | [] -> ()
+    | expr::exprs ->
+       pp_expr pp expr;
+       List.iter (Format.fprintf pp ", %a" pp_expr) exprs
+
+  let pp_atom pp = function
+    | {atom_data = Atom_predicate {pred; args}} ->
+       Format.fprintf pp "%a(%a)"
+         Names.pp_longident pred
+         pp_exprs args
+
+  let pp_rule pp {rule_pred; rule_args; rule_rhs} =
+    Format.pp_open_hovbox pp 4;
+    Format.fprintf pp "%a(%a)"
+      Names.pp_ident rule_pred
+      pp_exprs rule_args;
+    (match rule_rhs with
+      | [] -> ()
+      | atom::atoms ->
+         Format.fprintf pp " :- %a" pp_atom atom;
+         List.iter (Format.fprintf pp ",@ %a" pp_atom) atoms);
+    Format.pp_close_box pp ();
+    Format.pp_print_space pp ()
+
+  let pp_decl pp {decl_name; decl_type; decl_rules} =
+    Format.pp_open_vbox pp 0;
+    Format.fprintf pp "%a : %a@,"
       Names.pp_ident decl_name
-      pp_val_type decl_type
+      pp_val_type decl_type;
+    List.iter (pp_rule pp) decl_rules;
+    Format.pp_close_box pp ()
 
   let pp_term pp = function
     | [] -> ()
     | decl :: decls ->
+       Format.pp_open_vbox pp 0;
        Format.fprintf pp "def %a" pp_decl decl;
-       List.iter (Format.fprintf pp "@,and %a" pp_decl) decls
+       List.iter (Format.fprintf pp "@,and %a" pp_decl) decls;
+       Format.pp_close_box pp ()
 end
 
 module Syntax = Make_syntax (Modules.String_names)
