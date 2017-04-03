@@ -74,12 +74,11 @@ module Core_typing = struct
   let lift_lookup_error loc r =
     R.reword_error (fun e -> (loc, Lookup_error e)) r
 
-  let rec kind_deftype env = function
+  let rec check_deftype env () = function
     | Src.{ domtype_loc; domtype_data=Type_int} ->
        Ok ( Core.{ domtype_loc
                  ; domtype_data = Type_int
                  }
-          , ()
           )
 
     | Src.{domtype_loc; domtype_data=Type_typename path} ->
@@ -87,23 +86,21 @@ module Core_typing = struct
        >>| fun (path, _) ->
        Core.{ domtype_loc
             ; domtype_data = Type_typename path
-            },
-       ()
+            }
     | Src.{domtype_loc; domtype_data=Type_tuple tys} ->
-       kind_deftypes env [] tys >>= fun tys ->
-       Ok (Core.{ domtype_loc
-                ; domtype_data = Type_tuple tys
-                },
-           ())
+       check_deftypes env [] tys >>| fun tys ->
+       Core.{ domtype_loc
+            ; domtype_data = Type_tuple tys
+            }
 
-  and kind_deftypes env rev_tys = function
+  and check_deftypes env rev_tys = function
     | [] -> Ok (List.rev rev_tys)
     | ty :: tys ->
-       kind_deftype env ty >>= fun (ty, ()) ->
-       kind_deftypes env (ty :: rev_tys) tys
+       check_deftype env () ty >>= fun ty ->
+       check_deftypes env (ty :: rev_tys) tys
 
   let check_valtype env Src.{predty_loc; predty_data} =
-    kind_deftypes env [] predty_data >>| fun tys ->
+    check_deftypes env [] predty_data >>| fun tys ->
     Core.{ predty_loc; predty_data = tys }
 
   let rec deftype_equiv env () domty1 domty2 =

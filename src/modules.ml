@@ -595,7 +595,7 @@ module type CORE_TYPING = sig
 
   val type_term : Env.t -> Src.term -> (Core.term * (string * Core.val_type) list, core_error) result
 
-  val kind_deftype : Env.t -> Src.def_type -> (Core.def_type * Core.kind, core_error) result
+  val check_deftype : Env.t -> Core.kind -> Src.def_type -> (Core.def_type, core_error) result
 
   val check_valtype : Env.t -> Src.val_type -> (Core.val_type, core_error) result
 
@@ -848,11 +848,10 @@ struct
     | Application_of_nonfunctor
     | Application_to_non_path
     | Core_error of CT.core_error
-    | Kind_mismatch
     | Lookup_error of env_lookup_error
     | Match_error of string * match_error
     | Repeated_name of Src.Core.Names.ident
-  
+
   type error = Location.t * error_detail
 
   let pp_error pp (location, detail) =
@@ -867,9 +866,6 @@ struct
          Format.fprintf pp "In the declaration at %a@,Error @[<v>%a@]"
            Location.pp location
            CT.pp_error core_error
-      | Kind_mismatch ->
-         Format.fprintf pp "In %a@, kind mismatch"
-           Location.pp location
       | Lookup_error lookup_error ->
          Format.fprintf pp "In %a@,%a"
            Location.pp location
@@ -894,12 +890,9 @@ struct
   let check_manifest env loc kind = function
     | None -> Ok None
     | Some dty ->
-       lift_core_error loc @@ CT.kind_deftype env dty
-       >>= fun (dty, kind') ->
-       if CT.kind_match env kind' kind then
-         Ok (Some dty)
-       else
-         Error (loc, Kind_mismatch)
+       lift_core_error loc @@ CT.check_deftype env kind dty
+       >>= fun dty ->
+       Ok (Some dty)
 
   let rec check_modtype env = function
     | Src.{modtype_loc;modtype_data=Modtype_longident path} ->
@@ -1099,23 +1092,20 @@ struct
        else
          let seen = SeenSet.add id seen in
          lift_core_error stritem_loc (CT.check_kind env kind) >>= fun kind ->
-         lift_core_error stritem_loc (CT.kind_deftype env typ)
-         >>= fun (typ, kind') ->
-         if not (CT.kind_match env kind' kind) then
-           Error (stritem_loc, Kind_mismatch)
-         else
-           let tydecl = {Tgt.kind = kind; manifest = Some typ} in
-           let id, env = Env.add_type id tydecl env in
-           let sigitem =
-             Tgt.{ sigitem_loc = Location.Generated
-                 ; sigitem_data = Sig_type (id, tydecl)
-                 }
-           and stritem =
-             Tgt.{ stritem_loc
-                 ; stritem_data = Str_type (id, kind, typ)
-                 }
-           in
-           type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
+         lift_core_error stritem_loc (CT.check_deftype env kind typ)
+         >>= fun typ ->
+         let tydecl = {Tgt.kind = kind; manifest = Some typ} in
+         let id, env = Env.add_type id tydecl env in
+         let sigitem =
+           Tgt.{ sigitem_loc = Location.Generated
+               ; sigitem_data = Sig_type (id, tydecl)
+               }
+         and stritem =
+           Tgt.{ stritem_loc
+               ; stritem_data = Str_type (id, kind, typ)
+               }
+         in
+         type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
 
     | Src.{stritem_loc; stritem_data=Str_modty (id, mty)} :: items ->
        check_modtype env mty >>= fun mty ->
