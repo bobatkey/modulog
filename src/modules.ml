@@ -215,7 +215,7 @@ struct
          Core.Names.pp_ident id
          pp_modtype mty
     | { sigitem_data = Sig_modty (id, mty) } ->
-       Format.fprintf pp "@[<hv 2>module type %a =@ %a@]"
+       Format.fprintf pp "@[<v 2>module type %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
 
@@ -270,6 +270,7 @@ struct
     | item :: items ->
        pp_str_item pp item;
        Format.pp_print_space pp ();
+       Format.pp_print_cut pp ();
        pp_structure pp items
 
   and pp_str_item pp = function
@@ -280,11 +281,11 @@ struct
          Core.Names.pp_ident id
          Core.pp_def_type def_type
     | {stritem_data = Str_module (id, modl)} ->
-       Format.fprintf pp "@[<hv 2>module %a =@ %a@]"
+       Format.fprintf pp "@[<v 2>module %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modterm modl
     | {stritem_data = Str_modty (id, mty)} ->
-       Format.fprintf pp "@[<hv 2>module type %a =@ %a@]"
+       Format.fprintf pp "@[<v 2>module type %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
 end

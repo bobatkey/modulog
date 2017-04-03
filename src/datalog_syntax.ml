@@ -118,15 +118,19 @@ module Make_syntax (Names : Modules.NAMES) = struct
       | atom::atoms ->
          Format.fprintf pp " :- %a" pp_atom atom;
          List.iter (Format.fprintf pp ",@ %a" pp_atom) atoms);
-    Format.pp_close_box pp ();
-    Format.pp_print_space pp ()
+    Format.pp_close_box pp ()
 
   let pp_decl pp {decl_name; decl_type; decl_rules} =
     Format.pp_open_vbox pp 0;
     Format.fprintf pp "%a : %a@,"
       Names.pp_ident decl_name
       pp_val_type decl_type;
-    List.iter (pp_rule pp) decl_rules;
+    let rec pp_rules = function
+      | []          -> ()
+      | [rule]      -> pp_rule pp rule
+      | rule::rules -> pp_rule pp rule; Format.pp_print_space pp (); pp_rules rules
+    in
+    pp_rules decl_rules;
     Format.pp_close_box pp ()
 
   let pp_term pp = function
@@ -134,7 +138,7 @@ module Make_syntax (Names : Modules.NAMES) = struct
     | decl :: decls ->
        Format.pp_open_vbox pp 0;
        Format.fprintf pp "def %a" pp_decl decl;
-       List.iter (Format.fprintf pp "@,and %a" pp_decl) decls;
+       List.iter (Format.fprintf pp "@ @,and %a" pp_decl) decls;
        Format.pp_close_box pp ()
 end
 
