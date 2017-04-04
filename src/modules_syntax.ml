@@ -246,22 +246,30 @@ struct
     | Str_modty  of Core.Names.ident * mod_type
 
   let rec pp_modterm pp = function
-    | {modterm_data=Mod_longident lid} ->
-       Core.Names.pp_longident pp lid
-    | {modterm_data=Mod_structure items} ->
-       Format.fprintf pp "@[<v 2>struct@ %a@]@ end"
-         pp_structure items
     | {modterm_data = Mod_functor (id, mty, modl)} ->
        Format.fprintf pp "functor(%a : %a) ->@ %a"
          Core.Names.pp_ident id
          pp_modtype mty
          pp_modterm modl
+    | modterm ->
+       pp_modterm2 pp modterm
+
+  and pp_modterm2 fmt = function
+    | {modterm_data=Mod_longident lid} ->
+       Core.Names.pp_longident fmt lid
+    | {modterm_data=Mod_structure items} ->
+       Format.fprintf fmt "@[<v 2>struct@ %a@]@ end"
+         pp_structure items
     | {modterm_data = Mod_apply (modl1, modl2)} ->
-       Format.fprintf pp "APPLY"
+       Format.fprintf fmt "%a (%a)"
+         pp_modterm2 modl1
+         pp_modterm modl2
     | {modterm_data = Mod_constraint (modl, mty)} ->
-       Format.fprintf pp "(%a :@ %a)"
+       Format.fprintf fmt "(%a :@ %a)"
          pp_modterm modl
          pp_modtype mty
+    | modterm ->
+       Format.fprintf fmt "(%a)" pp_modterm modterm
 
   and pp_structure pp = function
     | [] -> ()
