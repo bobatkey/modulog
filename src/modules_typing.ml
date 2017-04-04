@@ -1,5 +1,9 @@
 open Modules_syntax
 
+module Ident  = Modules_ident
+module Path   = Modules_path
+module Subst  = Modules_subst
+
 type env_lookup_error =
   { path    : String_names.longident
   ; subpath : String_names.longident
