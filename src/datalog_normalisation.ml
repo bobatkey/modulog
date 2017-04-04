@@ -6,7 +6,7 @@ module Norm = struct
   let subst_atom sub = function
     | {atom_data = Atom_predicate { pred; args }} as atom ->
        { atom with
-           atom_data = Atom_predicate { pred = Modules_subst.path sub pred
+           atom_data = Atom_predicate { pred = Modules.Subst.path sub pred
                                       ; args }
        }
 
@@ -24,5 +24,5 @@ module Norm = struct
 
 end
 
-include Modules_normalisation.Mod_normalise (Datalog_checker.Mod) (Norm)
+include Modules.Normalisation.Mod_normalise (Datalog_checker.Mod) (Norm)
 

@@ -1,4 +1,4 @@
-module Make_syntax (Names : Modules.NAMES) = struct
+module Make_syntax (Names : Modules.Syntax.NAMES) = struct
 
   module Names = Names
 
@@ -142,9 +142,9 @@ module Make_syntax (Names : Modules.NAMES) = struct
        Format.pp_close_box pp ()
 end
 
-module Syntax = Make_syntax (Modules.String_names)
-module Mod    = Modules.Mod_Syntax_Raw (Syntax)
+module Syntax = Make_syntax (Modules.Syntax.String_names)
+module Mod    = Modules.Syntax.Mod_Syntax_Raw (Syntax)
 
-include Modules.String_names
+include Modules.Syntax.String_names
 include Syntax
 include Mod

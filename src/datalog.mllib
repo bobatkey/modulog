@@ -2,8 +2,10 @@ Location
 Modules_ident
 Modules_path
 Modules_subst
-Modules
+Modules_syntax
+Modules_typing
 Modules_normalisation
+Modules
 Datalog_syntax
 Datalog_parser
 Datalog_lexer

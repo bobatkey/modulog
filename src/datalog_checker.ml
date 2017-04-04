@@ -1,5 +1,5 @@
 module Core_syntax = struct
-  include Datalog_syntax.Make_syntax (Modules.Bound_names)
+  include Datalog_syntax.Make_syntax (Modules.Syntax.Bound_names)
 
   let rec subst_deftype sub domtype =
     { domtype with
@@ -17,9 +17,9 @@ module Core_syntax = struct
   let subst_kind sub () = ()
 end
 
-module Mod = Modules.Mod_Syntax (Core_syntax)
+module Mod = Modules.Syntax.Mod_Syntax (Core_syntax)
 
-module Env = Modules.Env (Mod)
+module Env = Modules.Typing.Env (Mod)
 
 module Core_typing = struct
   module Src  = Datalog_syntax.Syntax
@@ -30,7 +30,7 @@ module Core_typing = struct
   open Rresult
 
   type core_error_detail =
-    | Lookup_error of Modules.env_lookup_error
+    | Lookup_error of Modules.Typing.env_lookup_error
     | Type_mismatch of { expected : Core.def_type
                        ; actual   : Core.def_type }
     | Expr_is_tuple of { expected : Core.def_type }
@@ -48,7 +48,7 @@ module Core_typing = struct
       Location.pp_without_filename loc;
     match detail with
       | Lookup_error lookup_error ->
-         Modules.pp_lookup_error pp lookup_error
+         Modules.Typing.pp_lookup_error pp lookup_error
       | Type_mismatch { expected; actual } ->
          Format.fprintf pp
            "@[<hv 0>This expression has type@[<4>@ %a@]@ but was expected to have type@[<4>@ %a@]@]@;"
@@ -306,4 +306,4 @@ module Core_typing = struct
          }
 end
 
-module Typing = Modules.Mod_typing (Datalog_syntax.Mod) (Mod) (Core_typing)
+module Typing = Modules.Typing.Mod_typing (Datalog_syntax.Mod) (Mod) (Core_typing)

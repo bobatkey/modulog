@@ -1,17 +1,18 @@
 (* normalise module expressions by replacing functors with the
    substituted versions. *)
 
-module type CORE_NORM = sig
-  module Core : Modules.CORE_SYNTAX
+open Modules_syntax
 
-  val subst_term : Modules.Subst.t -> Core.term -> Core.term
+module type CORE_NORM = sig
+  module Core : Modules_syntax.CORE_SYNTAX
+
+  val subst_term : Subst.t -> Core.term -> Core.term
 end
 
 module Mod_normalise
-    (Mod : Modules.MOD_SYNTAX)
+    (Mod : Modules_syntax.MOD_SYNTAX)
     (CN  : CORE_NORM with module Core = Mod.Core) =
 struct
-  open Modules
   open Mod
 
   let rec subst_modterm sub = function
@@ -61,30 +62,43 @@ struct
   module Env : sig
     type t
     val empty : t
-    val find : Path.t -> t -> mod_term option
-    val add : Ident.t -> mod_term -> t -> t
+    val find_module : Path.t -> t -> mod_term option
+    val add_module : Ident.t -> mod_term -> t -> t
+    val add_type : Ident.t -> Core.kind -> Core.def_type -> t -> t
+    val find_type : Path.t -> t -> (Core.kind * Core.def_type)
   end = struct
-    type t = mod_term Ident.Table.t
+    type binding =
+      | Module of mod_term
+      | Type   of Core.kind * Core.def_type
 
-    let empty = Ident.Table.empty
+    type t = binding Ident.Table.t
 
-    let add id mtm env =
-      Ident.Table.add id mtm env
+    let empty =
+      Ident.Table.empty
 
-    let add_item item env =
+    let add id binding env =
+      Ident.Table.add id binding env
+
+    let add_module id modl env =
+      add id (Module modl) env
+
+    let add_type id kind defty env =
+      add id (Type (kind, defty)) env
+
+(*    let add_item item env =
       match item.stritem_data with
         | Str_value _ | Str_type _ | Str_modty _ -> env
-        | Str_module (id, modl) -> add id modl env
+        | Str_module (id, modl) -> add id (Module modl) env
 
     let add_structure = List.fold_right add_item
-
+*)
     let rec find path env =
       match path with
         | Path.Pident id ->
            Ident.Table.find id env
         | Path.Pdot (root, field) ->
            match find root env with
-             | Some {modterm_data=Mod_structure str} ->
+             | Some (Module {modterm_data=Mod_structure str}) ->
                 Some (find_field root field Subst.identity str)
              | None ->
                 None
@@ -96,20 +110,38 @@ struct
          failwith "no such field in structure"
       | {stritem_data=Str_value _} :: rem ->
          find_field p field sub rem
-      | {stritem_data=Str_type (id, _, _)} :: rem
       | {stritem_data=Str_modty (id, _)} :: rem ->
          if Ident.name id = field
          then failwith "expecting to find a module"
-         else find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
+         else
+           find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
+      | {stritem_data=Str_type (id, kind, dty)} :: rem ->
+         if Ident.name id = field
+         then Type (Core.subst_kind sub kind,
+                    Core.subst_deftype sub dty)
+         else
+           find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
       | {stritem_data=Str_module (id, modl)} :: rem ->
          if Ident.name id = field
-         then subst_modterm sub modl
-         else find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
+         then Module (subst_modterm sub modl)
+         else
+           find_field p field (Subst.add id (Path.Pdot (p, Ident.name id)) sub) rem
+
+    let find_module path env =
+      match find path env with
+        | None               -> None
+        | Some (Module modl) -> Some modl
+        | Some _             -> failwith "expecting a module"
+
+    let find_type path env =
+      match find path env with
+        | Some (Type (kind, defty)) -> (kind, defty)
+        | _             -> failwith "expecting a type"
   end
 
   let rec norm_modterm env = function
     | {modterm_loc; modterm_data=Mod_longident lid} as modl ->
-       (match Env.find lid env with
+       (match Env.find_module lid env with
          | None ->
             (* If not found, must be abstract *)
             modl
@@ -147,7 +179,7 @@ struct
        (env, def :: defs)
     | {stritem_loc; stritem_data=Str_module (id, modl)} ->
        let modl = norm_modterm env modl in
-       let env  = Env.add id modl env in
+       let env  = Env.add_module id modl env in
        (env, {stritem_loc; stritem_data=Str_module (id, modl)} :: defs)
 
   let norm_structure env items =
