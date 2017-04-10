@@ -3,29 +3,51 @@ module Subst  = Modules_subst
 module Path   = Modules_path
 module Syntax = Modules_syntax
 
-module type CORE_NORM = sig
+module type ENV = sig
+  type eval_value
+
+  type eval_type
+
+  type t
+
+  type value = private [> `Value of eval_value | `Type of eval_type ]
+
+  val empty : t
+
+  val add : Ident.t -> value -> t -> t
+
+  val add_values : (Ident.t * eval_value) list -> t -> t
+
+  val find : Path.t -> t -> value option
+end
+
+module type CORE_EVAL = sig
   module Core : Syntax.CORE_SYNTAX
 
-  val subst_term : Subst.t -> Core.term -> Core.term
-end
+  type 'a eval
 
-module type MOD_NORMALISATION = sig
-  module Mod : Syntax.MOD_SYNTAX
+  val return : 'a -> 'a eval
 
-  module Env : sig
-    type t
-    val empty : t
-    val add_module : Ident.t -> Mod.mod_term -> t -> t
-    val add_type : Ident.t -> Mod.Core.kind -> Mod.Core.def_type -> t -> t
-    val find_module : Path.t -> t -> Mod.mod_term option
-    val find_type : Path.t -> t -> (Mod.Core.kind * Mod.Core.def_type)
+  val (>>=)  : 'a eval -> ('a -> 'b eval) -> 'b eval
+
+  type eval_value
+
+  type eval_type
+
+  module Eval (Env : ENV with type eval_value = eval_value
+                          and type eval_type = eval_type) :
+  sig
+
+    val eval_type : Env.t -> Core.kind -> Core.def_type -> eval_type
+
+    val eval_term : Env.t -> Core.term -> (Ident.t * eval_value) list eval
+
   end
-
-  val norm_modterm : Env.t -> Mod.mod_term -> Mod.mod_term
-  val norm_structure : Env.t -> Mod.structure -> Mod.structure
 end
 
-module Mod_normalise
+module Evaluator
     (Mod : Syntax.MOD_SYNTAX)
-    (CN  : CORE_NORM with module Core = Mod.Core)
-  : MOD_NORMALISATION with module Mod = Mod
+    (Core_eval : CORE_EVAL with module Core = Mod.Core) :
+sig
+  val norm_structure : Mod.structure -> unit Core_eval.eval
+end

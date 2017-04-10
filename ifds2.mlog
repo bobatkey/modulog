@@ -1,5 +1,6 @@
 module type IFDS_PROGRAM = sig
   type procedure
+
   type point
 
   (* intra-procedural edges *)
@@ -40,8 +41,8 @@ module IFDS_of_Extended = functor (P : IFDS_PROGRAM_EXT) -> struct
   type point = P.point * P.fact
 
   def
-   edge : point * point
-   edge ((n,s), (n',s')) :- P.edge (n, s, n', s')
+    edge : point * point
+    edge ((n,s), (n',s')) :- P.edge (n, s, n', s')
 
   def
     start_edge : procedure * point
@@ -55,8 +56,9 @@ module IFDS_of_Extended = functor (P : IFDS_PROGRAM_EXT) -> struct
     return : point * point * point
     return ((nc,sc), (ne, se), (nr, sr)) :- P.return (nc, sc, ne, se, nr, sr)
 
-  def initial : procedure
-      initial ((p, ef)) :- P.initial (p, ef)
+  def
+    initial : procedure
+    initial ((p, ef)) :- P.initial (p, ef)
 end
 
 module IFDS = functor (P : IFDS_PROGRAM) -> struct
@@ -86,3 +88,28 @@ module Test = functor (P : IFDS_PROGRAM_EXT) -> struct
   module P' = IFDS_of_Extended (P)
   module A  = IFDS (P')
 end
+
+(* A nonsense example program *)
+module P = struct
+
+  type procedure = int
+
+  type point = int * int
+
+  def edge : point * point
+      edge ((1,4),(2,5))
+      edge ((1,2),(4,3))
+
+  def start_edge : procedure * point
+      start_edge (2,(1,4))
+
+  def call : point * procedure
+      call ((2,5),2)
+
+  def return : point * point * point
+
+  def initial : procedure
+      initial (1)
+end
+
+module A = IFDS (P)
