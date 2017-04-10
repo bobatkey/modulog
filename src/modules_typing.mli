@@ -1,17 +1,13 @@
-
 open Modules_syntax
 
-module Ident = Modules_ident
-module Path  = Modules_path
-
-type env_lookup_error =
+type lookup_error =
   { path    : String_names.longident
   ; subpath : String_names.longident
   ; reason  : [ `not_found | `not_a_structure | `not_a_module
               | `not_a_value | `not_a_type | `not_a_module_type]
   }
 
-val pp_lookup_error : Format.formatter -> env_lookup_error -> unit
+val pp_lookup_error : Format.formatter -> lookup_error -> unit
 
 module type ENV = sig
   module Mod : MOD_SYNTAX
@@ -21,32 +17,32 @@ module type ENV = sig
   val empty : t
 
 
-  val add_value : String_names.ident -> Mod.Core.val_type -> t -> Ident.t * t
+  val add_value : String_names.ident -> Mod.Core.val_type -> t -> Modules_ident.t * t
 
-  val add_type : String_names.ident -> Mod.type_decl -> t -> Ident.t * t
+  val add_type : String_names.ident -> Mod.type_decl -> t -> Modules_ident.t * t
 
-  val add_module : String_names.ident -> Mod.mod_type -> t -> Ident.t * t
+  val add_module : String_names.ident -> Mod.mod_type -> t -> Modules_ident.t * t
 
-  val add_modty : String_names.ident -> Mod.mod_type -> t -> Ident.t * t
+  val add_modty : String_names.ident -> Mod.mod_type -> t -> Modules_ident.t * t
 
   
   val add_signature : Mod.signature -> t -> t
 
-  val add_module_by_ident : Ident.t -> Mod.mod_type -> t -> t
+  val add_module_by_ident : Modules_ident.t -> Mod.mod_type -> t -> t
 
 
-  val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, env_lookup_error) result
+  val find_value : String_names.longident -> t -> (Modules_path.t * Mod.Core.val_type, lookup_error) result
 
-  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, env_lookup_error) result
+  val find_type : String_names.longident -> t -> (Modules_path.t * Mod.type_decl, lookup_error) result
 
-  val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
+  val find_module : String_names.longident -> t -> (Modules_path.t * Mod.mod_type, lookup_error) result
 
-  val find_modtype : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
+  val find_modtype : String_names.longident -> t -> (Modules_path.t * Mod.mod_type, lookup_error) result
 
 
-  val lookup_modtype : Path.t -> t -> Mod.mod_type
+  val lookup_modtype : Modules_path.t -> t -> Mod.mod_type
 
-  val lookup_type : Path.t -> t -> Mod.type_decl
+  val lookup_type : Modules_path.t -> t -> Mod.type_decl
 end
 
 module Env (Mod_syntax : MOD_SYNTAX) : ENV with module Mod = Mod_syntax
@@ -77,7 +73,7 @@ module type CORE_TYPING = sig
 
   val kind_match : Env.t -> Core.kind -> Core.kind -> bool
 
-  val deftype_of_path : Path.t -> Core.kind -> Core.def_type
+  val deftype_of_path : Modules_path.t -> Core.kind -> Core.def_type
 end
 
 module type MOD_TYPING = sig

@@ -30,7 +30,7 @@ module Core_typing = struct
   open Rresult
 
   type core_error_detail =
-    | Lookup_error of Modules.Typing.env_lookup_error
+    | Lookup_error of Modules.Typing.lookup_error
     | Type_mismatch of { expected : Core.def_type
                        ; actual   : Core.def_type }
     | Expr_is_tuple of { expected : Core.def_type }

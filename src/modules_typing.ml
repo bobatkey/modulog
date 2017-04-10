@@ -4,7 +4,7 @@ module Ident  = Modules_ident
 module Path   = Modules_path
 module Subst  = Modules_subst
 
-type env_lookup_error =
+type lookup_error =
   { path    : String_names.longident
   ; subpath : String_names.longident
   ; reason  : [ `not_found | `not_a_structure | `not_a_module
@@ -53,13 +53,13 @@ module type ENV = sig
   val add_module_by_ident : Ident.t -> Mod.mod_type -> t -> t
 
   
-  val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, env_lookup_error) result
+  val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 
-  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, env_lookup_error) result
+  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, lookup_error) result
 
-  val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
+  val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, lookup_error) result
 
-  val find_modtype : String_names.longident -> t -> (Path.t * Mod.mod_type, env_lookup_error) result
+  val find_modtype : String_names.longident -> t -> (Path.t * Mod.mod_type, lookup_error) result
 
 
   val lookup_modtype : Path.t -> t -> Mod.mod_type
@@ -503,7 +503,7 @@ struct
     | Application_of_nonfunctor
     | Application_to_non_path
     | Core_error of CT.core_error
-    | Lookup_error of env_lookup_error
+    | Lookup_error of lookup_error
     | Match_error of string * match_error
     | Repeated_name of Src.Core.Names.ident
 
