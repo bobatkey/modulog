@@ -60,6 +60,8 @@ type ruleset =
 
 type rule_id = int
 
+let rule_id i = i
+
 let pp fmt set =
   Format.pp_open_vbox fmt 0;
   for i = 0 to Array.length set.rules - 1 do
@@ -75,29 +77,45 @@ module G = struct
   type t = ruleset
 
   module V = struct
-    type t = int
-    let compare (x : t) (y : t) = Pervasives.compare x y
-    let hash (x : t) = x
-    let equal (x : t) y = x = y
+    type t = ruleset * int
+    let compare ((_, x) : t) ((_, y) : t) = Pervasives.compare x y
+    let hash ((_, x) : t) = x
+    let equal ((_, x) : t) (_, y) = x = y
   end
+
+  type vertex = V.t
+
+  let graph_of_vertex (ruleset, _) = ruleset
+  
+  module E = struct
+    type t = V.t * V.t
+    let src = fst
+    let dst = snd
+  end
+
+  type edge = E.t
 
   let iter_vertex f ruleset =
     for i = 0 to Array.length ruleset.rules - 1 do
-      f i
+      f (ruleset, i)
     done
 
-  let iter_succ f ruleset rule_id =
+  let iter_succ f ruleset (_, rule_id) =
     let rule = ruleset.rules.(rule_id) in
     rule.rhs |> List.iter begin fun (Atom {pred}) ->
       match PredicateNameMap.find pred ruleset.rules_of_pred with
         | exception Not_found -> ()
-        | rule_ids -> List.iter f rule_ids
+        | rule_ids -> List.iter (fun id -> f (ruleset, id)) rule_ids
     end
+
+  let iter_edges_e f ruleset =
+    iter_vertex (fun src -> iter_succ (fun tgt -> f (src,tgt)) ruleset src) ruleset
 end
 
 module SCC = Graph.Components.Make (G)
 
-let scc_list = SCC.scc_list
+let scc_list ruleset =
+  List.map (List.map snd) (SCC.scc_list ruleset)
 
 (** A rule is self recursive if it mentions the head predicate in the
    right hand side. *)

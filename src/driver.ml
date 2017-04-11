@@ -10,12 +10,17 @@ let () =
   match Datalog_checker.(Typing.type_structure Env.empty structure) with
     | Ok (str, sg) ->
        let rules = Datalog_normalisation.rules_of_structure str in
+       (*Format.printf
+         "@[<v>%a@]\n"
+         Datalog_ruleset_graphviz.dot_of_ruleset rules*)
+
        let code = Datalog_abstractmachine.translate rules in
        let patterns = Datalog_abstractmachine.search_patterns code in
        Format.printf
          "@[<v>%a@,%a@]\n"
          Datalog_abstractmachine.pp_comms         code
          Datalog_abstractmachine.PredicatePats.pp patterns
+
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
