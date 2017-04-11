@@ -103,12 +103,13 @@ module VarSet  = struct
   let concat_map_to_list f set =
     List.concat (map_to_list f set)
 end
+
 module AttrSet = (Set.Make (String) : Set.S with type elt = attr)
 
 let scalar_of_expr = function
   | RS.Var x      -> Attr x
   | RS.Lit i      -> Lit i
-  | RS.Underscore -> failwith "FIXME: do underscores"
+  | RS.Underscore -> failwith "internal error: underscore found in head"
 
 let expr_of_rule guard_relation head atoms =
   let rec transl_rhs env = function
@@ -123,6 +124,7 @@ let expr_of_rule guard_relation head atoms =
        in
        assert (AttrSet.subset reqd env);
        Return { guard_relation; values }, reqd
+
     | RS.Atom {pred=relation; args} :: atoms ->
        let _, projections, conditions =
          List.fold_left
@@ -132,6 +134,7 @@ let expr_of_rule guard_relation head atoms =
               | RS.Var x ->
                  (i+1, (i, x)::projections, conditions)
               | RS.Lit v ->
+                 (* FIXME: assert that 'v' is in scope *)
                  (i+1, projections, (i,Lit v)::conditions)
               | RS.Underscore ->
                  (i+1, projections, conditions))
@@ -169,22 +172,13 @@ let translate_rule ruleset rule_id =
   let expr = expr_of_rule None args rhs in
   Insert ([pred], expr)
 
-  (* To translate a non-recursive rule:
-     - convert the rhs of the rule to an expr and emit an assignment
-
-     To translate a recursive rule(s):
-     - initialise the delta_p_i to the current values for p_i
-     - while the union of the deltas is not empty:
-       - compute new_p_i using delta_p_i for any predicates inside the loop
-         - joins inside rules; unions across rules for same predicate
-       - set delta_p_i = new_p_i
-       - set p_i       = p_i \cup new_p_i
-  *)
-
 let predicates_of_rules =
   List.fold_left
     (fun set rule -> VarSet.add rule.RS.pred set)
     VarSet.empty
+
+let delta_ nm = "delta_"^nm
+let new_ nm = "new_"^nm
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -193,7 +187,7 @@ let extract_predicate dpred rhs =
     | (RS.Atom { pred; args } as atom) :: after ->
        let rest = loop (atom :: before) after in
        if pred = dpred then
-         let hatom = RS.Atom { pred = "delta_"^dpred; args} in
+         let hatom = RS.Atom { pred = delta_ dpred; args} in
          (hatom :: List.rev_append before after) :: rest
        else
          rest
@@ -203,12 +197,10 @@ let extract_predicate dpred rhs =
 let translate_recursive ruleset rule_ids =
   let rules = List.map (fun id -> ruleset.RS.rules.(id)) rule_ids in
   let predicates = predicates_of_rules rules in
-  let delta_predicates =
-    VarSet.map_to_list (fun pred_nm -> "delta_"^pred_nm) predicates
-  in
+  let delta_predicates = VarSet.map_to_list delta_ predicates in
   let declarations =
     VarSet.concat_map_to_list
-      (fun pred_nm -> ["new_"^pred_nm, None; "delta_"^pred_nm, Some pred_nm])
+      (fun pred_nm -> [new_ pred_nm, None; delta_ pred_nm, Some pred_nm])
       predicates
   in
   let moves =
@@ -228,7 +220,7 @@ let translate_recursive ruleset rule_ids =
                    (fun delta'd_predicate ->
                       List.map
                         (fun rhs ->
-                           Insert ([pred; "new_"^pred], expr_of_rule (Some pred) args rhs))
+                           Insert ([pred; new_ pred], expr_of_rule (Some pred) args rhs))
                         (extract_predicate delta'd_predicate rhs))
                    predicates
                end
@@ -240,7 +232,7 @@ let translate_recursive ruleset rule_ids =
 
 let translate_component ruleset = function
   | [] ->
-     invalid_arg "translate_component: empty component"
+     failwith "internal error: translate_component: empty component"
   | [rule_id] as rules ->
      if RS.rule_is_self_recursive ruleset rule_id then
        translate_recursive ruleset rules
@@ -263,37 +255,89 @@ let translate ruleset =
        test, which avoids the necessity to loop.
   *)
 
-module VarMap = Map.Make (String)
-module Pattern = Set.Make (struct type t = int let compare = compare end)
-module PatternSet = Set.Make (Pattern)
+module PatternSet = struct
+  (* FIXME: this could be more efficiently implemented with using
+     BDDs, but it is probably not worth it for the sizes of sets we
+     will be dealing with. *)
 
-module PredicatePats = struct
+  module Pattern = struct
+    include Set.Make (struct type t = int let compare = compare end)
+
+    let complete n =
+      let rec loop pat i = if i = n then pat else loop (add i pat) (i+1) in
+      loop empty 0
+  end
+
+  type pattern = Pattern.t
+
+  include Set.Make (Pattern)
+
+  let pp =
+    Fmt.braces
+      (Fmt.iter ~sep:(Fmt.always ",@ ") iter
+         (Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") Pattern.iter Fmt.int)))
+
+  module V = struct
+    type t = Pattern.t
+    let equal = Pattern.equal
+    let hash s = Hashtbl.hash (Pattern.elements s)
+  end
+
+  let is_strict_subset s1 s2 =
+    Pattern.subset s1 s2 && not (Pattern.equal s1 s2)
+
+  let iter_vertex =
+    iter
+
+  let iter_succ f g s =
+    iter (fun s' -> if is_strict_subset s' s then f s') g
+
+  let iter_pred f g s =
+    iter (fun s' -> if is_strict_subset s s' then f s') g
+end
+
+module MPC = Minimalpathcover.Make (PatternSet)
+
+module PredicatePats : sig
+  type t
+
+  val empty : t
+
+  val pats : string -> t -> PatternSet.t
+
+  val add : string -> PatternSet.pattern -> t -> t
+
+  val pp : t Fmt.t
+end = struct
+  module VarMap = Map.Make (String)
+
   type t = PatternSet.t VarMap.t
+
   let empty = VarMap.empty
+
   let pats pred t =
     match VarMap.find pred t with
       | exception Not_found -> PatternSet.empty
       | set -> set
-  let add pred pat t =
-    let set = pats pred t in
-    VarMap.add pred (PatternSet.add pat set) t
-end
 
-let list_init l f =
-  let rec init i =
-    if i = l then []
-    else f i :: init (i+1)
-  in
-  init 0
+  let add pred pat t =
+    if PatternSet.Pattern.is_empty pat then t
+    else
+      let set = pats pred t in
+      VarMap.add pred (PatternSet.add pat set) t
+
+  let pp =
+    Fmt.iter_bindings VarMap.iter (Fmt.pair ~sep:(Fmt.always " => ") Fmt.string PatternSet.pp)
+end
 
 let rec search_patterns_of_expr = function
   | Select { relation; conditions; projections; body } ->
-     let pat = Pattern.of_list (List.map fst conditions) in
+     let pat = PatternSet.Pattern.of_list (List.map fst conditions) in
      fun set -> PredicatePats.add relation pat (search_patterns_of_expr body set)
   | Return { guard_relation = None } ->
      fun set -> set
   | Return { guard_relation = Some relation; values } ->
-     let pat = Pattern.of_list (list_init (List.length values) (fun i -> i)) in
+     let pat = PatternSet.Pattern.complete (List.length values) in
      PredicatePats.add relation pat
 
 let rec search_patterns_of_comm = function

@@ -27,3 +27,18 @@ module PointsTo = functor (P : PROGRAM) -> struct
     fptsto(o,f,o2) :- P.fwrite(v,f,v2), ptsto(v,o), ptsto(v2,o2)
 
 end
+
+module TestProg = struct
+
+  type variable = int
+  type object = int
+  type fieldname = int
+
+  def alloc : int * int
+  and assign : int * int
+  and fread : int * int * int
+  and fwrite : int * int * int
+
+end
+
+module P = PointsTo (TestProg)

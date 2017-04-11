@@ -1,5 +1,5 @@
 PKG ocamlgraph
-PKG containers.data
 PKG rresult
+PKG fmt
 S .
 B ../_build/src

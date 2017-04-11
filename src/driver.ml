@@ -11,9 +11,11 @@ let () =
     | Ok (str, sg) ->
        let rules = Datalog_normalisation.rules_of_structure str in
        let code = Datalog_abstractmachine.translate rules in
+       let patterns = Datalog_abstractmachine.search_patterns code in
        Format.printf
-         "@[<v 0>%a@]\n"
-         Datalog_abstractmachine.pp_comms code
+         "@[<v>%a@,%a@]\n"
+         Datalog_abstractmachine.pp_comms         code
+         Datalog_abstractmachine.PredicatePats.pp patterns
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
