@@ -1,58 +1,4 @@
-let rec pp_list pp fmt = function
-  | [] -> ()
-  | [x] -> pp fmt x
-  | x::xs -> Format.fprintf fmt "%a,@ %a" pp x (pp_list pp) xs
-
-
-type predicate_name = Modules.Ident.t
-
-type flat_expr =
-  | Var of string * int list
-  | Lit of int32
-  | Underscore
-
-type flat_atom =
-  | Atom of { pred : predicate_name; args : flat_expr list }
-
-type flat_rule =
-  { pred : predicate_name
-  ; args : flat_expr list
-  ; rhs  : flat_atom list
-  }
-
-let pp_expr fmt = function
-  | Var (h, suffix) ->
-     Format.fprintf fmt "%s%s"
-       h
-       (String.concat "/" (List.map string_of_int suffix))
-  | Lit i ->
-     Format.fprintf fmt "%ld" i
-  | Underscore ->
-     Format.fprintf fmt "_"
-
-let pp_exprs = pp_list pp_expr
-
-let pp_atom fmt = function
-  | Atom { pred; args } ->
-     Format.fprintf fmt "%a(@[<h>%a@])"
-       Modules.Ident.pp pred
-       pp_exprs args
-
-let pp_rhs = pp_list pp_atom
-
-let pp_rule fmt {pred; args; rhs} =
-  match rhs with
-    | [] ->
-       Format.fprintf fmt
-         "%a(@[<h>%a@])@,"
-         Modules.Ident.pp pred
-         pp_exprs args
-    | rhs ->
-       Format.fprintf fmt
-         "%a(@[<h>%a@]) :- @[<hv>%a@]@,"
-         Modules.Ident.pp pred
-         pp_exprs args
-         pp_rhs rhs
+module RS = Datalog_ruleset
 
 module Eval = struct
   module Core = Datalog_checker.Core_syntax
@@ -60,7 +6,7 @@ module Eval = struct
   open Core
 
   type 'a eval =
-    flat_rule list -> 'a * flat_rule list
+    RS.rule list -> 'a * RS.rule list
 
   let return x rules = (x, rules)
   let (>>=) c f rules =
@@ -71,7 +17,7 @@ module Eval = struct
     | Itype_int
     | Itype_tuple of eval_type list
 
-  type eval_value = Modules.Ident.t * eval_type list
+  type eval_value = string * eval_type list
 
   module Eval (Env : Modules.Normalisation.ENV with type eval_value = eval_value and type eval_type = eval_type) =
   struct
@@ -89,7 +35,10 @@ module Eval = struct
     let rec eta_expand_var vnm suffix ty flexprs =
       match ty with
         | Itype_int ->
-           Var (vnm, List.rev suffix) :: flexprs
+           let vnm =
+             vnm ^ (String.concat "/" (List.map string_of_int (List.rev suffix)))
+           in
+           RS.Var vnm :: flexprs
         | Itype_tuple tys ->
            snd (List.fold_right
                   (fun ty (i, l) ->
@@ -100,7 +49,7 @@ module Eval = struct
     let rec eta_expand_underscore ty flexprs =
       match ty with
         | Itype_int ->
-           Underscore :: flexprs
+           RS.Underscore :: flexprs
         | Itype_tuple tys ->
            List.fold_right eta_expand_underscore tys flexprs
 
@@ -109,7 +58,7 @@ module Eval = struct
         | {expr_data = Expr_var vnm}, ty ->
            eta_expand_var vnm [] ty flexprs
         | {expr_data = Expr_literal i}, Itype_int ->
-           Lit i :: flexprs
+           RS.Lit i :: flexprs
         | {expr_data = Expr_underscore}, ty ->
            eta_expand_underscore ty flexprs
         | {expr_data = Expr_tuple exprs}, Itype_tuple tys ->
@@ -128,7 +77,7 @@ module Eval = struct
          (match Env.find pred env with
            | Some (`Value (pred, typ)) ->
               let args = flatten_args args typ in
-              Atom {pred; args}
+              RS.Atom {pred; args}
            | _ ->
               failwith "internal error: type error in eval_atom")
 
@@ -137,7 +86,7 @@ module Eval = struct
         | Some (`Value (pred, typ)) ->
            let args = flatten_args rule_args typ in
            let rhs  = List.map (eval_atom env) rule_rhs in
-           { pred; args; rhs }
+           RS.{ pred; args; rhs }
         | _ ->
            failwith "internal error: type error in eval_rule"
 
@@ -146,7 +95,7 @@ module Eval = struct
         List.map
           (fun {decl_name; decl_type} ->
              let decl_type = List.map (eval_type env ()) decl_type.predty_data in
-             (decl_name, (Modules.Ident.(create (name decl_name)), decl_type)))
+             (decl_name, (Modules.Ident.(full_name @@ create (name decl_name)), decl_type)))
           term
       in
       let env = Env.add_values bindings env in
@@ -167,4 +116,4 @@ module ModularDatalogEvaluator =
   Modules.Normalisation.Evaluator (Datalog_checker.Mod) (Eval)
 
 let rules_of_structure structure =
-  List.rev (snd (ModularDatalogEvaluator.norm_structure structure []))
+  RS.of_rules (snd (ModularDatalogEvaluator.norm_structure structure []))

@@ -4,6 +4,8 @@ val create : string -> t
 
 val name : t -> string
 
+val full_name : t -> string
+
 val equal : t -> t -> bool
 
 module Table : sig
