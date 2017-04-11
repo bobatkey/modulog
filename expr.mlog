@@ -1,0 +1,91 @@
+module type INPUT = sig
+  type index
+
+  type token = int
+
+  is_index : index
+
+  token_at : index * token * index
+end
+
+module type GRAMMAR = sig
+  type non_terminal
+  type token
+  type rhs
+
+  nt_to_rhs : non_terminal * rhs
+
+  rhs_nt   : rhs * non_terminal * rhs
+  rhs_tok  : rhs * token * rhs
+  rhs_stop : rhs
+end
+
+module G = struct
+  type non_terminal = int
+  type token = int
+  type rhs = int * int
+
+  def nt_to_rhs : non_terminal * rhs
+      nt_to_rhs (0, (0,0))
+      nt_to_rhs (0, (1,0))
+
+  def rhs_tok : rhs * token * rhs
+      rhs_tok ((0,0), 0, (0,1))
+      rhs_tok ((1,1), 1, (1,2))
+
+  def rhs_nt : rhs * non_terminal * rhs
+      rhs_nt ((1,0), 0, (1,1))
+      rhs_nt ((1,2), 0, (1,3))
+
+  def rhs_stop : rhs
+      rhs_stop ((0,1))
+      rhs_stop ((1,3))
+end
+
+module Recogniser =
+  functor (G : GRAMMAR) ->
+  functor (I : sig type index type token = G.token token_at : index * token * index is_index : index end) ->
+struct
+
+  def
+    parse : I.index * G.non_terminal * I.index
+    parse (i, nt, j) :- G.nt_to_rhs (nt, rhs), parse_rhs (i, rhs, j)
+
+  and
+    parse_rhs : I.index * G.rhs * I.index
+    parse_rhs (i, rhs, i) :- G.rhs_stop (rhs), I.is_index (i)
+    parse_rhs (i, rhs, j) :- G.rhs_tok (rhs, tok, rhs'), I.token_at (i, tok, i'), parse_rhs (i', rhs', j)
+    parse_rhs (i, rhs, j) :- G.rhs_nt (rhs, nt, rhs'), parse (i, nt, i'), parse_rhs (i', rhs', j)
+
+end
+
+module TestInput = struct
+  type index = int
+  type token = int
+
+  def is_index : index
+      is_index (0)
+      is_index (1)
+      is_index (2)
+      is_index (3)
+
+  def token_at : index * token * index
+      token_at (0,0,1)
+      token_at (1,1,2)
+      token_at (2,0,3)
+end
+
+module R = Recogniser (G) (TestInput)
+
+(*
+module Grammar = functor (I : INPUT) -> struct
+
+  def
+    expr : I.index * I.index
+    expr (i,j) :- I.token_at (i, 0, j)
+    expr (i,j) :- expr (i,i1), I.token_at (i1,1,j1), expr (j1,j)
+
+end
+
+module G = Grammar (TestInput)
+*)
