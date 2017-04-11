@@ -3,4 +3,4 @@ module Path   = Modules_path
 module Subst  = Modules_subst
 module Syntax = Modules_syntax
 module Typing = Modules_typing
-module Normalisation = Modules_normalisation
+module Evaluator = Modules_evaluator

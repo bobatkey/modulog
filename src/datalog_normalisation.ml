@@ -19,7 +19,9 @@ module Eval = struct
 
   type eval_value = string * eval_type list
 
-  module Eval (Env : Modules.Normalisation.ENV with type eval_value = eval_value and type eval_type = eval_type) =
+  module Eval (Env : Modules.Evaluator.EVAL_ENV
+               with type eval_value = eval_value
+                and type eval_type = eval_type) =
   struct
 
     let rec eval_type env () = function
@@ -113,7 +115,7 @@ module Eval = struct
 end
 
 module ModularDatalogEvaluator =
-  Modules.Normalisation.Evaluator (Datalog_checker.Mod) (Eval)
+  Modules.Evaluator.Make (Datalog_checker.Mod) (Eval)
 
 let rules_of_structure structure =
   RS.of_rules (snd (ModularDatalogEvaluator.norm_structure structure []))

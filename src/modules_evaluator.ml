@@ -3,9 +3,7 @@ module Subst  = Modules_subst
 module Path   = Modules_path
 module Syntax = Modules_syntax
 
-open Syntax
-
-module type ENV = sig
+module type EVAL_ENV = sig
   type eval_value
 
   type eval_type
@@ -24,7 +22,7 @@ module type ENV = sig
 end
 
 module type CORE_EVAL = sig
-  module Core : CORE_SYNTAX
+  module Core : Syntax.CORE_SYNTAX
 
   type 'a eval
 
@@ -36,8 +34,9 @@ module type CORE_EVAL = sig
 
   type eval_type
 
-  module Eval (Env : ENV with type eval_value = eval_value
-                          and type eval_type = eval_type) :
+  module Eval (Env : EVAL_ENV
+               with type eval_value = eval_value
+                and type eval_type = eval_type) :
   sig
 
     val eval_type : Env.t -> Core.kind -> Core.def_type -> eval_type
@@ -47,8 +46,8 @@ module type CORE_EVAL = sig
   end
 end
 
-module Evaluator
-    (Mod       : MOD_SYNTAX)
+module Make
+    (Mod       : Syntax.MOD_SYNTAX)
     (Core_eval : CORE_EVAL with module Core = Mod.Core) =
 struct
 
@@ -150,7 +149,7 @@ struct
             let env = Env.add arg_name value clo_env in
             norm_modterm env body
          | _ ->
-            failwith "not a functor in application")
+            failwith "internal error: not a functor in application")
 
     | {modterm_data=Mod_constraint (modl, _)} ->
        norm_modterm env modl
