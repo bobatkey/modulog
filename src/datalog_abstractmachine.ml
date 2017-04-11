@@ -168,7 +168,7 @@ let expr_of_rule guard_relation head atoms =
   expr
 
 let translate_rule ruleset rule_id =
-  let RS.{pred; args; rhs} = ruleset.RS.rules.(rule_id) in
+  let RS.{pred; args; rhs} = RS.rule rule_id ruleset in
   let expr = expr_of_rule None args rhs in
   Insert ([pred], expr)
 
@@ -195,7 +195,7 @@ let extract_predicate dpred rhs =
   loop [] rhs
 
 let translate_recursive ruleset rule_ids =
-  let rules = List.map (fun id -> ruleset.RS.rules.(id)) rule_ids in
+  let rules = List.map (fun id -> RS.rule id ruleset) rule_ids in
   let predicates = predicates_of_rules rules in
   let delta_predicates = VarSet.map_to_list delta_ predicates in
   let declarations =

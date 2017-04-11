@@ -16,6 +16,8 @@ type rule =
   ; rhs  : atom list
   }
 
+(**********************************************************************)
+
 let pp_expr fmt = function
   | Var vnm ->
      Format.fprintf fmt "%s" vnm
@@ -56,6 +58,8 @@ type ruleset =
   ; rules_of_pred : int list PredicateNameMap.t
   }
 
+type rule_id = int
+
 let pp fmt set =
   Format.pp_open_vbox fmt 0;
   for i = 0 to Array.length set.rules - 1 do
@@ -64,6 +68,8 @@ let pp fmt set =
       Format.pp_print_cut fmt ()
   done;
   Format.pp_close_box fmt ()
+
+let rule i set = set.rules.(i)
 
 module G = struct
   type t = ruleset
