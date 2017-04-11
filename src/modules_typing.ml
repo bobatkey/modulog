@@ -645,7 +645,7 @@ struct
        type_structure env [] [] SeenSet.empty str
        >>| fun (structure, signature) ->
        Tgt.{ modterm_loc; modterm_data=Mod_structure structure},
-       Tgt.{ modtype_loc  = Location.Generated
+       Tgt.{ modtype_loc  = Location.generated
            ; modtype_data = Modtype_signature signature
            }
 
@@ -654,7 +654,7 @@ struct
        let param, env = Env.add_module param mty env in
        type_modterm env body >>| fun (body, body_ty) ->
        Tgt.{modterm_loc; modterm_data=Mod_functor (param, mty, body)},
-       Tgt.{ modtype_loc  = Location.Generated
+       Tgt.{ modtype_loc  = Location.generated
            ; modtype_data = Modtype_functor (param, mty, body_ty)
            }
 
@@ -704,7 +704,7 @@ struct
          | [] -> env, rev_sigitems
          | (id, ty) :: items ->
             let ident, env = Env.add_value id ty env in
-            let item = Tgt.{ sigitem_loc  = Location.Generated
+            let item = Tgt.{ sigitem_loc  = Location.generated
                            ; sigitem_data = Tgt.Sig_value (ident, ty)
                            }
             in
@@ -731,7 +731,7 @@ struct
          type_modterm env modl >>= fun (modl, modty) ->
          let id, env = Env.add_module id modty env in
          let sigitem =
-           Tgt.{ sigitem_loc  = Location.Generated
+           Tgt.{ sigitem_loc  = Location.generated
                ; sigitem_data = Sig_module (id, modty)
                }
          and stritem =
@@ -752,7 +752,7 @@ struct
          let tydecl = {Tgt.kind = kind; manifest = Some typ} in
          let id, env = Env.add_type id tydecl env in
          let sigitem =
-           Tgt.{ sigitem_loc = Location.Generated
+           Tgt.{ sigitem_loc = Location.generated
                ; sigitem_data = Sig_type (id, tydecl)
                }
          and stritem =
@@ -766,7 +766,7 @@ struct
        check_modtype env mty >>= fun mty ->
        let id, env = Env.add_modty id mty env in
        let sigitem =
-         Tgt.{ sigitem_loc  = Location.Generated
+         Tgt.{ sigitem_loc  = Location.generated
              ; sigitem_data = Sig_modty (id, mty)
              }
        and stritem =

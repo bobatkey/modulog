@@ -7,6 +7,8 @@ type t =
 let mk loc_start loc_end =
   FromSource { loc_start; loc_end }
 
+let generated = Generated
+
 open Lexing
 
 let pp fmt = function
