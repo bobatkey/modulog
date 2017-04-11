@@ -8,6 +8,7 @@ module Core_syntax = struct
             | Type_int          -> Type_int
             | Type_typename lid -> Type_typename (Modules.Subst.path sub lid)
             | Type_tuple tys    -> Type_tuple (List.map (subst_deftype sub) tys)
+            | Type_enum syms    -> Type_enum syms
     }
 
   let subst_valtype sub predty =
@@ -40,6 +41,8 @@ module Core_typing = struct
     | Name_mismatch of { expected : string
                        ; actual   : string
                        }
+    | Enum_sym_not_found of string * string list
+    | Expr_is_enum of { expected : Core.def_type }
 
   type core_error = Location.t * core_error_detail
 
@@ -70,17 +73,24 @@ module Core_typing = struct
          Format.fprintf pp "Predicate declaration has name %S, but this rule is given name %S"
            expected
            actual
+      | Enum_sym_not_found (sym, syms) ->
+         Format.fprintf pp
+           "Symbol %a is not a member of the enumerated type @[<1>[%a]@]"
+           Src.pp_enum_sym sym
+           (Fmt.list ~sep:(Fmt.always "|@ ") Src.pp_enum_sym) syms
+      | Expr_is_enum { expected } ->
+         Format.fprintf pp
+           "@[<v 4>Expression is a symbol, but the expected type is@,%a@]@;"
+           Core.pp_def_type expected
 
   let lift_lookup_error loc r =
     R.reword_error (fun e -> (loc, Lookup_error e)) r
 
   let rec check_deftype env () = function
     | Src.{ domtype_loc; domtype_data=Type_int} ->
-       Ok ( Core.{ domtype_loc
-                 ; domtype_data = Type_int
-                 }
-          )
-
+       Ok Core.{ domtype_loc
+               ; domtype_data = Type_int
+               }
     | Src.{domtype_loc; domtype_data=Type_typename path} ->
        lift_lookup_error domtype_loc (Env.find_type path env)
        >>| fun (path, _) ->
@@ -92,6 +102,11 @@ module Core_typing = struct
        Core.{ domtype_loc
             ; domtype_data = Type_tuple tys
             }
+    | Src.{domtype_loc; domtype_data=Type_enum syms} ->
+       (* FIXME: check for duplicates *)
+       Ok Core.{ domtype_loc
+               ; domtype_data = Type_enum syms
+               }
 
   and check_deftypes env rev_tys = function
     | [] -> Ok (List.rev rev_tys)
@@ -124,6 +139,9 @@ module Core_typing = struct
         {domtype_data=Type_tuple tys2} ->
          List.length tys1 = List.length tys2 &&
          List.for_all2 (deftype_equiv env ()) tys1 tys2
+      | {domtype_data=Type_enum syms1},
+        {domtype_data=Type_enum syms2} ->
+         syms1 = syms2
       | _, _ ->
          false
 
@@ -141,6 +159,16 @@ module Core_typing = struct
          | Mod.{manifest=Some ty} -> domtype_is_tuple env ty)
     | Core.{domtype_data=Type_tuple tys} ->
        Some tys
+    | _ ->
+       None
+
+  let rec domtype_is_enum env = function
+    | Core.{domtype_data=Type_typename path} ->
+       (match Env.lookup_type path env with
+         | Mod.{manifest=None} -> None
+         | Mod.{manifest=Some ty} -> domtype_is_enum env ty)
+    | Core.{domtype_data=Type_enum syms} ->
+       Some syms
     | _ ->
        None
   
@@ -178,6 +206,16 @@ module Core_typing = struct
             Ok (Core.{ expr_loc; expr_data = Expr_tuple e }, local_env)
          | None ->
             Error (expr_loc, Expr_is_tuple { expected = expected_ty }))
+
+    | Src.{ expr_loc; expr_data = Expr_enum sym } ->
+       (match domtype_is_enum env expected_ty with
+         | Some syms ->
+            if List.mem sym syms then
+              Ok (Core.{ expr_loc; expr_data = Expr_enum sym }, local_env)
+            else
+              Error (expr_loc, Enum_sym_not_found (sym, syms))
+         | None ->
+            Error (expr_loc, Expr_is_enum { expected = expected_ty }))
 
   and type_exprs env local_env loc tys exprs =
     let rec check local_env rev_exprs exprs tys =
@@ -231,7 +269,7 @@ module Core_typing = struct
     | Src.{ expr_loc; expr_data = Expr_var vnm } ->
        if LocalEnv.mem vnm local_env then Ok ()
        else Error (expr_loc, Unsafe `Unbound_var)
-    | Src.{ expr_data = Expr_literal _ } ->
+    | Src.{ expr_data = Expr_literal _ | Expr_enum _ } ->
        Ok ()
     | Src.{ expr_loc; expr_data = Expr_underscore } ->
        Error (expr_loc, Unsafe `Catch_all)

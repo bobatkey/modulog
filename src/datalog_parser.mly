@@ -6,11 +6,11 @@ open Datalog_syntax
 %token COMMA
 %token COLON_DASH
 %token COLON
-%token STAR DOT ARROW EQUALS
+%token STAR DOT ARROW EQUALS BAR
 %token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF UNDERSCORE
-%token LPAREN RPAREN
+%token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
-%token<string> IDENT
+%token<string> IDENT ENUM_IDENT
 %token EOF
 
 %start <Datalog_syntax.structure> program
@@ -49,6 +49,9 @@ expr:
 | es=in_parens(separated_list(COMMA,expr))
     { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_tuple es } }
+| sym=ENUM_IDENT
+    { { expr_loc  = Location.mk $startpos $endpos
+      ; expr_data = Expr_enum sym } }
 
 atom:
 | pred=longident; args=in_parens(separated_list(COMMA,expr))
@@ -104,6 +107,9 @@ domain_type0:
       ; domtype_data = Type_tuple [] } }
 | LPAREN; dty=domain_type; RPAREN
     { dty }
+| LBRACE; syms=separated_list(BAR, ENUM_IDENT); RBRACE
+    { { domtype_loc  = Location.mk $startpos $endpos
+      ; domtype_data = Type_enum syms } }
 
 predicate_type:
 | dtys=separated_nonempty_list(STAR, domain_type0)

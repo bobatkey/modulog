@@ -16,6 +16,7 @@ module Eval = struct
   type eval_type =
     | Itype_int
     | Itype_tuple of eval_type list
+    | Itype_enum  of string list
 
   type eval_value = string * eval_type list
 
@@ -33,10 +34,12 @@ module Eval = struct
            | _ -> failwith "internal: expecting a type")
       | {domtype_data=Type_tuple tys} ->
          Itype_tuple (List.map (eval_type env ()) tys)
+      | {domtype_data=Type_enum syms} ->
+         Itype_enum syms
 
     let rec eta_expand_var vnm suffix ty flexprs =
       match ty with
-        | Itype_int ->
+        | Itype_int | Itype_enum _ ->
            let vnm =
              vnm ^ (String.concat "/" (List.map string_of_int (List.rev suffix)))
            in
@@ -50,7 +53,7 @@ module Eval = struct
 
     let rec eta_expand_underscore ty flexprs =
       match ty with
-        | Itype_int ->
+        | Itype_int | Itype_enum _ ->
            RS.Underscore :: flexprs
         | Itype_tuple tys ->
            List.fold_right eta_expand_underscore tys flexprs
@@ -65,6 +68,13 @@ module Eval = struct
            eta_expand_underscore ty flexprs
         | {expr_data = Expr_tuple exprs}, Itype_tuple tys ->
            flatten_exprs exprs tys flexprs
+        | {expr_data = Expr_enum sym}, Itype_enum syms ->
+           let rec find i = function
+             | [] -> failwith "internal error: dodgy enum symbol"
+             | s :: _ when s = sym -> Int32.of_int i
+             | _ :: syms -> find (i+1) syms
+           in
+           RS.Lit (find 0 syms) :: flexprs
         | _ ->
            failwith "internal error: type mismatch in flatten_expr"
 

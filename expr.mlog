@@ -1,7 +1,7 @@
 module type INPUT = sig
   type index
 
-  type token = int
+  type token
 
   is_index : index
 
@@ -20,31 +20,37 @@ module type GRAMMAR = sig
   rhs_stop : rhs
 end
 
-module G = struct
-  type non_terminal = int
-  type token = int
-  type rhs = int * int
+module ExprGrammar = struct
+  type non_terminal = [ `E ]
+
+  type token = [ `x | `plus ]
+
+  type rhs = [ `E1 | `E2 ] * int
 
   def nt_to_rhs : non_terminal * rhs
-      nt_to_rhs (0, (0,0))
-      nt_to_rhs (0, (1,0))
+      nt_to_rhs (`E, (`E1,0))
+      nt_to_rhs (`E, (`E2,0))
 
   def rhs_tok : rhs * token * rhs
-      rhs_tok ((0,0), 0, (0,1))
-      rhs_tok ((1,1), 1, (1,2))
+      rhs_tok ((`E1,0), `x, (`E1,1))
+      rhs_tok ((`E2,1), `plus, (`E2,2))
 
   def rhs_nt : rhs * non_terminal * rhs
-      rhs_nt ((1,0), 0, (1,1))
-      rhs_nt ((1,2), 0, (1,3))
+      rhs_nt ((`E2,0), `E, (`E2,1))
+      rhs_nt ((`E2,2), `E, (`E2,3))
 
   def rhs_stop : rhs
-      rhs_stop ((0,1))
-      rhs_stop ((1,3))
+      rhs_stop ((`E1,1))
+      rhs_stop ((`E2,3))
 end
 
 module Recogniser =
   functor (G : GRAMMAR) ->
-  functor (I : sig type index type token = G.token token_at : index * token * index is_index : index end) ->
+  functor (I : sig type index
+                   type token = G.token
+                   token_at : index * token * index
+                   is_index : index
+               end) ->
 struct
 
   def
@@ -53,15 +59,19 @@ struct
 
   and
     parse_rhs : I.index * G.rhs * I.index
-    parse_rhs (i, rhs, i) :- G.rhs_stop (rhs), I.is_index (i)
-    parse_rhs (i, rhs, j) :- G.rhs_tok (rhs, tok, rhs'), I.token_at (i, tok, i'), parse_rhs (i', rhs', j)
-    parse_rhs (i, rhs, j) :- G.rhs_nt (rhs, nt, rhs'), parse (i, nt, i'), parse_rhs (i', rhs', j)
+    parse_rhs (i, rhs, i) :-
+       G.rhs_stop (rhs), I.is_index (i)
+    parse_rhs (i, rhs, j) :-
+       G.rhs_tok (rhs, tok, rhs'), I.token_at (i, tok, i'), parse_rhs (i', rhs', j)
+    parse_rhs (i, rhs, j) :-
+       G.rhs_nt (rhs, nt, rhs'), parse (i, nt, i'), parse_rhs (i', rhs', j)
 
 end
 
 module TestInput = struct
   type index = int
-  type token = int
+
+  type token = [`x | `plus]
 
   def is_index : index
       is_index (0)
@@ -70,12 +80,12 @@ module TestInput = struct
       is_index (3)
 
   def token_at : index * token * index
-      token_at (0,0,1)
-      token_at (1,1,2)
-      token_at (2,0,3)
+      token_at (0,`x,1)
+      token_at (1,`plus,2)
+      token_at (2,`x,3)
 end
 
-module R = Recogniser (G) (TestInput)
+module R = Recogniser (ExprGrammar) (TestInput)
 
 (*
 module Grammar = functor (I : INPUT) -> struct

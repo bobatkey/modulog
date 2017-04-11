@@ -16,6 +16,7 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
     | Expr_literal of int32
     | Expr_underscore
     | Expr_tuple of expr list
+    | Expr_enum of string
 
   type domaintype =
     { domtype_loc  : Location.t
@@ -26,6 +27,10 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
     | Type_int
     | Type_typename of longident
     | Type_tuple    of domaintype list
+    | Type_enum     of string list
+
+  let pp_enum_sym fmt sym =
+    Format.fprintf fmt "`%s" sym
 
   let rec pp_domaintype pp = function
     | { domtype_data = Type_int } ->
@@ -34,6 +39,9 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
        Names.pp_longident pp lid
     | { domtype_data = Type_tuple tys } ->
        Format.fprintf pp "(@[<hov>%a@])" pp_domaintypes tys
+    | { domtype_data = Type_enum syms } ->
+       Format.fprintf pp "@[<2>[ %a ]@]"
+         (Fmt.list ~sep:(Fmt.always " |@ ") pp_enum_sym) syms
 
   and pp_domaintypes pp tys =
     let rec lp = function
@@ -92,11 +100,12 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
     Format.fprintf pp "@[<hv 1>%a@]"
       pp_domaintypes tys
 
-  let rec pp_expr pp = function
-    | {expr_data = Expr_var nm}     -> Format.pp_print_string pp nm
-    | {expr_data = Expr_literal i}  -> Format.fprintf pp "%ld" i
-    | {expr_data = Expr_underscore} -> Format.pp_print_string pp "_"
-    | {expr_data = Expr_tuple es}   -> Format.fprintf pp "(%a)" pp_exprs es
+  let rec pp_expr fmt = function
+    | {expr_data = Expr_var nm}     -> Format.pp_print_string fmt nm
+    | {expr_data = Expr_literal i}  -> Format.fprintf fmt "%ld" i
+    | {expr_data = Expr_underscore} -> Format.pp_print_string fmt "_"
+    | {expr_data = Expr_tuple es}   -> Format.fprintf fmt "(%a)" pp_exprs es
+    | {expr_data = Expr_enum sym}   -> pp_enum_sym fmt sym
 
   and pp_exprs pp = function
     | [] -> ()

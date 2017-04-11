@@ -353,3 +353,14 @@ and search_patterns_of_comms comms =
 
 let search_patterns comms =
   search_patterns_of_comms comms PredicatePats.empty
+
+(* Now to work out the indexes required for each relation:
+   - run "search_patterns program"
+   - for each predicate, get the minimal path cover - each path is an index.
+   - Two types of 'relation'
+     - sequential only: typically new_* and delta_*
+       - these are only used to (a) add things to; and (b) iterate over. Just use a linked list of blocks.
+     - lookup oriented ones
+       - will have 1 or more indexes
+       - insertion updates the indexes (all data is stored in the indexes anyway)
+*)
