@@ -1,5 +1,7 @@
 module Make_syntax (Names : Modules.Syntax.NAMES) = struct
 
+  module Location = Location
+
   module Names = Names
 
   open Names

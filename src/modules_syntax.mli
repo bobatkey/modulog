@@ -1,3 +1,11 @@
+module type SOURCE_LOCATION = sig
+  type t
+
+  val generated : t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module type NAMES = sig
   type ident
   type longident
@@ -25,6 +33,7 @@ module Bound_names : sig
 end
 
 module type CORE_SYNTAX_RAW = sig
+  module Location : SOURCE_LOCATION
   module Names : NAMES
 
   type term
@@ -49,7 +58,7 @@ module type MOD_SYNTAX_RAW = sig
   val pp_type_decl : Format.formatter -> Core.Names.ident * type_decl -> unit
 
   type mod_type =
-    { modtype_loc  : Location.t
+    { modtype_loc  : Core.Location.t
     ; modtype_data : modtype_data
     }
 
@@ -62,7 +71,7 @@ module type MOD_SYNTAX_RAW = sig
     sig_item list
 
   and sig_item =
-    { sigitem_loc  : Location.t
+    { sigitem_loc  : Core.Location.t
     ; sigitem_data : sigitem_data
     }
 
@@ -77,7 +86,7 @@ module type MOD_SYNTAX_RAW = sig
   val pp_sig_item : Format.formatter -> sig_item -> unit
 
   type mod_term =
-    { modterm_loc  : Location.t
+    { modterm_loc  : Core.Location.t
     ; modterm_data : modterm_data
     }
 
@@ -92,7 +101,7 @@ module type MOD_SYNTAX_RAW = sig
     str_item list
 
   and str_item =
-    { stritem_loc  : Location.t
+    { stritem_loc  : Core.Location.t
     ; stritem_data : stritem_data
     }
 
