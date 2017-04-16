@@ -28,7 +28,7 @@ val rule : rule_id -> ruleset -> rule
 
 val rule_is_self_recursive : ruleset -> rule_id -> bool
 
-val scc_list : ruleset -> rule_id list list
+val scc_list : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
 
 module G : sig
   type t = ruleset

@@ -167,8 +167,7 @@ let expr_of_rule guard_relation head atoms =
   assert (AttrSet.is_empty reqd);
   expr
 
-let translate_rule ruleset rule_id =
-  let RS.{pred; args; rhs} = RS.rule rule_id ruleset in
+let translate_rule ruleset RS.{pred; args; rhs} =
   let expr = expr_of_rule None args rhs in
   Insert ([pred], expr)
 
@@ -194,8 +193,7 @@ let extract_predicate dpred rhs =
   in
   loop [] rhs
 
-let translate_recursive ruleset rule_ids =
-  let rules = List.map (fun id -> RS.rule id ruleset) rule_ids in
+let translate_recursive ruleset rules =
   let predicates = predicates_of_rules rules in
   let delta_predicates = VarSet.map_to_list delta_ predicates in
   let declarations =
@@ -220,7 +218,8 @@ let translate_recursive ruleset rule_ids =
                    (fun delta'd_predicate ->
                       List.map
                         (fun rhs ->
-                           Insert ([pred; new_ pred], expr_of_rule (Some pred) args rhs))
+                           Insert ([pred; new_ pred],
+                                   expr_of_rule (Some pred) args rhs))
                         (extract_predicate delta'd_predicate rhs))
                    predicates
                end
@@ -231,19 +230,13 @@ let translate_recursive ruleset rule_ids =
      ])
 
 let translate_component ruleset = function
-  | [] ->
-     failwith "internal error: translate_component: empty component"
-  | [rule_id] as rules ->
-     if RS.rule_is_self_recursive ruleset rule_id then
-       translate_recursive ruleset rules
-     else
-       translate_rule ruleset rule_id
-  | rules ->
+  | `Direct rule ->
+     translate_rule ruleset rule
+  | `Recursive rules ->
      translate_recursive ruleset rules
 
 let translate ruleset =
-  let components = RS.scc_list ruleset in
-  List.map (translate_component ruleset) components
+  List.map (translate_component ruleset) (RS.scc_list ruleset)
 
   (* Indexes:
      - work out which indexes are needed:

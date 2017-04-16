@@ -112,16 +112,27 @@ module G = struct
     iter_vertex (fun src -> iter_succ (fun tgt -> f (src,tgt)) ruleset src) ruleset
 end
 
-module SCC = Graph.Components.Make (G)
-
-let scc_list ruleset =
-  List.map (List.map snd) (SCC.scc_list ruleset)
-
 (** A rule is self recursive if it mentions the head predicate in the
-   right hand side. *)
+    right hand side. *)
 let rule_is_self_recursive ruleset rule_id =
   let rule = ruleset.rules.(rule_id) in
   List.exists (fun (Atom {pred}) -> pred = rule.pred) rule.rhs
+
+module SCC = Graph.Components.Make (G)
+
+let form_of_component ruleset = function
+  | [] -> assert false
+  | [_, rule_id] ->
+     if rule_is_self_recursive ruleset rule_id then
+       `Recursive [rule rule_id ruleset]
+     else
+       `Direct (rule rule_id ruleset)
+  | rules ->
+     `Recursive (List.map (fun (_,id) -> rule id ruleset) rules)
+
+let scc_list ruleset =
+  List.map (form_of_component ruleset) (SCC.scc_list ruleset)
+
 
 let of_rules rules =
   let update pred f map =
