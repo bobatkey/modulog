@@ -197,12 +197,14 @@ struct
       | Ok (Type ty) -> ty
       | _ -> failwith "internal: type lookup failed"
 
-  open Rresult
+  let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
 
   let reword_lookup_error ~target_path result =
-    R.reword_error
-      (fun (subpath, reason) -> { path = target_path; subpath; reason })
-      result
+    match result with
+      | Ok value ->
+         Ok value
+      | Error (subpath, reason) ->
+         Error { path = target_path; subpath; reason }
 
   let find_value lid {bindings;names} =
     reword_lookup_error ~target_path:lid begin
@@ -305,7 +307,8 @@ struct
   module Env = CT.Env
   module Location = Src.Core.Location
   
-  open Rresult
+  let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
+  let (>>|) c f = match c with Ok a -> Ok (f a) | Error e -> Error e
 
   let rec check_list f = function
     | [] -> Ok ()
@@ -372,23 +375,28 @@ struct
       (* Check signatures via subsumption *)
       | {modtype_data=Modtype_signature sig1},
         {modtype_data=Modtype_signature sig2} ->
-         R.reword_error (fun detail -> {mty1;mty2;detail}) begin
-           pair_signature_components sig1 sig2 >>= fun (paired_components, sub) ->
-           let ext_env = Env.add_signature sig1 env in
-           check_list (specification_match ext_env sub) paired_components
-         end
+         (match signature_match env sig1 sig2 with
+           | Ok () ->
+              Ok ()
+           | Error detail ->
+              Error {mty1;mty2;detail})
 
-      (* *)
+      (* Check that functor types match: contravariantly in their
+         arguments, and covariantly in their results. *)
       | {modtype_data=Modtype_functor (param1, arg1, res1)},
         {modtype_data=Modtype_functor (param2, arg2, res2)} ->
          let sub   = Subst.add param1 (Path.Pident param2) Subst.identity in
          let res1' = Tgt.subst_modtype sub res1 in
-         modtype_match env arg2 arg1
-         >>= fun () ->
+         modtype_match env arg2 arg1 >>= fun () ->
          modtype_match (Env.add_module_by_ident param2 arg2 env) res1' res2
 
       | _, _ ->
          Error {mty1;mty2;detail=Signature_vs_functor}
+
+  and signature_match env sig1 sig2 =
+    pair_signature_components sig1 sig2 >>= fun (paired_components, sub) ->
+    let ext_env = Env.add_signature sig1 env in
+    check_list (specification_match ext_env sub) paired_components
 
   and pair_signature_components sig1 sig2 =
     let open Tgt in
@@ -429,17 +437,23 @@ struct
          Error (Type_mismatch (id, decl1, decl2))
 
     | Tgt.Sig_module (id, mty1), Tgt.Sig_module (_, mty2) ->
-       R.reword_error (fun e -> Module_mismatch (id, e)) begin
-         modtype_match env mty1 (Tgt.subst_modtype sub mty2)
-       end
+       (match modtype_match env mty1 (Tgt.subst_modtype sub mty2) with
+         | Ok () ->
+            Ok ()
+         | Error e ->
+            Error (Module_mismatch (id, e)))
 
     | Tgt.Sig_modty (id, mty1), Tgt.Sig_modty (_, mty2) ->
        (* FIXME: not sure this is right? matching both ways =>
           equality up to permutation? *)
-       R.reword_error (fun e -> Module_eq_mismatch (id, e)) begin
-         modtype_match env mty1 (Tgt.subst_modtype sub mty2) >>= fun () ->
-         modtype_match env (Tgt.subst_modtype sub mty2) mty1
-       end
+       (match
+          modtype_match env mty1 (Tgt.subst_modtype sub mty2) >>= fun () ->
+          modtype_match env (Tgt.subst_modtype sub mty2) mty1
+        with
+          | Ok () ->
+             Ok ()
+          | Error e ->
+             Error (Module_eq_mismatch (id, e)))
 
     | _, _ ->
        assert false
@@ -458,7 +472,8 @@ struct
            typ2)
 
 
-  (* Strengthening: FIXME: switch to Generated locations everywhere *)
+  (* Strengthening: FIXME: switch to generated locations everywhere,
+     or record the provenance? *)
   let rec strengthen_modtype env path = function
     | Tgt.{modtype_data = Modtype_longident p} ->
        strengthen_modtype env path (Env.lookup_modtype p env)
@@ -538,12 +553,17 @@ struct
            Location.pp location
            id
 
-  let lift_lookup_error loc r =
-    R.reword_error (fun err -> (loc, Lookup_error err)) r
-  let lift_core_error loc r =
-    R.reword_error (fun err -> (loc, Core_error err)) r
-  let lift_match_error loc reason r =
-    R.reword_error (fun err -> (loc, Match_error (reason, err))) r
+  let lift_lookup_error loc = function
+    | Ok value  -> Ok value
+    | Error err -> Error (loc, Lookup_error err)
+
+  let lift_core_error loc = function
+    | Ok value  -> Ok value
+    | Error err -> Error (loc, Core_error err)
+
+  let lift_match_error loc reason = function
+    | Ok value  -> Ok value
+    | Error err -> Error (loc, Match_error (reason, err))
 
   let check_manifest env loc kind = function
     | None -> Ok None
@@ -636,7 +656,7 @@ struct
          check_signature env (item :: rev_sig) seen rem
 
 
-  
+
   let rec type_modterm env = function
     | Src.{modterm_loc; modterm_data=Mod_longident path} ->
        lift_lookup_error modterm_loc (Env.find_module path env)
