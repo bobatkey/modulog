@@ -47,12 +47,14 @@ module type ENV = sig
 
   val add_modty : String_names.ident -> Mod.mod_type -> t -> Ident.t * t
 
-  
   val add_signature : Mod.signature -> t -> t
+
 
   val add_module_by_ident : Ident.t -> Mod.mod_type -> t -> t
 
-  
+  val bind_value : Ident.t -> Mod.Core.val_type -> t -> t
+
+
   val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 
   val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, lookup_error) result
@@ -98,6 +100,11 @@ struct
     }
 
   let add_value id vty = add id (Value vty)
+
+  let bind_value id vty {bindings; names} =
+    { bindings = Ident.Table.add id (Value vty) bindings
+    ; names    = NameMap.add (Ident.name id) id names
+    }
 
   let add_type id decl = add id (Type decl)
 
@@ -250,7 +257,7 @@ module type CORE_TYPING = sig
 
   val pp_error : Format.formatter -> core_error -> unit
 
-  val type_term : Env.t -> Src.term -> (Core.term * (string * Core.val_type) list, core_error) result
+  val type_term : Env.t -> Src.term -> (Core.term * (Ident.t * Core.val_type) list, core_error) result
 
   val check_deftype : Env.t -> Core.kind -> Src.def_type -> (Core.def_type, core_error) result
 
@@ -725,8 +732,8 @@ struct
        (* FIXME: also do 'seen' *)
        let rec collect env rev_sigitems = function
          | [] -> env, rev_sigitems
-         | (id, ty) :: items ->
-            let ident, env = Env.add_value id ty env in
+         | (ident, ty) :: items ->
+            let env = Env.bind_value ident ty env in
             let item = Tgt.{ sigitem_loc  = Location.generated
                            ; sigitem_data = Tgt.Sig_value (ident, ty)
                            }

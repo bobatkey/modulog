@@ -30,6 +30,8 @@ module type ENV = sig
 
   val add_module_by_ident : Modules_ident.t -> Mod.mod_type -> t -> t
 
+  val bind_value : Modules_ident.t -> Mod.Core.val_type -> t -> t
+
 
   val find_value : String_names.longident -> t -> (Modules_path.t * Mod.Core.val_type, lookup_error) result
 
@@ -59,7 +61,7 @@ module type CORE_TYPING = sig
   val pp_error : Format.formatter -> core_error -> unit
 
 
-  val type_term : Env.t -> Src.term -> (Core.term * (string * Core.val_type) list, core_error) result
+  val type_term : Env.t -> Src.term -> (Core.term * (Modules_ident.t * Core.val_type) list, core_error) result
 
   val check_deftype : Env.t -> Core.kind -> Src.def_type -> (Core.def_type, core_error) result
 

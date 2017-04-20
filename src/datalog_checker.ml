@@ -257,7 +257,7 @@ module Core_typing = struct
     | Src.{decl_name; decl_type} :: decls ->
        check_valtype env decl_type >>= fun decl_type ->
        let ident, env = Env.add_value decl_name decl_type env in
-       bind_decls env ((decl_name, ident, decl_type) :: rev_decls) decls
+       bind_decls env ((ident, decl_type) :: rev_decls) decls
 
 
   let rec check_safe local_env = function
@@ -298,7 +298,7 @@ module Core_typing = struct
        type_rule env decl_name ident tys rule >>= fun rule ->
        type_rules env decl_name ident tys (rule :: rev_rules) rules
 
-  let type_decl env (id, ident, predty) Src.{decl_name; decl_loc; decl_rules} =
+  let type_decl env (ident, predty) Src.{decl_name; decl_loc; decl_rules} =
     type_rules env decl_name ident predty.Core.predty_data [] decl_rules
     >>| fun decl_rules ->
     Core.{ decl_loc
@@ -320,7 +320,7 @@ module Core_typing = struct
     bind_decls env [] decls >>= fun (idents, env) ->
     type_decls env [] idents decls >>= fun decls ->
     Ok ( decls
-       , List.map (fun (id, _, ty) -> (id, ty)) idents
+       , List.map (fun (id, ty) -> (id, ty)) idents
        )
 
 
