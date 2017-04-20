@@ -42,45 +42,50 @@ module IFDS_of_Extended = functor (P : IFDS_PROGRAM_EXT) -> struct
 
   def
     edge : point * point
-    edge ((n,s), (n',s')) :- P.edge (n, s, n', s')
+    edge ((?n,?s), (?n',?s')) :- P.edge (?n, ?s, ?n', ?s')
 
   def
     start_edge : procedure * point
-    start_edge ((p, ef), (n, s)) :- P.start_edge (p, ef, n, s)
+    start_edge ((?p, ?ef), (?n, ?s)) :- P.start_edge (?p, ?ef, ?n, ?s)
 
   def
     call : point * procedure
-    call ((n, s), (p, ef)) :- P.call (n, s, p, ef)
+    call ((?n, ?s), (?p, ?ef)) :- P.call (?n, ?s, ?p, ?ef)
 
   def
     return : point * point * point
-    return ((nc,sc), (ne, se), (nr, sr)) :- P.return (nc, sc, ne, se, nr, sr)
+    return ((?nc,?sc), (?ne, ?se), (?nr, ?sr)) :-
+      P.return (?nc, ?sc, ?ne, ?se, ?nr, ?sr)
 
   def
     initial : procedure
-    initial ((p, ef)) :- P.initial (p, ef)
+    initial ((?p, ?ef)) :- P.initial (?p, ?ef)
 end
 
 module IFDS = functor (P : IFDS_PROGRAM) -> struct
 
   def
     intra : P.procedure * P.point
-    intra (p, n) :- invoked (p), P.start_edge (p, n)
-    intra (p, n) :- intra (p, n'), P.edge (n', n)
-    intra (p, n) :- intra (p, n'), callreturn (n', n)
+    intra (?Proc, ?Node) :- invoked (?Proc), P.start_edge (?Proc, ?Node)
+    intra (?Proc, ?Node) :- intra (?Proc, ?Node'), P.edge (?Node', ?Node)
+    intra (?Proc, ?Node) :- intra (?Proc, ?Node'), callreturn (?Node', ?Node)
 
   and
     invoked : P.procedure
-    invoked (p) :- P.initial (p)
-    invoked (p) :- callsite(n, p)
+    invoked (?Proc) :- P.initial (?Proc)
+    invoked (?Proc) :- callsite (?Node, ?Proc)
 
   and
     callsite : P.point * P.procedure
-    callsite (n,p') :- intra (p, n), P.call (n, p')
+    callsite (?Node, ?CalledProc) :-
+       intra (?Proc, ?Node), P.call (?Node, ?CalledProc)
 
   and
     callreturn : P.point * P.point
-    callreturn(n, n') :- callsite (n, p), intra (p, ne), P.return (n, ne, n')
+    callreturn (?CallNode, ?ReturnNode) :-
+       callsite (?CallNode, ?CalledProc),
+       intra (?CalledProc, ?ExitNode),
+       P.return (?CallNode, ?ExitNode, ?ReturnNode)
 
 end
 

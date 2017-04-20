@@ -354,8 +354,8 @@ struct
     | Value_mismatch (id, vty1, vty2) ->
        Format.fprintf pp "the entry %S has type@ @[<v 2>@,%a@,@]@ in the former, and@ @[<v 2>@,%a@,@]@ in the latter, and these are not equal."
          (Ident.name id)
-         Tgt.Core.pp_val_type vty1
-         Tgt.Core.pp_val_type vty2
+         Tgt.Core.pp_val_decl (id, vty1)
+         Tgt.Core.pp_val_decl (id, vty2)
     | Type_mismatch (id, decl1, decl2) ->
        Format.fprintf pp "the type %a is declared as@ %a@ in the former, and @ %a@ in the latter, and these do not match."
          Ident.pp id

@@ -13,6 +13,14 @@ module type GRAMMAR = sig
   type token
   type rhs
 
+  constant start : non_terminal
+
+  (* naturally gives regular right-hand sides!
+
+     the 'rhs' is a state in some state machine where the transitions
+     are non-terminals or tokens. If it is 'infinite' state, then we'd
+     have data driven parsers? *)
+
   nt_to_rhs : non_terminal * rhs
 
   rhs_nt   : rhs * non_terminal * rhs
@@ -23,27 +31,30 @@ end
 module ExprGrammar = struct
   type non_terminal = [ `E ]
 
+  constant start : non_terminal = `E
+
   type token = [ `x | `plus ]
 
-  type rhs = [ `E1 | `E2 ] * int
+  type rhs = [ `E1_0 | `E1_1 | `E2_0 | `E2_1 | `E2_2 | `E2_3 ]
 
   def nt_to_rhs : non_terminal * rhs
-      nt_to_rhs (`E, (`E1,0))
-      nt_to_rhs (`E, (`E2,0))
+      nt_to_rhs (`E, `E1_0)
+      nt_to_rhs (`E, `E2_0)
 
   def rhs_tok : rhs * token * rhs
-      rhs_tok ((`E1,0), `x, (`E1,1))
-      rhs_tok ((`E2,1), `plus, (`E2,2))
+      rhs_tok (`E1_0, `x, `E1_1)
+      rhs_tok (`E2_1, `plus, `E2_2)
 
   def rhs_nt : rhs * non_terminal * rhs
-      rhs_nt ((`E2,0), `E, (`E2,1))
-      rhs_nt ((`E2,2), `E, (`E2,3))
+      rhs_nt (`E2_0, `E, `E2_1)
+      rhs_nt (`E2_2, `E, `E2_3)
 
   def rhs_stop : rhs
-      rhs_stop ((`E1,1))
-      rhs_stop ((`E2,3))
+      rhs_stop (`E1_1)
+      rhs_stop (`E2_3)
 end
 
+(* Basically computes the intersection of a CFG with a regular language... *)
 module Recogniser =
   functor (G : GRAMMAR) ->
   functor (I : sig type index
@@ -53,18 +64,29 @@ module Recogniser =
                end) ->
 struct
 
+  (* parse (i, nt, j) if the symbol 'nt' is recognised between 'i' and
+  'j' in the input. *)
+
   def
     parse : I.index * G.non_terminal * I.index
-    parse (i, nt, j) :- G.nt_to_rhs (nt, rhs), parse_rhs (i, rhs, j)
+    parse (?i, ?nt, ?j) :-
+      G.nt_to_rhs (?nt, ?rhs), parse_rhs (?i, ?rhs, ?j)
 
   and
     parse_rhs : I.index * G.rhs * I.index
-    parse_rhs (i, rhs, i) :-
-       G.rhs_stop (rhs), I.is_index (i)
-    parse_rhs (i, rhs, j) :-
-       G.rhs_tok (rhs, tok, rhs'), I.token_at (i, tok, i'), parse_rhs (i', rhs', j)
-    parse_rhs (i, rhs, j) :-
-       G.rhs_nt (rhs, nt, rhs'), parse (i, nt, i'), parse_rhs (i', rhs', j)
+    parse_rhs (?i, ?rhs, ?i) :-
+       G.rhs_stop (?rhs), I.is_index (?i)
+    parse_rhs (?i, ?rhs, ?j) :-
+       G.rhs_tok (?rhs, ?tok, ?rhs'),
+       I.token_at (?i, ?tok, ?i'),
+       parse_rhs (?i', ?rhs', ?j)
+    parse_rhs (?i, ?rhs, ?j) :-
+       G.rhs_nt (?rhs, ?nt, ?rhs'),
+       parse (?i, ?nt, ?i'), parse_rhs (?i', ?rhs', ?j)
+
+  def
+    parse_between : I.index * I.index
+    parse_between (?i, ?j) :- parse (?i, G.start, ?j)
 
 end
 
@@ -86,16 +108,3 @@ module TestInput = struct
 end
 
 module R = Recogniser (ExprGrammar) (TestInput)
-
-(*
-module Grammar = functor (I : INPUT) -> struct
-
-  def
-    expr : I.index * I.index
-    expr (i,j) :- I.token_at (i, 0, j)
-    expr (i,j) :- expr (i,i1), I.token_at (i1,1,j1), expr (j1,j)
-
-end
-
-module G = Grammar (TestInput)
-*)

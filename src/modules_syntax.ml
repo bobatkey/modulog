@@ -62,9 +62,10 @@ module type CORE_SYNTAX_RAW = sig
   type kind
 
   val pp_term : Format.formatter -> term -> unit
-  val pp_val_type : Format.formatter -> val_type -> unit
-  val pp_def_type : Format.formatter -> def_type -> unit
-  val pp_kind : (Format.formatter -> kind -> unit) option
+
+  val pp_val_decl : Format.formatter -> Names.ident * val_type -> unit
+
+  val pp_def_decl : Format.formatter -> Names.ident * kind * def_type option -> unit
 end
 
 module type MOD_SYNTAX_RAW = sig
@@ -169,27 +170,8 @@ struct
     | Sig_module of Core.Names.ident * mod_type
     | Sig_modty  of Core.Names.ident * mod_type
 
-  let pp_type_decl pp = function
-    | (id, { kind; manifest = None }) ->
-       (match Core.pp_kind with
-         | None ->
-            Format.fprintf pp "type %a" Core.Names.pp_ident id
-         | Some pp_kind ->
-            Format.fprintf pp "type %a :: %a"
-              Core.Names.pp_ident id
-              pp_kind kind)
-    | (id, { kind; manifest = Some ty }) ->
-       (match Core.pp_kind with
-         | None ->
-            Format.fprintf pp "type %a = %a"
-              Core.Names.pp_ident id
-              Core.pp_def_type ty
-         | Some pp_kind ->
-            Format.fprintf pp "@[<hv 2>type %a :: %a =@ %a@]"
-              Core.Names.pp_ident id
-              pp_kind kind
-              Core.pp_def_type ty)
-
+  let pp_type_decl fmt (id, { kind; manifest }) =
+    Core.pp_def_decl fmt (id, kind, manifest)
 
   let rec pp_modtype pp = function
     | {modtype_data = Modtype_longident lid} ->
@@ -212,19 +194,17 @@ struct
        Format.pp_print_space pp ();
        pp_signature pp items
 
-  and pp_sig_item pp = function
+  and pp_sig_item fmt = function
     | { sigitem_data = Sig_value (id, vty) } ->
-       Format.fprintf pp "%a : %a"
-         Core.Names.pp_ident id
-         Core.pp_val_type vty
+       Core.pp_val_decl fmt (id, vty)
     | { sigitem_data = Sig_type (id, decl) } ->
-       pp_type_decl pp (id, decl)
+       pp_type_decl fmt (id, decl)
     | { sigitem_data = Sig_module (id, mty) } ->
-       Format.fprintf pp "@[<hv 2>module %a :@ %a@]"
+       Format.fprintf fmt "@[<hv 2>module %a :@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
     | { sigitem_data = Sig_modty (id, mty) } ->
-       Format.fprintf pp "@[<v 2>module type %a =@ %a@]"
+       Format.fprintf fmt "@[<v 2>module type %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
 
@@ -290,19 +270,17 @@ struct
        Format.pp_print_cut pp ();
        pp_structure pp items
 
-  and pp_str_item pp = function
+  and pp_str_item fmt = function
     | {stritem_data = Str_value term} ->
-       Core.pp_term pp term
+       Core.pp_term fmt term
     | {stritem_data = Str_type (id, kind, def_type)} ->
-       Format.fprintf pp "type %a = %a"
-         Core.Names.pp_ident id
-         Core.pp_def_type def_type
+       Core.pp_def_decl fmt (id, kind, Some def_type)
     | {stritem_data = Str_module (id, modl)} ->
-       Format.fprintf pp "@[<v 2>module %a =@ %a@]"
+       Format.fprintf fmt "@[<v 2>module %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modterm modl
     | {stritem_data = Str_modty (id, mty)} ->
-       Format.fprintf pp "@[<v 2>module type %a =@ %a@]"
+       Format.fprintf fmt "@[<v 2>module type %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
 end

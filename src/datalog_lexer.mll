@@ -22,6 +22,7 @@ rule token = parse
 | "int"      { INT }
 | "and"      { AND }
 | "def"      { DEF }
+| "constant" { CONSTANT }
 | '('        { LPAREN }
 | ')'        { RPAREN }
 | '['        { LBRACE }
@@ -32,6 +33,8 @@ rule token = parse
              { IDENT (Lexing.lexeme lexbuf) }
 | '`'(['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']* as ident)
              { ENUM_IDENT ident }
+| '?'(['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']* as ident)
+             { MV_IDENT ident }
 | '_'        { UNDERSCORE }
 | eof        { EOF }
 

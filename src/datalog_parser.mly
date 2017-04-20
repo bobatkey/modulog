@@ -6,11 +6,11 @@ open Datalog_syntax
 %token COMMA
 %token COLON_DASH
 %token COLON
-%token STAR DOT ARROW EQUALS BAR
-%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF UNDERSCORE
+%token STAR DOT ARROW EQUALS BAR UNDERSCORE
+%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF CONSTANT
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
-%token<string> IDENT ENUM_IDENT
+%token<string> IDENT ENUM_IDENT MV_IDENT
 %token EOF
 
 %start <Datalog_syntax.structure> program
@@ -37,9 +37,12 @@ longident:
 /* Datalog rules */
 
 expr:
-| v=IDENT
+| v=MV_IDENT
     { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_var v } }
+| lid=longident
+    { { expr_loc  = Location.mk $startpos $endpos
+      ; expr_data = Expr_lid lid } }
 | i=INT_LITERAL
     { { expr_loc  = Location.mk $startpos $endpos
       ; expr_data = Expr_literal i } }
@@ -81,9 +84,15 @@ pred_decl:
       ; decl_type  = types
       ; decl_rules = rules } }
 
-decl:
+def:
 | DEF; d=pred_decl; ds=list(AND; d=pred_decl {d})
-    { d :: ds }
+    { PredicateDefs (d :: ds) }
+| CONSTANT; name=IDENT; COLON; ty=domain_type; EQUALS; e=expr
+    { ConstantDef { const_loc  = Location.mk $startpos $endpos
+                  ; const_name = name
+                  ; const_type = ty
+                  ; const_expr = e
+                  } }
 
 /* types */
 
@@ -132,7 +141,10 @@ mod_type:
 sig_item:
 | id=IDENT; COLON; ty=predicate_type
     { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_value (id, ty) } }
+      ; sigitem_data = Sig_value (id, Predicate ty) } }
+| CONSTANT; id=IDENT; COLON; ty=domain_type
+    { { sigitem_loc  = Location.mk $startpos $endpos
+      ; sigitem_data = Sig_value (id, Value ty) } }
 | TYPE; id=IDENT
     { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_type (id, { kind = (); manifest = None }) } }
@@ -170,7 +182,7 @@ mod_term2:
     { m }
 
 str_item:
-| d=decl
+| d=def
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_value d } }
 | TYPE; id=IDENT; EQUALS; ty=domain_type

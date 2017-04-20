@@ -18,13 +18,13 @@ module PointsTo = functor (P : PROGRAM) -> struct
 
   def
     ptsto : P.variable * P.object
-    ptsto(v,o) :- P.alloc(v,o)
-    ptsto(v,o) :- P.assign(v,v2), ptsto(v2,o)
-    ptsto(v,o) :- P.fread(v,v2,f), ptsto(v2,o2), fptsto(o2,f,o)
+    ptsto(?v,?o) :- P.alloc(?v,?o)
+    ptsto(?v,?o) :- P.assign(?v,?v2), ptsto(?v2,?o)
+    ptsto(?v,?o) :- P.fread(?v,?v2,?f), ptsto(?v2,?o2), fptsto(?o2,?f,?o)
 
   and
     fptsto : P.object * P.fieldname * P.object
-    fptsto(o,f,o2) :- P.fwrite(v,f,v2), ptsto(v,o), ptsto(v2,o2)
+    fptsto(?o,?f,?o2) :- P.fwrite(?v,?f,?v2), ptsto(?v,?o), ptsto(?v2,?o2)
 
 end
 

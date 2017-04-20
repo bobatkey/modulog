@@ -18,7 +18,9 @@ module Eval = struct
     | Itype_tuple of eval_type list
     | Itype_enum  of string list
 
-  type eval_value = string * eval_type list
+  type eval_value =
+    | Val_predicate of string * eval_type list
+    | Val_const     of expr
 
   module Eval (Env : Modules.Evaluator.EVAL_ENV
                with type eval_value = eval_value
@@ -58,7 +60,7 @@ module Eval = struct
         | Itype_tuple tys ->
            List.fold_right eta_expand_underscore tys flexprs
 
-    let rec flatten_expr expr ty flexprs =
+    let rec flatten_expr env expr ty flexprs =
       match expr, ty with
         | {expr_data = Expr_var vnm}, ty ->
            eta_expand_var vnm [] ty flexprs
@@ -67,7 +69,7 @@ module Eval = struct
         | {expr_data = Expr_underscore}, ty ->
            eta_expand_underscore ty flexprs
         | {expr_data = Expr_tuple exprs}, Itype_tuple tys ->
-           flatten_exprs exprs tys flexprs
+           flatten_exprs env exprs tys flexprs
         | {expr_data = Expr_enum sym}, Itype_enum syms ->
            let rec find i = function
              | [] -> failwith "internal error: dodgy enum symbol"
@@ -75,40 +77,51 @@ module Eval = struct
              | _ :: syms -> find (i+1) syms
            in
            RS.Lit (find 0 syms) :: flexprs
+        | {expr_data = Expr_lid lid}, ty ->
+           (match Env.find lid env with
+             | Some (`Value (Val_const expr)) ->
+                flatten_expr env expr ty flexprs
+             | Some _ | None ->
+                failwith "internal error: failure looking up constant")
         | _ ->
            failwith "internal error: type mismatch in flatten_expr"
 
-    and flatten_exprs exprs tys =
-      List.fold_right2 flatten_expr exprs tys
+    and flatten_exprs env exprs tys =
+      List.fold_right2 (flatten_expr env) exprs tys
 
-    let flatten_args exprs tys =
-      flatten_exprs exprs tys []
+    let flatten_args env exprs tys =
+      flatten_exprs env exprs tys []
 
     let eval_atom env = function
       | {atom_data=Atom_predicate { pred; args }} ->
          (match Env.find pred env with
-           | Some (`Value (pred, typ)) ->
-              let args = flatten_args args typ in
+           | Some (`Value (Val_predicate (pred, typ))) ->
+              let args = flatten_args env args typ in
               RS.Atom {pred; args}
            | _ ->
               failwith "internal error: type error in eval_atom")
 
     let eval_rule env {rule_pred; rule_args; rule_rhs} =
       match Env.find (Modules.Path.Pident rule_pred) env with
-        | Some (`Value (pred, typ)) ->
-           let args = flatten_args rule_args typ in
+        | Some (`Value (Val_predicate (pred, typ))) ->
+           let args = flatten_args env rule_args typ in
            let rhs  = List.map (eval_atom env) rule_rhs in
            RS.{ pred; args; rhs }
         | _ ->
            failwith "internal error: type error in eval_rule"
 
-    let eval_term env term rules =
+    let eval_predicate env defs rules =
       let bindings =
         List.map
           (fun {decl_name; decl_type} ->
-             let decl_type = List.map (eval_type env ()) decl_type.predty_data in
-             (decl_name, (Modules.Ident.(full_name @@ create (name decl_name)), decl_type)))
-          term
+             let decl_type =
+               List.map (eval_type env ()) decl_type.predty_data
+             in
+             (decl_name,
+              Val_predicate
+                (Modules.Ident.(full_name @@ create (name decl_name)),
+                 decl_type)))
+          defs
       in
       let env = Env.add_values bindings env in
       let rules =
@@ -117,10 +130,19 @@ module Eval = struct
              List.fold_right
                (fun rule -> List.cons (eval_rule env rule))
                decl_rules)
-          term
+          defs
           rules
       in
       bindings, rules
+
+    let eval_term env term rules =
+      match term with
+        | PredicateDefs defs ->
+           eval_predicate env defs rules
+        | ConstantDef {const_name;const_expr} ->
+           [ (const_name, Val_const const_expr) ],
+           rules
+
   end
 end
 

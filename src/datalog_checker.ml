@@ -11,9 +11,16 @@ module Core_syntax = struct
             | Type_enum syms    -> Type_enum syms
     }
 
-  let subst_valtype sub predty =
-    { predty with predty_data = List.map (subst_deftype sub) predty.predty_data
-    }
+
+  let subst_valtype sub = function
+    | Predicate predty ->
+       Predicate
+         { predty with
+             predty_data = List.map (subst_deftype sub) predty.predty_data
+         }
+
+    | Value domty ->
+       Value (subst_deftype sub domty)
 
   let subst_kind sub () = ()
 end
@@ -43,6 +50,8 @@ module Core_typing = struct
                        }
     | Enum_sym_not_found of string * string list
     | Expr_is_enum of { expected : Core.def_type }
+    | Predicate_reference_in_expr of Src.Names.longident
+    | Constant_reference_in_atom of Src.Names.longident
 
   type core_error = Location.t * core_error_detail
 
@@ -55,12 +64,12 @@ module Core_typing = struct
       | Type_mismatch { expected; actual } ->
          Format.fprintf pp
            "@[<hv 0>This expression has type@[<4>@ %a@]@ but was expected to have type@[<4>@ %a@]@]@;"
-           Core.pp_def_type actual
-           Core.pp_def_type expected
+           Core.pp_domaintype actual
+           Core.pp_domaintype expected
       | Expr_is_tuple { expected } ->
          Format.fprintf pp
            "@[<v 4>This expression is a tuple, but was expected to have type@,%a@]@;"
-           Core.pp_def_type expected
+           Core.pp_domaintype expected
       | Tuple_too_short ->
          Format.fprintf pp "Not enough elements in tuple expression"
       | Tuple_too_long ->
@@ -81,7 +90,15 @@ module Core_typing = struct
       | Expr_is_enum { expected } ->
          Format.fprintf pp
            "@[<v 4>Expression is a symbol, but the expected type is@,%a@]@;"
-           Core.pp_def_type expected
+           Core.pp_domaintype expected
+      | Predicate_reference_in_expr lid ->
+         Format.fprintf pp
+           "@[<hv>Reference@ to@ predicate@ %a,@ where@ a@ reference@ to@ a@ constant@ value@ was@ expected@]"
+           Src.Names.pp_longident lid
+      | Constant_reference_in_atom lid ->
+         Format.fprintf pp
+           "@[<hv>Reference@ to@ constant@ %a,@ where@ a@ reference@ to@ a@ predicate@ was@ expected@]"
+           Src.Names.pp_longident lid
 
   let lift_lookup_error loc r =
     R.reword_error (fun e -> (loc, Lookup_error e)) r
@@ -114,9 +131,19 @@ module Core_typing = struct
        check_deftype env () ty >>= fun ty ->
        check_deftypes env (ty :: rev_tys) tys
 
-  let check_valtype env Src.{predty_loc; predty_data} =
+  let check_predtype env Src.{predty_loc; predty_data} =
     check_deftypes env [] predty_data >>| fun tys ->
     Core.{ predty_loc; predty_data = tys }
+
+
+  let check_valtype env = function
+    | Src.Predicate predty ->
+       check_predtype env predty >>| fun predty ->
+       Core.Predicate predty
+    | Src.Value domty ->
+       check_deftype env () domty >>| fun domty ->
+       Core.Value domty
+
 
   let rec deftype_equiv env () domty1 domty2 =
     let open Core in
@@ -189,6 +216,19 @@ module Core_typing = struct
               Error (expr_loc,
                      Type_mismatch { expected = expected_ty ; actual = ty }))
 
+    | Src.{ expr_loc; expr_data = Expr_lid lid } ->
+       (match Env.find_value lid env with
+         | Ok (lid, Core.Value ty) ->
+            if deftype_equiv env () expected_ty ty then
+              Ok (Core.{ expr_loc; expr_data = Expr_lid lid }, local_env)
+            else
+              Error (expr_loc,
+                     Type_mismatch { expected = expected_ty; actual = ty })
+         | Ok (_, Core.Predicate _) ->
+            Error (expr_loc, Predicate_reference_in_expr lid)
+         | Error err ->
+            Error (expr_loc, Lookup_error err))
+
     | Src.{ expr_loc; expr_data = Expr_literal i } ->
        if deftype_equiv env () expected_ty ty_int then
          Ok (Core.{ expr_loc; expr_data = Expr_literal i }, local_env)
@@ -236,11 +276,14 @@ module Core_typing = struct
   let type_atom env local_env = function
     | Src.{atom_loc; atom_data = Atom_predicate { pred; args }} ->
        lift_lookup_error atom_loc (Env.find_value pred env)
-       >>= fun (pred, predty) ->
-       type_exprs env local_env atom_loc predty.Core.predty_data args
-       >>| fun (args, local_env) ->
-       (Core.{ atom_loc; atom_data = Atom_predicate {pred;args}},
-        local_env)
+       >>= function
+       | (pred, Core.Predicate predty) ->
+          type_exprs env local_env atom_loc predty.Core.predty_data args
+          >>| fun (args, local_env) ->
+          (Core.{ atom_loc; atom_data = Atom_predicate {pred;args}},
+           local_env)
+       | (_, Core.Value _) ->
+          Error (atom_loc, Constant_reference_in_atom pred)
 
 
   let rec type_atoms env local_env rev_atoms = function
@@ -255,8 +298,8 @@ module Core_typing = struct
     | [] ->
        Ok (List.rev rev_decls, env)
     | Src.{decl_name; decl_type} :: decls ->
-       check_valtype env decl_type >>= fun decl_type ->
-       let ident, env = Env.add_value decl_name decl_type env in
+       check_predtype env decl_type >>= fun decl_type ->
+       let ident, env = Env.add_value decl_name (Core.Predicate decl_type) env in
        bind_decls env ((ident, decl_type) :: rev_decls) decls
 
 
@@ -269,7 +312,7 @@ module Core_typing = struct
     | Src.{ expr_loc; expr_data = Expr_var vnm } ->
        if LocalEnv.mem vnm local_env then Ok ()
        else Error (expr_loc, Unsafe `Unbound_var)
-    | Src.{ expr_data = Expr_literal _ | Expr_enum _ } ->
+    | Src.{ expr_data = Expr_literal _ | Expr_enum _ | Expr_lid _ } ->
        Ok ()
     | Src.{ expr_loc; expr_data = Expr_underscore } ->
        Error (expr_loc, Unsafe `Catch_all)
@@ -315,23 +358,43 @@ module Core_typing = struct
          type_decls env (decl :: rev_decls) idents decls
       | _ ->
          assert false
-  
-  let type_term env decls =
-    bind_decls env [] decls >>= fun (idents, env) ->
-    type_decls env [] idents decls >>= fun decls ->
-    Ok ( decls
-       , List.map (fun (id, ty) -> (id, ty)) idents
-       )
 
+  let type_term env = function
+    | Src.PredicateDefs decls ->
+       bind_decls env [] decls >>= fun (idents, env) ->
+       type_decls env [] idents decls >>= fun decls ->
+       Ok ( Core.PredicateDefs decls
+          , List.map (fun (id, ty) -> (id, Core.Predicate ty)) idents
+          )
+
+    | Src.(ConstantDef { const_loc; const_name; const_type; const_expr }) ->
+       check_deftype env () const_type >>= fun typ ->
+       type_expr env LocalEnv.empty typ const_expr >>= fun (expr, _) ->
+       let name = Modules.Ident.create const_name in
+       Ok ( Core.(ConstantDef { const_loc
+                              ; const_name = name
+                              ; const_type = typ
+                              ; const_expr = expr
+                              })
+          , [ Modules.Ident.create const_name, Core.Value typ ]
+          )
 
   let check_kind env () =
     Ok ()
 
 
-  let valtype_match env predty1 predty2 =
-    let open Core in
-    List.length predty1.predty_data = List.length predty2.predty_data &&
-    List.for_all2 (deftype_equiv env ()) predty1.predty_data predty2.predty_data
+  let valtype_match env ty1 ty2 =
+    match ty1, ty2 with
+      | Core.Predicate predty1, Core.Predicate predty2 ->
+         let open Core in
+         List.length predty1.predty_data = List.length predty2.predty_data &&
+         List.for_all2 (deftype_equiv env ())
+           predty1.predty_data
+           predty2.predty_data
+      | Core.Value domty1, Core.Value domty2 ->
+         deftype_equiv env () domty1 domty2
+      | _ ->
+         false
 
   
   let kind_match env () () =

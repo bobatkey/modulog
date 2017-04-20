@@ -13,6 +13,7 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
 
   and expr_data =
     | Expr_var of string
+    | Expr_lid of longident
     | Expr_literal of int32
     | Expr_underscore
     | Expr_tuple of expr list
@@ -86,26 +87,53 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
     }
 
   type kind = unit
-  type val_type = predicate_type
+
+  type val_type =
+    | Predicate of predicate_type
+    | Value     of domaintype
+
   type def_type = domaintype
-  type term = declaration list
+
+  type constant_def =
+    { const_loc  : Location.t
+    ; const_name : Names.ident
+    ; const_type : domaintype
+    ; const_expr : expr
+    }
+
+  type term =
+    | PredicateDefs of declaration list
+    | ConstantDef   of constant_def
 
   let pp_kind =
     None
 
-  let pp_def_type =
-    pp_domaintype
+  let pp_def_decl fmt = function
+    | (id, (), Some domty) ->
+      Format.fprintf fmt "type %a = %a"
+        Names.pp_ident id
+        pp_domaintype domty
+    | (id, (), None) ->
+      Format.fprintf fmt "type %a"
+        Names.pp_ident id
 
-  let pp_val_type pp {predty_data=tys} =
-    Format.fprintf pp "@[<hv 1>%a@]"
-      pp_domaintypes tys
+  let pp_val_decl fmt = function
+    | (id, Predicate {predty_data=tys}) ->
+       Format.fprintf fmt "%a : @[<hv 1>%a@]"
+         Names.pp_ident id
+         pp_domaintypes tys
+    | (id, Value domty) ->
+       Format.fprintf fmt "constant %a : %a"
+         Names.pp_ident id
+         pp_domaintype  domty
 
   let rec pp_expr fmt = function
-    | {expr_data = Expr_var nm}     -> Format.pp_print_string fmt nm
+    | {expr_data = Expr_var nm}     -> Format.fprintf fmt "?%s" nm
     | {expr_data = Expr_literal i}  -> Format.fprintf fmt "%ld" i
     | {expr_data = Expr_underscore} -> Format.pp_print_string fmt "_"
     | {expr_data = Expr_tuple es}   -> Format.fprintf fmt "(%a)" pp_exprs es
     | {expr_data = Expr_enum sym}   -> pp_enum_sym fmt sym
+    | {expr_data = Expr_lid lid}    -> Names.pp_longident fmt lid
 
   and pp_exprs pp = function
     | [] -> ()
@@ -133,9 +161,9 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
 
   let pp_decl pp {decl_name; decl_type; decl_rules} =
     Format.pp_open_vbox pp 0;
-    Format.fprintf pp "%a : %a@,"
+    Format.fprintf pp "%a : @[<h>%a@]@,"
       Names.pp_ident decl_name
-      pp_val_type decl_type;
+      pp_domaintypes decl_type.predty_data;
     let rec pp_rules = function
       | []          -> ()
       | [rule]      -> pp_rule pp rule
@@ -144,13 +172,24 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
     pp_rules decl_rules;
     Format.pp_close_box pp ()
 
-  let pp_term pp = function
+  let pp_pred_defs pp = function
     | [] -> ()
     | decl :: decls ->
        Format.pp_open_vbox pp 0;
        Format.fprintf pp "def %a" pp_decl decl;
        List.iter (Format.fprintf pp "@ @,and %a" pp_decl) decls;
        Format.pp_close_box pp ()
+
+  let pp_constant_def fmt { const_name; const_type; const_expr } =
+    Format.fprintf fmt
+      "constant %a : %a = %a"
+      Names.pp_ident const_name
+      pp_domaintype  const_type
+      pp_expr        const_expr
+
+  let pp_term fmt = function
+    | PredicateDefs defs -> pp_pred_defs fmt defs
+    | ConstantDef c      -> pp_constant_def fmt c
 end
 
 module Syntax = Make_syntax (Modules.Syntax.String_names)

@@ -42,9 +42,10 @@ module type CORE_SYNTAX_RAW = sig
   type kind
 
   val pp_term : Format.formatter -> term -> unit
-  val pp_val_type : Format.formatter -> val_type -> unit
-  val pp_def_type : Format.formatter -> def_type -> unit
-  val pp_kind : (Format.formatter -> kind -> unit) option
+
+  val pp_val_decl : Format.formatter -> Names.ident * val_type -> unit
+
+  val pp_def_decl : Format.formatter -> Names.ident * kind * def_type option -> unit
 end
 
 module type MOD_SYNTAX_RAW = sig
