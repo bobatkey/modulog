@@ -408,3 +408,6 @@ module Core_typing = struct
 end
 
 module Typing = Modules.Typing.Mod_typing (Datalog_syntax.Mod) (Mod) (Core_typing)
+
+let type_structure structure =
+  Typing.type_structure Env.empty structure

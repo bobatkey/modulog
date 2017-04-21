@@ -1,3 +1,2 @@
 true: use_menhir
-true: package(rresult), package(ocamlgraph), package(fmt)
-
+true: package(rresult), package(ocamlgraph), package(fmt), package(cmdliner)
