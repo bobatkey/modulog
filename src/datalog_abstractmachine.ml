@@ -1,6 +1,6 @@
 module RS = Datalog_ruleset
 
-type var = string
+type relvar = string
 
 type attr = string
 
@@ -9,28 +9,30 @@ type scalar =
   | Lit  of int32
 
 type expr =
-  | Return of { guard_relation : var option
+  | Return of { guard_relation : relvar option
               ; values         : scalar list
               }
-  | Select of { relation    : var
+  | Select of { relation    : relvar
               ; conditions  : (int * scalar) list
               ; projections : (int * attr) list
               ; body        : expr
               }
 
 type comm =
-  | WhileNotEmpty of var list * comms
+  | WhileNotEmpty of relvar list * comms
   (** Loop until all the relations in the named variables are
       empty. *)
 
-  | Insert of var list * expr
+  | Insert of relvar * expr
   (** Insert the results of the expression into the named
-      variables. *)
+      variable. *)
 
-  | Move of { tgt : var; src : var }
+  | Merge of { tgt : relvar; src : relvar }
+
+  | Move of { tgt : relvar; src : relvar }
   (** Move the contents of 'src' into 'tgt', leaving 'src' empty. *)
 
-  | Declare of (var * var option) list * comms
+  | Declare of (relvar * relvar option) list * comms
 
 and comms = comm list
 
@@ -76,9 +78,11 @@ let rec pp_comm fmt = function
        Format_util.(pp_list Format.pp_print_string) rels
        pp_comms body
   | Insert (vars, expr) ->
-     Format.fprintf fmt "@[<hv 4>insert into @[<hv>%a@] value@ %a@]"
-       Format_util.(pp_list Format.pp_print_string) vars
+     Format.fprintf fmt "@[<hv 4>insert into %s value@ %a@]"
+       vars
        pp_expr expr
+  | Merge {tgt; src} ->
+     Format.fprintf fmt "merge %s into %s" src tgt
   | Move {tgt; src} ->
      Format.fprintf fmt "move %s into %s" src tgt
   | Declare (initialisers, body) ->
@@ -96,8 +100,8 @@ and pp_comms fmt = function
      pp_comms fmt cs
 
 
-module VarSet  = struct
-  include (Set.Make (String) : Set.S with type elt = var)
+module RelvarSet  = struct
+  include (Set.Make (String) : Set.S with type elt = relvar)
   let map_to_list f set =
     fold (fun x -> List.cons (f x)) set []
   let concat_map_to_list f set =
@@ -169,12 +173,12 @@ let expr_of_rule guard_relation head atoms =
 
 let translate_rule ruleset RS.{pred; args; rhs} =
   let expr = expr_of_rule None args rhs in
-  Insert ([pred], expr)
+  Insert (pred, expr)
 
 let predicates_of_rules =
   List.fold_left
-    (fun set rule -> VarSet.add rule.RS.pred set)
-    VarSet.empty
+    (fun set rule -> RelvarSet.add rule.RS.pred set)
+    RelvarSet.empty
 
 let delta_ nm = "delta_"^nm
 let new_ nm = "new_"^nm
@@ -195,39 +199,36 @@ let extract_predicate dpred rhs =
 
 let translate_recursive ruleset rules =
   let predicates = predicates_of_rules rules in
-  let delta_predicates = VarSet.map_to_list delta_ predicates in
+  let delta_predicates = RelvarSet.map_to_list delta_ predicates in
   let declarations =
-    VarSet.concat_map_to_list
+    RelvarSet.concat_map_to_list
       (fun pred_nm -> [new_ pred_nm, None; delta_ pred_nm, Some pred_nm])
       predicates
   in
-  let moves =
-    VarSet.map_to_list
+  let updates =
+    List.concat @@
+    List.map
+      begin fun RS.{pred; args; rhs} ->
+        RelvarSet.concat_map_to_list
+          (fun delta'd_predicate ->
+             List.map
+               (fun rhs ->
+                  Insert (new_ pred, expr_of_rule (Some pred) args rhs))
+               (extract_predicate delta'd_predicate rhs))
+          predicates
+      end
+      rules
+  and merges =
+    RelvarSet.map_to_list
+      (fun nm -> Merge { src = new_ nm; tgt = nm })
+      predicates
+  and moves =
+    RelvarSet.map_to_list
       (fun nm -> Move {tgt="delta_"^nm; src="new_"^nm})
       predicates
   in
   Declare
-    (declarations,
-     [ WhileNotEmpty
-         (delta_predicates,
-          begin
-            (rules
-             |> List.map
-               begin fun RS.{pred; args; rhs} ->
-                 VarSet.concat_map_to_list
-                   (fun delta'd_predicate ->
-                      List.map
-                        (fun rhs ->
-                           Insert ([pred; new_ pred],
-                                   expr_of_rule (Some pred) args rhs))
-                        (extract_predicate delta'd_predicate rhs))
-                   predicates
-               end
-             |> List.concat)
-            @
-            moves
-          end)
-     ])
+    (declarations, [ WhileNotEmpty (delta_predicates, updates @ merges @ moves) ])
 
 let translate_component ruleset = function
   | `Direct rule ->
@@ -238,7 +239,28 @@ let translate_component ruleset = function
 let translate ruleset =
   List.map (translate_component ruleset) (RS.scc_list ruleset)
 
-  (* Indexes:
+(**********************************************************************)
+let rec free_written_relvars_comm comm =
+  match comm with
+    | WhileNotEmpty (_, comms) ->
+       free_written_relvars comms
+    | Insert (relvar, _) ->
+       RelvarSet.add relvar
+    | Merge { tgt } | Move { tgt } ->
+       RelvarSet.add tgt
+    | Declare (vars, comms) ->
+       fun set ->
+         List.fold_right (fun (rv, _) -> RelvarSet.remove rv) vars @@
+         free_written_relvars comms @@
+         set
+
+and free_written_relvars comms =
+  List.fold_right free_written_relvars_comm comms
+
+let free_written_relvars comms =
+  free_written_relvars comms RelvarSet.empty
+
+(* Indexes:
      - work out which indexes are needed:
        - for each select, we know the inputs and the outputs required.
        - therefore, we know what sub-indexes to maintain for each relation
@@ -259,16 +281,16 @@ module PatternSet = struct
     let complete n =
       let rec loop pat i = if i = n then pat else loop (add i pat) (i+1) in
       loop empty 0
+
+    let pp =
+      Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Fmt.int)
   end
 
   type pattern = Pattern.t
 
   include Set.Make (Pattern)
 
-  let pp =
-    Fmt.braces
-      (Fmt.iter ~sep:(Fmt.always ",@ ") iter
-         (Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") Pattern.iter Fmt.int)))
+  let pp = Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Pattern.pp)
 
   module V = struct
     type t = Pattern.t
@@ -300,7 +322,11 @@ module PredicatePats : sig
 
   val add : string -> PatternSet.pattern -> t -> t
 
-  val pp : t Fmt.t
+  val fold : (string -> PatternSet.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val map_to_list : (string -> PatternSet.t -> 'a) -> t -> 'a list
+
+  val pp : Format.formatter -> t -> unit
 end = struct
   module VarMap = Map.Make (String)
 
@@ -319,8 +345,14 @@ end = struct
       let set = pats pred t in
       VarMap.add pred (PatternSet.add pat set) t
 
+  let fold = VarMap.fold
+  let map_to_list f t = VarMap.fold (fun p pats -> List.cons (f p pats)) t []
+
   let pp =
-    Fmt.iter_bindings VarMap.iter (Fmt.pair ~sep:(Fmt.always " => ") Fmt.string PatternSet.pp)
+    Fmt.iter_bindings VarMap.iter
+      (Fmt.pair ~sep:(Fmt.always " => ")
+         Fmt.string
+         PatternSet.pp)
 end
 
 let rec search_patterns_of_expr = function
@@ -338,7 +370,7 @@ let rec search_patterns_of_comm = function
      search_patterns_of_comms comms
   | Insert (_, expr) ->
      search_patterns_of_expr expr
-  | Move _ ->
+  | Move _ | Merge _ ->
      fun set -> set
 
 and search_patterns_of_comms comms =
@@ -346,6 +378,29 @@ and search_patterns_of_comms comms =
 
 let search_patterns comms =
   search_patterns_of_comms comms PredicatePats.empty
+
+let indexes comms : (string * PatternSet.Pattern.t list list) list =
+  comms
+  |> search_patterns
+  |> PredicatePats.map_to_list
+    (fun pred pats -> (pred, List.rev (MPC.minimal_path_cover pats)))
+
+(* Now:
+   - generate a variable ordering for each index
+   - and a back mapping to the search patterns, in some form
+*)
+
+let pp_indexes =
+  Fmt.(brackets
+         (list ~sep:(always ";@ ")
+            (brackets
+               (list ~sep:(always ";@ ")
+                  PatternSet.Pattern.pp))))
+
+let pp_all_indexes =
+  Fmt.(braces
+         (list ~sep:(always ";@ ")
+            (pair ~sep:(always " =>@ ") string pp_indexes)))
 
 (* Now to work out the indexes required for each relation:
    - run "search_patterns program"
