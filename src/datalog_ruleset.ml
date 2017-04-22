@@ -77,10 +77,10 @@ module G = struct
   type t = ruleset
 
   module V = struct
-    type t = ruleset * int
-    let compare ((_, x) : t) ((_, y) : t) = Pervasives.compare x y
-    let hash ((_, x) : t) = x
-    let equal ((_, x) : t) (_, y) = x = y
+    type t = rule_id
+    let compare (x : t) (y : t) = Pervasives.compare x y
+    let hash (x : t) = x
+    let equal (x : t) y = x = y
   end
 
   type vertex = V.t
@@ -97,15 +97,15 @@ module G = struct
 
   let iter_vertex f ruleset =
     for i = 0 to Array.length ruleset.rules - 1 do
-      f (ruleset, i)
+      f i
     done
 
-  let iter_succ f ruleset (_, rule_id) =
+  let iter_succ f ruleset rule_id =
     let rule = ruleset.rules.(rule_id) in
     rule.rhs |> List.iter begin fun (Atom {pred}) ->
       match PredicateNameMap.find pred ruleset.rules_of_pred with
         | exception Not_found -> ()
-        | rule_ids -> List.iter (fun id -> f (ruleset, id)) rule_ids
+        | rule_ids -> List.iter f rule_ids
     end
 
   let iter_edges_e f ruleset =
@@ -122,13 +122,13 @@ module SCC = Graph.Components.Make (G)
 
 let form_of_component ruleset = function
   | [] -> assert false
-  | [_, rule_id] ->
+  | [rule_id] ->
      if rule_is_self_recursive ruleset rule_id then
        `Recursive [rule rule_id ruleset]
      else
        `Direct (rule rule_id ruleset)
   | rules ->
-     `Recursive (List.map (fun (_,id) -> rule id ruleset) rules)
+     `Recursive (List.map (fun id -> rule id ruleset) rules)
 
 let scc_list ruleset =
   List.map (form_of_component ruleset) (SCC.scc_list ruleset)

@@ -30,10 +30,18 @@ val rule_is_self_recursive : ruleset -> rule_id -> bool
 
 val scc_list : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
 
+(** Graph representation of a set of datalog rules. Each vertex is a
+    rule. There exists an edge [r1 -> r2] if the head of [r2] is
+    mentioned on th right-hand side of [r1]. *)
 module G : sig
   type t = ruleset
 
-  module V : Graph.Sig.COMPARABLE with type t = ruleset * rule_id
+  module V : sig
+    type t = rule_id
+    val equal : t -> t -> bool
+    val hash : t -> int
+    val compare : t -> t -> int
+  end
 
   module E : sig
     type t
@@ -42,6 +50,8 @@ module G : sig
   end
 
   val iter_vertex : (V.t -> unit) -> t -> unit
+
   val iter_succ : (V.t -> unit) -> t -> V.t -> unit
+
   val iter_edges_e : (E.t -> unit) -> t -> unit
 end
