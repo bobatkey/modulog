@@ -1,6 +1,5 @@
 %{
 open Datalog_syntax
-
 %}
 
 %token COMMA
@@ -151,12 +150,19 @@ sig_item:
 | TYPE; id=IDENT; EQUALS; ty=domain_type
     { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_type (id, { kind = (); manifest = Some ty }) } }
-| MODULE; id=IDENT; COLON; mty=mod_type
+| MODULE; id=IDENT; mty=functor_type_decls
     { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_module (id, mty) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
     { { sigitem_loc  = Location.mk $startpos $endpos
       ; sigitem_data = Sig_modty (id, mty) } }
+
+functor_type_decls:
+| COLON; mty=mod_type
+    { mty }
+| LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; mty2=functor_type_decls
+    { { modtype_loc  = Location.mk $startpos $endpos
+      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
 
 mod_term:
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
@@ -188,9 +194,16 @@ str_item:
 | TYPE; id=IDENT; EQUALS; ty=domain_type
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_type (id, (), ty) } }
-| MODULE; id=IDENT; EQUALS; modl=mod_term
+| MODULE; id=IDENT; modl=functor_decls
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_module (id, modl) } }
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_modty (id, mty) } }
+
+functor_decls:
+| EQUALS; modl=mod_term
+    { modl }
+| LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; modl=functor_decls
+    { { modterm_loc  = Location.mk $startpos $endpos
+      ; modterm_data = Mod_functor (id, mty, modl) } }

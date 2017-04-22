@@ -36,7 +36,7 @@ module type IFDS_PROGRAM_EXT = sig
   initial : procedure * entry_fact
 end
 
-module IFDS_of_Extended = functor (P : IFDS_PROGRAM_EXT) -> struct
+module IFDS_of_Extended (P : IFDS_PROGRAM_EXT) = struct
   type procedure = P.procedure * P.entry_fact
   type point = P.point * P.fact
 
@@ -62,7 +62,7 @@ module IFDS_of_Extended = functor (P : IFDS_PROGRAM_EXT) -> struct
     initial ((?p, ?ef)) :- P.initial (?p, ?ef)
 end
 
-module IFDS = functor (P : IFDS_PROGRAM) -> struct
+module IFDS (P : IFDS_PROGRAM) = struct
 
   def
     intra : P.procedure * P.point
@@ -89,7 +89,7 @@ module IFDS = functor (P : IFDS_PROGRAM) -> struct
 
 end
 
-module Test = functor (P : IFDS_PROGRAM_EXT) -> struct
+module Test (P : IFDS_PROGRAM_EXT) = struct
   module P' = IFDS_of_Extended (P)
   module A  = IFDS (P')
 end
