@@ -1,5 +1,12 @@
 open Cmdliner
 
+module Modlog = struct
+  module Parser    = Datalog_parser
+  module Lexer     = Datalog_lexer
+  module Checker   = Datalog_checker
+  module Flattener = Datalog_normalisation
+end
+
 let read_structure_from_file filename =
   let ch = open_in filename in
   try
@@ -28,15 +35,15 @@ let go filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Datalog_abstractmachine.translate rules in
-       let patterns = Datalog_abstractmachine.search_patterns code in
-       let indexes  = Datalog_abstractmachine.indexes code in
+       let code     = Relmachine_syntax.translate rules in
+       let patterns = Relmachine_syntax.search_patterns code in
+       let indexes  = Relmachine_syntax.indexes code in
        Format.printf
-         "@[<v>%a@@,%a@,%a@,%a@]\n"
+         "@[<v>%a@,%a@,%a@,%a@]\n"
          Datalog_ruleset_graphviz.dot_of_ruleset  rules
-         Datalog_abstractmachine.pp_comms         code
-         Datalog_abstractmachine.PredicatePats.pp patterns
-         Datalog_abstractmachine.pp_all_indexes   indexes
+         Relmachine_syntax.pp_comms         code
+         Relmachine_syntax.PredicatePats.pp patterns
+         Relmachine_syntax.pp_all_indexes   indexes
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -59,10 +66,10 @@ let relmachine filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Datalog_abstractmachine.translate rules in
+       let code     = Relmachine_syntax.translate rules in
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_abstractmachine.pp_comms code
+         Relmachine_syntax.pp_comms code
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -73,7 +80,7 @@ let exec filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Datalog_abstractmachine.translate rules in
+       let code     = Relmachine_syntax.translate rules in
        let env      = Relmachine_interpreter.eval code in
        Format.printf
          "@[<v>%a@]\n"

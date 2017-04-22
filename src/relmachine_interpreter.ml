@@ -46,9 +46,7 @@ end
 module RelvarEnv = MakeEnv (Relation)
 module AttrEnv   = MakeEnv (struct type t = int32 end)
 
-(* FIXME: wrap the 'Not_found' errors with something better *)
-
-open Datalog_abstractmachine
+open Relmachine_syntax
 
 let eval_scalar attr_env = function
   | Attr attr -> AttrEnv.find attr attr_env
