@@ -479,8 +479,6 @@ struct
            typ2)
 
 
-  (* Strengthening: FIXME: switch to generated locations everywhere,
-     or record the provenance? *)
   let rec strengthen_modtype env path = function
     | Tgt.{modtype_data = Modtype_longident p} ->
        strengthen_modtype env path (Env.lookup_modtype p env)
