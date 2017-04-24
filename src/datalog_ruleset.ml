@@ -1,5 +1,3 @@
-(* FIXME: keep track of the arities of predicates too *)
-
 type predicate_name = string
 
 type expr =
@@ -79,28 +77,106 @@ let pp fmt set =
 
 let rule i set = set.rules.(i)
 
-let of_rules rules =
-  let update pred f map =
+(**********************************************************************)
+module Builder = struct
+  type t =
+    { rules_so_far      : rule list
+    ; next_rule_id      : int
+    ; index_so_far      : int list PredicateNameMap.t
+    ; predicates_so_far : predicate_info PredicateNameMap.t
+    }
+
+  type error =
+    | Undeclared_predicate of predicate_name
+    | Arity_mismatch of
+        { pred  : predicate_name
+        ; arity : int
+        ; used_arity : int
+        }
+    | Definition_of_extensional_predicate of predicate_name
+    | Predicate_already_declared of predicate_name
+
+  let empty =
+    { rules_so_far = []
+    ; next_rule_id = 0
+    ; index_so_far = PredicateNameMap.empty
+    ; predicates_so_far = PredicateNameMap.empty
+    }
+
+  let update_index pred f map =
     let existing =
       match PredicateNameMap.find pred map with
         | exception Not_found -> []
         | rule_ids -> rule_ids
     in
     PredicateNameMap.add pred (f existing) map
-  in
-  let rules = Array.of_list rules in
-  let _, rules_of_pred =
-    Array.fold_left
-      (fun (i,map) rule -> (i+1, update rule.pred (List.cons i) map))
-      (0, PredicateNameMap.empty)
-      rules
-  in
-  { rules; rules_of_pred; pred_info = PredicateNameMap.empty }
 
-(* FIXME: would like to know:
-   1. The arity of each predicate
-   2. Intensionality of each predicate
-*)
+  let rec check_atoms pred_info = function
+    | [] ->
+       Ok ()
+    | Atom {pred;args} :: atoms ->
+       match PredicateNameMap.find pred pred_info with
+         | exception Not_found ->
+            Error (Undeclared_predicate pred)
+         | {arity} ->
+            let used_arity = List.length args in
+            if arity <> used_arity then
+              Error (Arity_mismatch { pred; arity; used_arity })
+            else
+              check_atoms pred_info atoms
+
+  let add_rule ({pred;args;rhs} as rule) t =
+    match check_atoms t.predicates_so_far rhs with
+      | Error e -> Error e
+      | Ok () ->
+         match PredicateNameMap.find pred t.predicates_so_far with
+           | exception Not_found ->
+              Error (Undeclared_predicate pred)
+           | {intensional=false} ->
+              Error (Definition_of_extensional_predicate pred)
+           | {arity} ->
+              let used_arity = List.length args in
+              if arity <> used_arity then
+                Error (Arity_mismatch {pred; arity; used_arity})
+              else
+                let id = t.next_rule_id in
+                Ok { t with rules_so_far = rule :: t.rules_so_far
+                          ; next_rule_id = id + 1
+                          ; index_so_far =
+                              update_index pred (List.cons id) t.index_so_far
+                   }
+
+  let add_predicate name arity intensional t =
+    match PredicateNameMap.find name t.predicates_so_far with
+      | exception Not_found ->
+         let info = { arity; intensional } in
+         Ok { t with predicates_so_far =
+                       PredicateNameMap.add name info t.predicates_so_far
+            }
+      | _ ->
+         Error (Predicate_already_declared name)
+
+  let add_edb_predicate name arity t =
+    add_predicate name arity false t
+
+  let add_idb_predicate name arity t =
+    add_predicate name arity true t
+
+  let finish { rules_so_far; next_rule_id; index_so_far; predicates_so_far } =
+    let rules_of_pred = index_so_far
+    and pred_info     = predicates_so_far in
+    if next_rule_id = 0 then
+      { rules = [||]; rules_of_pred; pred_info }
+    else
+      let rules = Array.make next_rule_id (List.hd rules_so_far) in
+      (* Do this backwards to maintain the numbering *)
+      let rec insert_all i = function
+        | []    -> ()
+        | r::rs -> rules.(i) <- r; insert_all (i-1) rs
+      in
+      insert_all (next_rule_id - 1) rules_so_far;
+      { rules; rules_of_pred; pred_info }
+end
 
 (**********************************************************************)
 module G = struct

@@ -6,7 +6,7 @@ module Eval = struct
   open Core
 
   type 'a eval =
-    RS.rule list -> 'a * RS.rule list
+    RS.Builder.t -> 'a * RS.Builder.t
 
   let return x rules = (x, rules)
   let (>>=) c f rules =
@@ -17,6 +17,16 @@ module Eval = struct
     | Itype_int
     | Itype_tuple of eval_type list
     | Itype_enum  of string list
+
+  let arity_of_eval_type typ =
+    let rec count = function
+      | Itype_int | Itype_enum _ -> fun i -> i+1
+      | Itype_tuple typs -> List.fold_right count typs
+    in
+    count typ 0
+
+  let arity_of_decl_type typs =
+    List.fold_left (fun a typ -> arity_of_eval_type typ + a) 0 typs
 
   type eval_value =
     | Val_predicate of string * eval_type list
@@ -110,25 +120,32 @@ module Eval = struct
         | _ ->
            failwith "internal error: type error in eval_rule"
 
+    let ignore_builder_error = function
+      | Ok x -> x
+      | Error _ -> failwith "internal error: builder error"
+
     let eval_predicate env defs rules =
-      let bindings =
-        List.map
-          (fun {decl_name; decl_type} ->
-             let decl_type =
-               List.map (eval_type env ()) decl_type.predty_data
+      let bindings, rules =
+        List.fold_right
+          (fun {decl_name; decl_type} (bindings, rules) ->
+             let name = Modules.Ident.(full_name @@ create (name decl_name)) in
+             let decl_type = List.map (eval_type env ()) decl_type.predty_data in
+             let arity = arity_of_decl_type decl_type in
+             let rules =
+               ignore_builder_error (RS.Builder.add_idb_predicate name arity rules)
              in
-             (decl_name,
-              Val_predicate
-                (Modules.Ident.(full_name @@ create (name decl_name)),
-                 decl_type)))
+             ((decl_name, Val_predicate (name, decl_type)) :: bindings, rules))
           defs
+          ([], rules)
       in
       let env = Env.add_values bindings env in
       let rules =
         List.fold_right
           (fun {decl_rules} ->
              List.fold_right
-               (fun rule -> List.cons (eval_rule env rule))
+               (fun rule rules ->
+                  ignore_builder_error
+                    (RS.Builder.add_rule (eval_rule env rule) rules))
                decl_rules)
           defs
           rules
@@ -150,4 +167,7 @@ module ModularDatalogEvaluator =
   Modules.Evaluator.Make (Datalog_checker.Mod) (Eval)
 
 let from_structure structure =
-  RS.of_rules (snd (ModularDatalogEvaluator.norm_structure structure []))
+  RS.Builder.empty
+  |> ModularDatalogEvaluator.norm_structure structure
+  |> snd
+  |> RS.Builder.finish

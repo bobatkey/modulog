@@ -20,8 +20,6 @@ type ruleset
 
 val pp : Format.formatter -> ruleset -> unit
 
-val of_rules : rule list -> ruleset
-
 type rule_id
 
 val rule_id : rule_id -> int
@@ -29,6 +27,27 @@ val rule_id : rule_id -> int
 val rule : rule_id -> ruleset -> rule
 
 val rule_is_self_recursive : ruleset -> rule_id -> bool
+
+module Builder : sig
+  type t
+
+  type error =
+    | Undeclared_predicate of predicate_name
+    | Arity_mismatch of
+        { pred  : predicate_name
+        ; arity : int
+        ; used_arity : int
+        }
+    | Definition_of_extensional_predicate of predicate_name
+    | Predicate_already_declared of predicate_name
+
+  val empty : t
+  val add_rule : rule -> t -> (t, error) result
+  val add_idb_predicate : predicate_name -> int -> t -> (t, error) result
+  val add_edb_predicate : predicate_name -> int -> t -> (t, error) result
+
+  val finish : t -> ruleset
+end
 
 val components : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
 
