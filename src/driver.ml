@@ -46,6 +46,20 @@ let rules filename =
          "@[<v>%a@]\n"
          Modlog.Checker.pp_error err
 
+let rules_graph filename =
+  let structure = Modlog.read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
+    | Ok (str, sg) ->
+       let rules = Modlog.To_rules.from_structure str in
+       Format.printf
+         "@[<v>%a@]\n"
+         Datalog_ruleset_graphviz.dot_of_ruleset rules
+
+    | Error err ->
+       Format.printf
+         "@[<v>%a@]\n"
+         Modlog.Checker.pp_error err
+
 let exec filename =
   let structure = Modlog.read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
@@ -93,6 +107,11 @@ let rules_cmd =
   Term.(const rules $ filename_arg),
   Term.info "rules" ~doc ~exits:Term.default_exits
 
+let rules_graph_cmd =
+  let doc = "Compile a Modular Datalog program to a graph of datalog rules" in
+  Term.(const rules_graph $ filename_arg),
+  Term.info "rules-graph" ~doc ~exits:Term.default_exits
+
 let exec_cmd =
   let doc = "Execute a Modular Datalog program" in
   Term.(const exec $ filename_arg),
@@ -110,4 +129,5 @@ let () =
   Term.(exit (eval_choice default_cmd [ typecheck_cmd
                                       ; relmachine_cmd
                                       ; rules_cmd
+                                      ; rules_graph_cmd
                                       ; exec_cmd ]))
