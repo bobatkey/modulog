@@ -43,7 +43,9 @@ end = struct
   let clear = H.clear
   let copy = H.copy
 end
+
 module RelvarEnv = MakeEnv (Relation)
+
 module AttrEnv   = MakeEnv (struct type t = int32 end)
 
 open Relmachine_syntax
@@ -132,8 +134,11 @@ let eval comms =
   rel_env
 
 let pp_rel =
-  Fmt.(braces (iter ~sep:(always ",@ ") Relation.iter (brackets (array ~sep:(always ",") int32))))
+  Fmt.(braces
+         (iter ~sep:(always ",@ ") Relation.iter
+            (brackets (array ~sep:(always ",") int32))))
 
 let pp_relvarenv =
-  Fmt.(iter_bindings ~sep:(always ",@ ") RelvarEnv.iter (pair ~sep:(always " = ") string pp_rel))
+  Fmt.(iter_bindings ~sep:(always ",@ ") RelvarEnv.iter
+         (pair ~sep:(always " = ") string pp_rel))
             
