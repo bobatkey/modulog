@@ -46,6 +46,8 @@ module Builder : sig
   val add_idb_predicate : predicate_name -> int -> t -> (t, error) result
   val add_edb_predicate : predicate_name -> int -> t -> (t, error) result
 
+  val freshen_name : predicate_name -> t -> predicate_name
+
   val finish : t -> ruleset
 end
 

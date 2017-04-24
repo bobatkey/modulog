@@ -128,7 +128,8 @@ module Eval = struct
       let bindings, rules =
         List.fold_right
           (fun {decl_name; decl_type} (bindings, rules) ->
-             let name = Modules.Ident.(full_name @@ create (name decl_name)) in
+             let name =
+               RS.Builder.freshen_name (Modules.Ident.name decl_name) rules in
              let decl_type = List.map (eval_type env ()) decl_type.predty_data in
              let arity = arity_of_decl_type decl_type in
              let rules =
