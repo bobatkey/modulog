@@ -1,5 +1,5 @@
 %{
-open Datalog_syntax
+open Modlog_syntax
 %}
 
 %token COMMA
@@ -12,7 +12,7 @@ open Datalog_syntax
 %token<string> IDENT ENUM_IDENT MV_IDENT
 %token EOF
 
-%start <Datalog_syntax.structure> program
+%start <Modlog_syntax.structure> program
 
 %%
 

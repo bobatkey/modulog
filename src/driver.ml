@@ -1,36 +1,20 @@
-let read_structure_from_file filename =
-  let ch = open_in filename in
-  try
-    let lexbuf = Lexing.from_channel (open_in filename) in
-    lexbuf.Lexing.lex_curr_p <-
-      { Lexing.pos_fname = filename
-      ; pos_lnum = 1
-      ; pos_cnum = 0
-      ; pos_bol = 0
-      };
-    let structure = Datalog_parser.program Datalog_lexer.token lexbuf in
-    close_in ch;
-    structure
-  with e ->
-    close_in ch; raise e
-
 let typecheck filename =
-  let structure = read_structure_from_file filename in
-  match Datalog_checker.type_structure structure with
+  let structure = Modlog.read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.Mod.pp_signature sg
+         Modlog.Checker.Mod.pp_signature sg
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.pp_error err
+         Modlog.Checker.pp_error err
 
 let relmachine filename with_indexes =
-  let structure = read_structure_from_file filename in
-  match Datalog_checker.type_structure structure with
+  let structure = Modlog.read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.from_structure str in
+       let rules    = Modlog.To_rules.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n%!"
@@ -44,26 +28,26 @@ let relmachine filename with_indexes =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.pp_error err
+         Modlog.Checker.pp_error err
 
 let rules filename =
-  let structure = read_structure_from_file filename in
-  match Datalog_checker.type_structure structure with
+  let structure = Modlog.read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules = Datalog_normalisation.from_structure str in
+       let rules = Modlog.To_rules.from_structure str in
        Format.printf
          "@[<v>%a@]\n"
          Datalog_ruleset.pp rules
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.pp_error err
+         Modlog.Checker.pp_error err
 
 let exec filename =
-  let structure = read_structure_from_file filename in
-  match Datalog_checker.type_structure structure with
+  let structure = Modlog.read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.from_structure str in
+       let rules    = Modlog.To_rules.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        let env      = Relmachine_interpreter.eval code in
        Format.printf
@@ -72,7 +56,7 @@ let exec filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.pp_error err
+         Modlog.Checker.pp_error err
 
 (**********************************************************************)
 (* The command line interface *)

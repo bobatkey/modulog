@@ -1,7 +1,7 @@
 module RS = Datalog_ruleset
 
 module Eval = struct
-  module Core = Datalog_checker.Core_syntax
+  module Core = Modlog_checker.Core_syntax
 
   open Core
 
@@ -164,11 +164,11 @@ module Eval = struct
   end
 end
 
-module ModularDatalogEvaluator =
-  Modules.Evaluator.Make (Datalog_checker.Mod) (Eval)
+module Evaluator =
+  Modules.Evaluator.Make (Modlog_checker.Mod) (Eval)
 
 let from_structure structure =
   RS.Builder.empty
-  |> ModularDatalogEvaluator.eval_structure structure
+  |> Evaluator.eval_structure structure
   |> snd
   |> RS.Builder.finish

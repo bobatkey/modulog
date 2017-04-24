@@ -1,5 +1,5 @@
 module Core_syntax = struct
-  include Datalog_syntax.Make_syntax (Modules.Syntax.Bound_names)
+  include Modlog_syntax.Make_syntax (Modules.Syntax.Bound_names)
 
   let rec subst_deftype sub domtype =
     { domtype with
@@ -30,7 +30,7 @@ module Mod = Modules.Syntax.Mod_Syntax (Core_syntax)
 module Env = Modules.Typing.Env (Mod)
 
 module Core_typing = struct
-  module Src  = Datalog_syntax.Syntax
+  module Src  = Modlog_syntax.Syntax
   module Core = Core_syntax
 
   module Env = Env
@@ -407,7 +407,7 @@ module Core_typing = struct
          }
 end
 
-module Typing = Modules.Typing.Mod_typing (Datalog_syntax.Mod) (Mod) (Core_typing)
+module Typing = Modules.Typing.Mod_typing (Modlog_syntax.Mod) (Mod) (Core_typing)
 
 let type_structure structure =
   Typing.type_structure Env.empty structure
