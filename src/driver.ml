@@ -34,7 +34,7 @@ let go filename =
   let structure = read_structure_from_file filename in
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.rules_of_structure str in
+       let rules    = Datalog_normalisation.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        let patterns = Relmachine_syntax.search_patterns code in
        let indexes  = Relmachine_syntax.indexes code in
@@ -65,7 +65,7 @@ let relmachine filename =
   let structure = read_structure_from_file filename in
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.rules_of_structure str in
+       let rules    = Datalog_normalisation.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n"
@@ -75,11 +75,24 @@ let relmachine filename =
          "@[<v>%a@]\n"
          Datalog_checker.Typing.pp_error err
 
+let rules filename =
+  let structure = read_structure_from_file filename in
+  match Datalog_checker.type_structure structure with
+    | Ok (str, sg) ->
+       let rules = Datalog_normalisation.from_structure str in
+       Format.printf
+         "@[<v>%a@]\n"
+         Datalog_ruleset.pp rules
+    | Error err ->
+       Format.printf
+         "@[<v>%a@]\n"
+         Datalog_checker.Typing.pp_error err
+
 let exec filename =
   let structure = read_structure_from_file filename in
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.rules_of_structure str in
+       let rules    = Datalog_normalisation.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        let env      = Relmachine_interpreter.eval code in
        Format.printf
@@ -109,6 +122,11 @@ let relmachine_cmd =
   Term.(const relmachine $ filename_arg),
   Term.info "relmachine" ~doc ~exits:Term.default_exits
 
+let rules_cmd =
+  let doc = "Compile a Modular Datalog program to flat datalog rules" in
+  Term.(const rules $ filename_arg),
+  Term.info "rules" ~doc ~exits:Term.default_exits
+
 let exec_cmd =
   let doc = "Execute a Modular Datalog program" in
   Term.(const exec $ filename_arg),
@@ -125,4 +143,5 @@ let default_cmd =
 let () =
   Term.(exit (eval_choice default_cmd [ typecheck_cmd
                                       ; relmachine_cmd
+                                      ; rules_cmd
                                       ; exec_cmd ]))

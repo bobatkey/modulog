@@ -18,6 +18,8 @@ val pp_rule : Format.formatter -> rule -> unit
 
 type ruleset
 
+val pp : Format.formatter -> ruleset -> unit
+
 val of_rules : rule list -> ruleset
 
 type rule_id
@@ -28,7 +30,7 @@ val rule : rule_id -> ruleset -> rule
 
 val rule_is_self_recursive : ruleset -> rule_id -> bool
 
-val scc_list : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
+val components : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
 
 (** Graph representation of a set of datalog rules. Each vertex is a
     rule. There exists an edge [r1 -> r2] if the head of [r2] is

@@ -129,4 +129,4 @@ let translate_component ruleset = function
      translate_recursive ruleset rules
 
 let translate ruleset =
-  List.map (translate_component ruleset) (Ruleset.scc_list ruleset)
+  List.map (translate_component ruleset) (Ruleset.components ruleset)

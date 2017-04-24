@@ -17,7 +17,6 @@ type rule =
   }
 
 (**********************************************************************)
-
 let pp_expr fmt = function
   | Var vnm ->
      Format.fprintf fmt "%s" vnm
@@ -26,26 +25,26 @@ let pp_expr fmt = function
   | Underscore ->
      Format.fprintf fmt "_"
 
-let pp_exprs = Format_util.pp_list pp_expr
+let pp_exprs = Fmt.list ~sep:(Fmt.always ", ") pp_expr
 
 let pp_atom fmt = function
   | Atom { pred; args } ->
-     Format.fprintf fmt "%s(@[<h>%a@])"
+     Format.fprintf fmt "%s(%a)"
        pred
        pp_exprs args
 
-let pp_rhs = Format_util.pp_list pp_atom
+let pp_rhs = Fmt.list ~sep:(Fmt.always ",@ ") pp_atom
 
 let pp_rule fmt {pred; args; rhs} =
   match rhs with
     | [] ->
        Format.fprintf fmt
-         "%s(@[<h>%a@])"
+         "%s(@[<h>%a@])."
          pred
          pp_exprs args
     | rhs ->
        Format.fprintf fmt
-         "%s(@[<h>%a@]) :- @[<hv>%a@]"
+         "@[<v4>%s(@[<h>%a@]) :-@ %a.@]"
          pred
          pp_exprs args
          pp_rhs rhs
@@ -53,9 +52,15 @@ let pp_rule fmt {pred; args; rhs} =
 (**********************************************************************)
 module PredicateNameMap = Map.Make (String)
 
+type predicate_info =
+  { arity       : int
+  ; intensional : bool
+  }
+
 type ruleset =
   { rules         : rule array
   ; rules_of_pred : int list PredicateNameMap.t
+  ; pred_info     : predicate_info PredicateNameMap.t
   }
 
 type rule_id = int
@@ -63,16 +68,41 @@ type rule_id = int
 let rule_id i = i
 
 let pp fmt set =
+  (* FIXME: sort into components before printing? *)
   Format.pp_open_vbox fmt 0;
-  for i = 0 to Array.length set.rules - 1 do
+  for i = Array.length set.rules -1 downto 0 do
     pp_rule fmt set.rules.(i);
-    if i < Array.length set.rules - 1 then
+    if i > 0 then
       Format.pp_print_cut fmt ()
   done;
   Format.pp_close_box fmt ()
 
 let rule i set = set.rules.(i)
 
+let of_rules rules =
+  let update pred f map =
+    let existing =
+      match PredicateNameMap.find pred map with
+        | exception Not_found -> []
+        | rule_ids -> rule_ids
+    in
+    PredicateNameMap.add pred (f existing) map
+  in
+  let rules = Array.of_list rules in
+  let _, rules_of_pred =
+    Array.fold_left
+      (fun (i,map) rule -> (i+1, update rule.pred (List.cons i) map))
+      (0, PredicateNameMap.empty)
+      rules
+  in
+  { rules; rules_of_pred; pred_info = PredicateNameMap.empty }
+
+(* FIXME: would like to know:
+   1. The arity of each predicate
+   2. Intensionality of each predicate
+*)
+
+(**********************************************************************)
 module G = struct
   type t = ruleset
 
@@ -121,7 +151,8 @@ let rule_is_self_recursive ruleset rule_id =
 module SCC = Graph.Components.Make (G)
 
 let form_of_component ruleset = function
-  | [] -> assert false
+  | [] ->
+     assert false
   | [rule_id] ->
      if rule_is_self_recursive ruleset rule_id then
        `Recursive [rule rule_id ruleset]
@@ -130,24 +161,5 @@ let form_of_component ruleset = function
   | rules ->
      `Recursive (List.map (fun id -> rule id ruleset) rules)
 
-let scc_list ruleset =
+let components ruleset =
   List.map (form_of_component ruleset) (SCC.scc_list ruleset)
-
-
-let of_rules rules =
-  let update pred f map =
-    let existing =
-      match PredicateNameMap.find pred map with
-        | exception Not_found -> []
-        | rule_ids -> rule_ids
-    in
-    PredicateNameMap.add pred (f existing) map
-  in
-  let rules = Array.of_list rules in
-  let _, rules_of_pred =
-    Array.fold_left
-      (fun (i,map) rule -> (i+1, update rule.pred (List.cons i) map))
-      (0, PredicateNameMap.empty)
-      rules
-  in
-  { rules; rules_of_pred }

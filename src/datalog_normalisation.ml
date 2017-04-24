@@ -149,5 +149,5 @@ end
 module ModularDatalogEvaluator =
   Modules.Evaluator.Make (Datalog_checker.Mod) (Eval)
 
-let rules_of_structure structure =
+let from_structure structure =
   RS.of_rules (snd (ModularDatalogEvaluator.norm_structure structure []))
