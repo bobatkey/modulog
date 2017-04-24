@@ -17,7 +17,7 @@ type rule =
 (**********************************************************************)
 let pp_expr fmt = function
   | Var vnm ->
-     Format.fprintf fmt "%s" vnm
+     Format.fprintf fmt "?%s" vnm
   | Lit i ->
      Format.fprintf fmt "%ld" i
   | Underscore ->
@@ -65,12 +65,22 @@ type rule_id = int
 
 let rule_id i = i
 
+let pp_pred_info fmt (name, {arity; intensional}) =
+  Format.fprintf fmt
+    "%s %s : %d"
+    (if intensional then "int" else "ext")
+    name
+    arity
+
 let pp fmt set =
-  (* FIXME: sort into components before printing? *)
+  Format.fprintf fmt "@[<v>%a@]"
+    Fmt.(iter_bindings PredicateNameMap.iter pp_pred_info) set.pred_info;
+  Format.pp_print_cut fmt ();
+  Format.pp_print_cut fmt ();
   Format.pp_open_vbox fmt 0;
-  for i = Array.length set.rules -1 downto 0 do
+  for i = 0 to Array.length set.rules - 1 do
     pp_rule fmt set.rules.(i);
-    if i > 0 then
+    if i < Array.length set.rules - 1 then
       Format.pp_print_cut fmt ()
   done;
   Format.pp_close_box fmt ()
