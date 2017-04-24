@@ -28,6 +28,13 @@ val rule : rule_id -> ruleset -> rule
 
 val rule_is_self_recursive : ruleset -> rule_id -> bool
 
+type predicate_info =
+  { arity       : int
+  ; intensional : bool
+  }
+
+val predicates : ruleset -> (predicate_name * predicate_info) list
+
 module Builder : sig
   type t
 

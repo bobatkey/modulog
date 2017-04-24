@@ -34,7 +34,7 @@ let relmachine filename =
        let code     = Relmachine_of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n"
-         Relmachine_syntax.pp_comms code
+         Relmachine_syntax.pp_program code
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"

@@ -122,15 +122,14 @@ and eval_comms rel_env comms =
   List.iter (eval_comm rel_env) comms
 
 
-let eval comms =
-  let rels = free_written_relvars comms in
+let eval {edb_relvars; idb_relvars; commands} =
   let rel_env =
-    RelvarSet.fold
-      (fun rel -> RelvarEnv.add rel (Relation.create 128))
-      rels
+    List.fold_left
+      (fun rel_env (nm, _) -> RelvarEnv.add nm (Relation.create 128) rel_env)
       RelvarEnv.empty
+      idb_relvars
   in
-  eval_comms rel_env comms;
+  eval_comms rel_env commands;
   rel_env
 
 let pp_rel =

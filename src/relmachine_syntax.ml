@@ -34,6 +34,14 @@ type comm =
 
 and comms = comm list
 
+type program =
+  { edb_relvars : (relvar * int) list
+  ; idb_relvars : (relvar * int) list
+  ; commands    : comms
+  }
+
+(**********************************************************************)
+
 let pp_scalar fmt = function
   | Attr attr -> Format.pp_print_string fmt attr
   | Lit i     -> Format.fprintf fmt "%ld" i
@@ -97,36 +105,14 @@ and pp_comms fmt = function
      Format.pp_print_cut fmt ();
      pp_comms fmt cs
 
-module RelvarSet  = struct
-  include (Set.Make (String) : Set.S with type elt = relvar)
-  let map_to_list f set =
-    fold (fun x -> List.cons (f x)) set []
-  let concat_map_to_list f set =
-    List.concat (map_to_list f set)
-end
-
-module AttrSet = (Set.Make (String) : Set.S with type elt = attr)
-
-(**********************************************************************)
-let rec free_written_relvars_comm comm =
-  match comm with
-    | WhileNotEmpty (_, comms) ->
-       free_written_relvars comms
-    | Insert (relvar, _) ->
-       RelvarSet.add relvar
-    | Merge { tgt } | Move { tgt } ->
-       RelvarSet.add tgt
-    | Declare (vars, comms) ->
-       fun set ->
-         List.fold_right (fun (rv, _) -> RelvarSet.remove rv) vars @@
-         free_written_relvars comms @@
-         set
-
-and free_written_relvars comms =
-  List.fold_right free_written_relvars_comm comms
-
-let free_written_relvars comms =
-  free_written_relvars comms RelvarSet.empty
+let pp_program fmt {edb_relvars; idb_relvars; commands} =
+  let pp_relvar_decl typ fmt (nm, arity) =
+    Format.fprintf fmt "%s %s : %d" typ nm arity
+  in
+  Format.fprintf fmt "@[<v>%a@,@,%a@,@,%a@]"
+    Fmt.(list (pp_relvar_decl "ext")) edb_relvars
+    Fmt.(list (pp_relvar_decl "int")) idb_relvars
+    pp_comms                          commands
 
 (**********************************************************************)
 (* Indexes:

@@ -61,10 +61,6 @@ type ruleset =
   ; pred_info     : predicate_info PredicateNameMap.t
   }
 
-type rule_id = int
-
-let rule_id i = i
-
 let pp_pred_info fmt (name, {arity; intensional}) =
   Format.fprintf fmt
     "%s %s : %d"
@@ -85,7 +81,14 @@ let pp fmt set =
   done;
   Format.pp_close_box fmt ()
 
+type rule_id = int
+
+let rule_id i = i
+
 let rule i set = set.rules.(i)
+
+let predicates {pred_info} =
+  PredicateNameMap.bindings pred_info
 
 (**********************************************************************)
 module Builder = struct

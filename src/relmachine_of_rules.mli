@@ -1,1 +1,1 @@
-val translate : Datalog_ruleset.ruleset -> Relmachine_syntax.comms
+val translate : Datalog_ruleset.ruleset -> Relmachine_syntax.program

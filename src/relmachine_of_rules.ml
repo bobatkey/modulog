@@ -2,6 +2,18 @@ module Ruleset = Datalog_ruleset
 
 open Relmachine_syntax
 
+module RelvarSet  = struct
+  include (Set.Make (String) : Set.S with type elt = relvar)
+  let map_to_list f set =
+    fold (fun x -> List.cons (f x)) set []
+  let concat_map_to_list f set =
+    List.concat (map_to_list f set)
+end
+
+module AttrSet =
+  (Set.Make (String) : Set.S with type elt = attr)
+
+
 let scalar_of_expr = function
   | Ruleset.Var x      -> Attr x
   | Ruleset.Lit i      -> Lit i
@@ -128,5 +140,21 @@ let translate_component ruleset = function
   | `Recursive rules ->
      translate_recursive ruleset rules
 
-let translate ruleset =
+let translate_rules ruleset =
   List.map (translate_component ruleset) (Ruleset.components ruleset)
+
+
+let translate ruleset =
+  let edb_relvars, idb_relvars =
+    List.fold_left
+      (fun (edb, idb) (pred_name, Ruleset.{arity; intensional}) ->
+         let decl = (pred_name, arity) in
+         if intensional then
+           (edb, decl :: idb)
+         else
+           (decl :: edb, idb))
+      ([], [])
+      (Ruleset.predicates ruleset)
+  in
+  let commands = translate_rules ruleset in
+  { edb_relvars; idb_relvars; commands }
