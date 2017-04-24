@@ -5,6 +5,7 @@ let typecheck filename =
        Format.printf
          "@[<v>%a@]\n"
          Modlog.Checker.Mod.pp_signature sg
+
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -25,6 +26,7 @@ let relmachine filename with_indexes =
            "\n@[<v>%a@]\n%!"
            Relmachine_indexes.pp_all_indexes indexes
        end
+
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -38,6 +40,7 @@ let rules filename =
        Format.printf
          "@[<v>%a@]\n"
          Datalog_ruleset.pp rules
+
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -53,6 +56,7 @@ let exec filename =
        Format.printf
          "@[<v>%a@]\n"
          Relmachine_interpreter.pp_relvarenv env
+
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"

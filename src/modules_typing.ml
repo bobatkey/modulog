@@ -81,7 +81,7 @@ struct
     | Module of Mod.mod_type
     | Modty  of Mod.mod_type
 
-  
+
   type t =
     { bindings : binding Ident.Table.t
     ; names    : Ident.t NameMap.t
@@ -117,7 +117,7 @@ struct
 
   let add_module_by_ident ident mty env =
     add_by_ident ident (Module mty) env
-  
+
   let add_sigitem item env =
     match item.Mod.sigitem_data with
       | Mod.Sig_value (id, vty)  -> add_by_ident id (Value vty) env
@@ -198,7 +198,7 @@ struct
 
   let lookup_modtype path {bindings} =
     lookup_modtype path bindings
-  
+
   let lookup_type path {bindings} =
     match find path bindings with
       | Ok (Type ty) -> ty
@@ -313,7 +313,7 @@ struct
   module Tgt = Tgt
   module Env = CT.Env
   module Location = Src.Core.Location
-  
+
   let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
   let (>>|) c f = match c with Ok a -> Ok (f a) | Error e -> Error e
 
@@ -520,7 +520,7 @@ struct
     | Tgt.{sigitem_data=Sig_modty (id, mty)} as item ->
        Tgt.{item with sigitem_data=Sig_modty (id, mty)}
 
-  
+
   module SeenSet = Set.Make (String)
 
   type core_error = CT.core_error
@@ -902,5 +902,5 @@ struct
 
   let type_structure env str =
     type_structure env [] [] SeenSet.empty str
-  
+
 end

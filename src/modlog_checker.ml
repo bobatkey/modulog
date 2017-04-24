@@ -198,7 +198,7 @@ module Core_typing = struct
        Some syms
     | _ ->
        None
-  
+
   (* check each expression against some expected type, using an
      environment of already bound vars. Return the translated
      expression and complete list of bound vars. *)
@@ -318,7 +318,7 @@ module Core_typing = struct
        Error (expr_loc, Unsafe `Catch_all)
     | Src.{ expr_data = Expr_tuple exprs } ->
        check_safe local_env exprs
-  
+
 
   let type_rule env expected_name ident tys
       Src.{rule_loc;rule_pred;rule_args;rule_rhs} =
@@ -396,11 +396,11 @@ module Core_typing = struct
       | _ ->
          false
 
-  
+
   let kind_match env () () =
     true
 
-  
+
   let deftype_of_path path () =
     Core.{ domtype_loc  = Location.generated
          ; domtype_data = Type_typename path

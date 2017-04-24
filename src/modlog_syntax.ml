@@ -5,7 +5,7 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
   module Names = Names
 
   open Names
-  
+
   type expr =
     { expr_loc : Location.t
     ; expr_data : expr_data

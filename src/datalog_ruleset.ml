@@ -238,7 +238,7 @@ module G = struct
   type vertex = V.t
 
   let graph_of_vertex (ruleset, _) = ruleset
-  
+
   module E = struct
     type t = V.t * V.t
     let src = fst

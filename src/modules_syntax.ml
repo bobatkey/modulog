@@ -188,7 +188,7 @@ struct
     Core.pp_def_decl fmt (id, kind, manifest)
 
 
-  
+
   let rec pp_modtype fmt = function
     | {modtype_data = Modtype_functor (id, mty1, mty2)} ->
        Format.fprintf fmt "functor(%a : %a) ->@ %a"
@@ -351,7 +351,7 @@ struct
 
   let rec subst_modtype sub modtype =
     {modtype with
-       modtype_data = 
+       modtype_data =
          match modtype.modtype_data with
            | Modtype_longident p ->
               Modtype_longident (Subst.path sub p)

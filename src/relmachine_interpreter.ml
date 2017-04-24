@@ -140,4 +140,3 @@ let pp_rel =
 let pp_relvarenv =
   Fmt.(iter_bindings ~sep:(always ",@ ") RelvarEnv.iter
          (pair ~sep:(always " = ") string pp_rel))
-            

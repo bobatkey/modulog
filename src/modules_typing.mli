@@ -25,7 +25,7 @@ module type ENV = sig
 
   val add_modty : String_names.ident -> Mod.mod_type -> t -> Modules_ident.t * t
 
-  
+
   val add_signature : Mod.signature -> t -> t
 
   val add_module_by_ident : Modules_ident.t -> Mod.mod_type -> t -> t
