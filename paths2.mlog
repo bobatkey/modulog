@@ -19,8 +19,8 @@ module Path = functor (E : Edges) -> struct
 
   def
     path : E.vertex * E.vertex
-    path(X,Y) :- E.edge(X,Y)
-    path(X,Z) :- path(X,Y), E.edge(Y,Z)
+    path(?X,?Y) :- E.edge(?X,?Y)
+    path(?X,?Z) :- path(?X,?Y), E.edge(?Y,?Z)
 
 end
 
