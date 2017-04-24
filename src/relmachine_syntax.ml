@@ -47,23 +47,23 @@ let pp_projection fmt (idx, attr) =
 let rec pp_expr fmt = function
   | Return {guard_relation=None; values} ->
      Format.fprintf fmt "(@[<h>%a@])"
-       (Format_util.pp_list pp_scalar) values
+       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
   | Return {guard_relation=Some rel; values} ->
      Format.fprintf fmt "(@[<h>%a@]) unless in %s"
-       (Format_util.pp_list pp_scalar) values
+       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
        rel
   | Select { relation; conditions=[]; projections; body } ->
      Format.fprintf fmt
        "@[<hv 0>select @[<hv 0>from %s@ with@ @[%a@]@]@ in@]@ %a"
        relation
-       (Format_util.pp_list pp_projection) projections
+       Fmt.(list ~sep:(always ",@ ") pp_projection) projections
        pp_expr body
   | Select { relation; conditions; projections; body } ->
      Format.fprintf fmt
        "@[<hv 0>select @[<hv 0>from %s@ when @[%a@]@ with @[%a@]@]@ in@]@ %a"
        relation
-       (Format_util.pp_list pp_condition) conditions
-       (Format_util.pp_list pp_projection) projections
+       Fmt.(list ~sep:(always ",@ ") pp_condition) conditions
+       Fmt.(list ~sep:(always ",@ ") pp_projection) projections
        pp_expr body
 
 let pp_initialiser fmt = function
@@ -73,7 +73,7 @@ let pp_initialiser fmt = function
 let rec pp_comm fmt = function
   | WhileNotEmpty (rels, body) ->
      Format.fprintf fmt "@[<v 4>whileNotEmpty (@[<hv>%a@]) do@,%a@]@,end"
-       Format_util.(pp_list Format.pp_print_string) rels
+       Fmt.(list ~sep:(always ",@ ") string) rels
        pp_comms body
   | Insert (vars, expr) ->
      Format.fprintf fmt "@[<hv 4>insert into %s value@ %a@]"
@@ -85,7 +85,7 @@ let rec pp_comm fmt = function
      Format.fprintf fmt "move %s into %s" src tgt
   | Declare (initialisers, body) ->
      Format.fprintf fmt "@[<v 4>declare (@[<v 0>%a@]) in@,%a@]@,end"
-       (Format_util.pp_list pp_initialiser) initialisers
+       Fmt.(list ~sep:(always ",@ ") pp_initialiser) initialisers
        pp_comms body
 
 and pp_comms fmt = function
