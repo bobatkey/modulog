@@ -1,0 +1,3 @@
+module type X = functor (P : sig end) -> sig end
+
+module type Y = X with type t = int

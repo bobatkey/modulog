@@ -23,6 +23,7 @@ rule token = parse
 | "and"      { AND }
 | "def"      { DEF }
 | "constant" { CONSTANT }
+| "with"     { WITH }
 | '('        { LPAREN }
 | ')'        { RPAREN }
 | '['        { LBRACE }

@@ -31,6 +31,14 @@ module String_names = struct
        Format.pp_print_string pp f
 end
 
+let rec pp_path fmt = function
+  | [] ->
+     failwith "internal error: empty path"
+  | [nm] ->
+     Format.pp_print_string fmt nm
+  | nm::nms ->
+     Format.fprintf fmt "%s.%a" nm pp_path nms
+
 module Ident = Modules_ident
 
 module Path = Modules_path
@@ -65,7 +73,11 @@ module type CORE_SYNTAX_RAW = sig
 
   val pp_val_decl : Format.formatter -> Names.ident * val_type -> unit
 
-  val pp_def_decl : Format.formatter -> Names.ident * kind * def_type option -> unit
+  val pp_def_decl :
+    Format.formatter -> Names.ident * kind * def_type option -> unit
+
+  val pp_type_constraint :
+    Format.formatter -> string list * kind * def_type -> unit
 end
 
 module type MOD_SYNTAX_RAW = sig
@@ -87,6 +99,7 @@ module type MOD_SYNTAX_RAW = sig
     | Modtype_longident of Core.Names.longident
     | Modtype_signature of signature
     | Modtype_functor   of Core.Names.ident * mod_type * mod_type
+    | Modtype_withtype  of mod_type * string list * Core.kind * Core.def_type
 
   and signature =
     sig_item list
@@ -155,6 +168,7 @@ struct
     | Modtype_longident of Core.Names.longident
     | Modtype_signature of signature
     | Modtype_functor   of Core.Names.ident * mod_type * mod_type
+    | Modtype_withtype  of mod_type * string list * Core.kind * Core.def_type
 
   and signature =
     sig_item list
@@ -173,26 +187,39 @@ struct
   let pp_type_decl fmt (id, { kind; manifest }) =
     Core.pp_def_decl fmt (id, kind, manifest)
 
-  let rec pp_modtype pp = function
-    | {modtype_data = Modtype_longident lid} ->
-       Core.Names.pp_longident pp lid
-    | {modtype_data = Modtype_signature sg} ->
-       Format.fprintf pp "@[<v 2>sig@ %a@]@ end"
-         pp_signature sg
+
+  
+  let rec pp_modtype fmt = function
     | {modtype_data = Modtype_functor (id, mty1, mty2)} ->
-       Format.fprintf pp "functor(%a : %a) ->@ %a"
+       Format.fprintf fmt "functor(%a : %a) ->@ %a"
          Core.Names.pp_ident id
          pp_modtype mty1
          pp_modtype mty2
+    | modty ->
+       pp_modtype2 fmt modty
 
-  and pp_signature pp = function
+  and pp_modtype2 fmt = function
+    | {modtype_data = Modtype_longident lid} ->
+       Core.Names.pp_longident fmt lid
+    | {modtype_data = Modtype_signature sg} ->
+       Format.fprintf fmt "@[<v 2>sig@ %a@]@ end"
+         pp_signature sg
+    | {modtype_data = Modtype_withtype (mty, path, kind, deftype)} ->
+       Format.fprintf fmt "%a with type %a = %a"
+         pp_modtype2 mty
+         pp_path path
+         Core.pp_type_constraint (path, kind, deftype)
+    | modty ->
+       Format.fprintf fmt "(%a)" pp_modtype modty
+
+  and pp_signature fmt = function
     | [] -> ()
     | [item] ->
-       pp_sig_item pp item
+       pp_sig_item fmt item
     | item :: items ->
-       pp_sig_item pp item;
-       Format.pp_print_space pp ();
-       pp_signature pp items
+       pp_sig_item fmt item;
+       Format.pp_print_space fmt ();
+       pp_signature fmt items
 
   and pp_sig_item fmt = function
     | { sigitem_data = Sig_value (id, vty) } ->
@@ -332,6 +359,11 @@ struct
               Modtype_signature (List.map (subst_sig_item sub) sg)
            | Modtype_functor (id, mty1, mty2) ->
               Modtype_functor (id, subst_modtype sub mty1, subst_modtype sub mty2)
+           | Modtype_withtype (mty, path, kind, deftype) ->
+              Modtype_withtype (subst_modtype sub mty,
+                                path,
+                                Core.subst_kind sub kind,
+                                Core.subst_deftype sub deftype)
     }
 
   and subst_sig_item sub sigitem =
@@ -344,4 +376,3 @@ struct
            | Sig_modty (id, mty)  -> Sig_modty (id, subst_modtype sub mty)
     }
 end
-

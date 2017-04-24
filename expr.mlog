@@ -55,11 +55,7 @@ module ExprGrammar = struct
 end
 
 (* Basically computes the intersection of a CFG with a regular language... *)
-module Recogniser (G : GRAMMAR) (I : sig type index
-                                         type token = G.token
-                                         token_at : index * token * index
-                                         is_index : index
-                                     end) =
+module Recogniser (G : GRAMMAR) (I : INPUT with type token = G.token) =
 struct
 
   (* parse (i, nt, j) if the symbol 'nt' is recognised between 'i' and

@@ -6,7 +6,7 @@ open Datalog_syntax
 %token COLON_DASH
 %token COLON
 %token STAR DOT ARROW EQUALS BAR UNDERSCORE
-%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF CONSTANT
+%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF CONSTANT WITH
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
 %token<string> IDENT ENUM_IDENT MV_IDENT
@@ -126,16 +126,29 @@ predicate_type:
 
 /* the module language */
 
+with_path:
+| mod_path=separated_nonempty_list(DOT, IDENT)
+    { mod_path }
+
 mod_type:
+| FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
+    { { modtype_loc  = Location.mk $startpos $endpos
+      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
+| mty=mod_type2
+    { mty }
+
+mod_type2:
 | lid=longident
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_longident lid } }
 | SIG; s=list(sig_item); END
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_signature s } }
-| FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
+| mty=mod_type2; WITH; TYPE; path=with_path; EQUALS; ty=domain_type
     { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
+      ; modtype_data = Modtype_withtype (mty, path, (), ty) } }
+| LPAREN; mty=mod_type; RPAREN
+    { mty }
 
 sig_item:
 | id=IDENT; COLON; ty=predicate_type

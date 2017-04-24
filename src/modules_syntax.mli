@@ -24,6 +24,8 @@ module String_names : sig
                  and type longident := longident
 end
 
+val pp_path : Format.formatter -> string list -> unit
+
 module Bound_names : sig
   type ident = Modules_ident.t
   type longident = Modules_path.t
@@ -45,7 +47,11 @@ module type CORE_SYNTAX_RAW = sig
 
   val pp_val_decl : Format.formatter -> Names.ident * val_type -> unit
 
-  val pp_def_decl : Format.formatter -> Names.ident * kind * def_type option -> unit
+  val pp_def_decl :
+    Format.formatter -> Names.ident * kind * def_type option -> unit
+
+  val pp_type_constraint :
+    Format.formatter -> string list * kind * def_type -> unit
 end
 
 module type MOD_SYNTAX_RAW = sig
@@ -67,6 +73,7 @@ module type MOD_SYNTAX_RAW = sig
     | Modtype_longident of Core.Names.longident
     | Modtype_signature of signature
     | Modtype_functor   of Core.Names.ident * mod_type * mod_type
+    | Modtype_withtype  of mod_type * string list * Core.kind * Core.def_type
 
   and signature =
     sig_item list

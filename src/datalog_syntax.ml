@@ -190,6 +190,11 @@ module Make_syntax (Names : Modules.Syntax.NAMES) = struct
   let pp_term fmt = function
     | PredicateDefs defs -> pp_pred_defs fmt defs
     | ConstantDef c      -> pp_constant_def fmt c
+
+  let pp_type_constraint fmt (path, (), dty) =
+    Format.fprintf fmt "%a = %a"
+      Modules.Syntax.pp_path path
+      pp_domaintype          dty
 end
 
 module Syntax = Make_syntax (Modules.Syntax.String_names)

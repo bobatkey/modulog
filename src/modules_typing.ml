@@ -493,6 +493,9 @@ struct
     | Tgt.{modtype_data = Modtype_functor _} as mty ->
        mty
 
+    | Tgt.{modtype_data = Modtype_withtype _} ->
+       failwith "internal error: unexpanded 'with type' in checked module type"
+
   and strengthen_sigitem env path = function
     | Tgt.{sigitem_data=Sig_value _} as item ->
        item
@@ -531,6 +534,10 @@ struct
     | Lookup_error of lookup_error
     | Match_error of string * match_error
     | Repeated_name of Src.Core.Names.ident
+    | Not_a_signature
+    | Type_already_manifest of string list
+    | Kind_mismatch_in_with of Tgt.Core.Names.ident * Tgt.Core.kind * string list * Tgt.Core.kind * Tgt.Core.def_type
+    | Path_not_found of string list
 
   type error = Location.t * error_detail
 
@@ -559,6 +566,24 @@ struct
          Format.fprintf pp "In declaration at %a@, repeated name: %S"
            Location.pp location
            id
+      | Not_a_signature ->
+         Format.fprintf pp "The module type at %a is not a signature"
+           Location.pp location
+      | Type_already_manifest path ->
+         Format.fprintf pp "At %a, the type identified by the path@ @;<0 4>%a@,@ is already manifest@]"
+           Location.pp location
+           pp_path path
+      | Kind_mismatch_in_with (ident, kind1, path, kind2, dty) ->
+         Format.fprintf pp
+           "At %a,@, Error:@;<0 2>Cannot replace@,@;<0 4>%a@,@,with@,@;<0 4>%a@,@,because the kinds do not match"
+           Location.pp location
+           Tgt.Core.pp_def_decl (ident, kind1, None)
+           Tgt.Core.pp_type_constraint (path, kind2, dty)
+      | Path_not_found path ->
+         Format.fprintf pp
+           "At %a, the path %a does not refer to a type in this signature"
+           Location.pp location
+           pp_path path
 
   let lift_lookup_error loc = function
     | Ok value  -> Ok value
@@ -578,6 +603,62 @@ struct
        lift_core_error loc @@ CT.check_deftype env kind dty
        >>= fun dty ->
        Ok (Some dty)
+
+  let rec subst_type_in_items env typename kind dty rev_items = function
+    | [] ->
+       Error `path_not_found
+    | Tgt.({sigitem_data=Sig_type (ident, decl)} as item)::items
+      when Ident.name ident = typename ->
+       let open Tgt in
+       if CT.kind_match env kind decl.kind then
+         (match decl.manifest with
+           | None ->
+              let sigitem_data = Sig_type (ident, { kind; manifest=Some dty }) in
+              Ok (List.rev_append rev_items ({item with sigitem_data} :: items))
+           | Some _ ->
+              Error `already_manifest)
+       else
+         Error (`kinds_dont_match (ident, decl.kind))
+    | item::items ->
+       subst_type_in_items env typename kind dty (item::rev_items) items
+
+  let rec subst_type env modty path kind dty =
+    match modty with
+      | Tgt.{modtype_data = Modtype_longident lid} ->
+         subst_type env (Env.lookup_modtype lid env) path kind dty
+      | Tgt.{modtype_data = Modtype_signature items} ->
+         (match path with
+           | [] ->
+              failwith "internal error: empty path"
+           | [typename] ->
+              subst_type_in_items env typename kind dty [] items >>= fun items ->
+              Ok (Tgt.{ modtype_loc  = Location.generated
+                      ; modtype_data = Modtype_signature items
+                      })
+           | modname::path ->
+              subst_type_in_submodule env modname path kind dty [] items
+              >>= fun items ->
+              Ok (Tgt.{ modtype_loc  = Location.generated
+                      ; modtype_data = Modtype_signature items
+                      }))
+      | Tgt.{modtype_data = Modtype_functor _} ->
+         Error `Not_a_signature
+      | Tgt.{modtype_data = Modtype_withtype _} ->
+         failwith "internal error: unexpanded 'with type' in checked module type"
+
+  and subst_type_in_submodule env nm path kind dty rev_items = function
+    | [] ->
+       Error `path_not_found
+    | Tgt.{sigitem_data=Sig_module (ident, modty)}::items
+      when Ident.name ident = nm ->
+       subst_type env modty path kind dty >>= fun modty ->
+       let item = Tgt.{ sigitem_loc  = Location.generated
+                      ; sigitem_data = Sig_module (ident, modty)
+                      }
+       in
+       Ok (List.rev_append rev_items (item :: items))
+    | item::items ->
+       subst_type_in_submodule env nm path kind dty (item::rev_items) items
 
   let rec check_modtype env = function
     | Src.{modtype_loc;modtype_data=Modtype_longident path} ->
@@ -600,6 +681,21 @@ struct
        Tgt.{ modtype_loc
            ; modtype_data = Modtype_functor (param, arg, res)
            }
+    | Src.{modtype_loc;modtype_data=Modtype_withtype (mty, path, kind, dty)} ->
+       let sig_loc = mty.Src.modtype_loc in
+       check_modtype env mty >>= fun mty ->
+       lift_core_error modtype_loc (CT.check_kind env kind) >>= fun kind ->
+       lift_core_error modtype_loc (CT.check_deftype env kind dty) >>= fun dty ->
+       (match subst_type env mty path kind dty with
+         | Ok mty -> Ok mty
+         | Error `Not_a_signature  ->
+            Error (sig_loc, Not_a_signature)
+         | Error `already_manifest ->
+            Error (modtype_loc, Type_already_manifest path)
+         | Error (`kinds_dont_match (ident, expected_kind)) ->
+            Error (modtype_loc, Kind_mismatch_in_with (ident, expected_kind, path, kind, dty))
+         | Error `path_not_found ->
+            Error (modtype_loc, Path_not_found path))
 
   and check_signature env rev_sig seen = function
     | [] ->

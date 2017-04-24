@@ -1,0 +1,1 @@
+module type X = sig type t = int end with type t = int * int
