@@ -26,15 +26,21 @@ let typecheck filename =
          "@[<v>%a@]\n"
          Datalog_checker.pp_error err
 
-let relmachine filename =
+let relmachine filename with_indexes =
   let structure = read_structure_from_file filename in
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.from_structure str in
        let code     = Relmachine_of_rules.translate rules in
        Format.printf
-         "@[<v>%a@]\n"
-         Relmachine_syntax.pp_program code
+         "@[<v>%a@]\n%!"
+         Relmachine_syntax.pp_program code;
+       if with_indexes then begin
+         let indexes = Relmachine_indexes.indexes code in
+         Format.printf
+           "\n@[<v>%a@]\n%!"
+           Relmachine_indexes.pp_all_indexes indexes
+       end
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
@@ -80,6 +86,10 @@ let filename_arg =
          ~docv:"FILENAME"
          ~doc:"Name of modular datalog file to process")
 
+let with_indexes_opt =
+  let doc = "Whether to print computed index information" in
+  Arg.(value & flag & info ["i";"with-indexes"] ~doc)
+
 let typecheck_cmd =
   let doc = "Typecheck a Modular Datalog program and print the signature" in
   Term.(const typecheck $ filename_arg),
@@ -87,7 +97,7 @@ let typecheck_cmd =
 
 let relmachine_cmd =
   let doc = "Compile a Modular Datalog program to the RelMachine" in
-  Term.(const relmachine $ filename_arg),
+  Term.(const relmachine $ filename_arg $ with_indexes_opt),
   Term.info "relmachine" ~doc ~exits:Term.default_exits
 
 let rules_cmd =
@@ -102,11 +112,11 @@ let exec_cmd =
 
 let default_cmd =
   let doc = "a Modular Datalog compiler" in
-  (*let sdocs = Manpage.s_common_options in*)
+  let sdocs = Manpage.s_common_options in
   let exits = Term.default_exits in
   (*let man = help_secs in*)
   Term.(ret (const (`Help (`Pager, None)))),
-  Term.info "modlog" ~version:"v1.0.0" ~doc (*~sdocs*) ~exits (*~man*)
+  Term.info "modlog" ~version:"v1.0.0" ~doc ~sdocs ~exits (*~man*)
 
 let () =
   Term.(exit (eval_choice default_cmd [ typecheck_cmd
