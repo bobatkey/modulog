@@ -35,7 +35,7 @@ let go filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Relmachine_syntax.translate rules in
+       let code     = Relmachine_of_rules.translate rules in
        let patterns = Relmachine_syntax.search_patterns code in
        let indexes  = Relmachine_syntax.indexes code in
        Format.printf
@@ -66,7 +66,7 @@ let relmachine filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Relmachine_syntax.translate rules in
+       let code     = Relmachine_of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n"
          Relmachine_syntax.pp_comms code
@@ -80,7 +80,7 @@ let exec filename =
   match Datalog_checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Datalog_normalisation.rules_of_structure str in
-       let code     = Relmachine_syntax.translate rules in
+       let code     = Relmachine_of_rules.translate rules in
        let env      = Relmachine_interpreter.eval code in
        Format.printf
          "@[<v>%a@]\n"
