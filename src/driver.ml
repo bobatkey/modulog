@@ -1,12 +1,3 @@
-open Cmdliner
-
-module Modlog = struct
-  module Parser    = Datalog_parser
-  module Lexer     = Datalog_lexer
-  module Checker   = Datalog_checker
-  module Flattener = Datalog_normalisation
-end
-
 let read_structure_from_file filename =
   let ch = open_in filename in
   try
@@ -23,32 +14,6 @@ let read_structure_from_file filename =
   with e ->
     close_in ch; raise e
 
-(* Possible tasks:
-   1. Typecheck
-   2. Print rules as graphviz
-   3. Print abstract machine code
-   4. Print indexes
-*)
-
-let go filename =
-  let structure = read_structure_from_file filename in
-  match Datalog_checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules    = Datalog_normalisation.from_structure str in
-       let code     = Relmachine_of_rules.translate rules in
-       let patterns = Relmachine_syntax.search_patterns code in
-       let indexes  = Relmachine_syntax.indexes code in
-       Format.printf
-         "@[<v>%a@,%a@,%a@,%a@]\n"
-         Datalog_ruleset_graphviz.dot_of_ruleset  rules
-         Relmachine_syntax.pp_comms         code
-         Relmachine_syntax.PredicatePats.pp patterns
-         Relmachine_syntax.pp_all_indexes   indexes
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Datalog_checker.Typing.pp_error err
-
 let typecheck filename =
   let structure = read_structure_from_file filename in
   match Datalog_checker.type_structure structure with
@@ -59,7 +24,7 @@ let typecheck filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.Typing.pp_error err
+         Datalog_checker.pp_error err
 
 let relmachine filename =
   let structure = read_structure_from_file filename in
@@ -73,7 +38,7 @@ let relmachine filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.Typing.pp_error err
+         Datalog_checker.pp_error err
 
 let rules filename =
   let structure = read_structure_from_file filename in
@@ -86,7 +51,7 @@ let rules filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.Typing.pp_error err
+         Datalog_checker.pp_error err
 
 let exec filename =
   let structure = read_structure_from_file filename in
@@ -101,9 +66,12 @@ let exec filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_checker.Typing.pp_error err
+         Datalog_checker.pp_error err
 
 (**********************************************************************)
+(* The command line interface *)
+
+open Cmdliner
 
 let filename_arg =
   Arg.(required
