@@ -169,6 +169,6 @@ module ModularDatalogEvaluator =
 
 let from_structure structure =
   RS.Builder.empty
-  |> ModularDatalogEvaluator.norm_structure structure
+  |> ModularDatalogEvaluator.eval_structure structure
   |> snd
   |> RS.Builder.finish

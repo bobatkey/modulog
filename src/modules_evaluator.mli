@@ -49,5 +49,5 @@ module Make
     (Mod       : Syntax.MOD_SYNTAX)
     (Core_eval : CORE_EVAL with module Core = Mod.Core) :
 sig
-  val norm_structure : Mod.structure -> unit Core_eval.eval
+  val eval_structure : Mod.structure -> unit Core_eval.eval
 end

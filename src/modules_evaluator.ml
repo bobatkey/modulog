@@ -95,7 +95,7 @@ struct
 
   module Eval = Core_eval.Eval (Env)
 
-  let rec norm_structure env rev_bindings = function
+  let rec eval_structure env rev_bindings = function
     | [] ->
        return (List.rev rev_bindings)
 
@@ -109,52 +109,53 @@ struct
            bindings
            rev_bindings
        in
-       norm_structure env rev_bindings items
+       eval_structure env rev_bindings items
 
     | {stritem_data=Str_type (ident, kind, typ)} :: items ->
        let typ = Eval.eval_type env kind typ in
        let value = `Type typ in
        let env = Env.add ident value env in
        let rev_bindings = (Ident.name ident, value) :: rev_bindings in
-       norm_structure env rev_bindings items
+       eval_structure env rev_bindings items
 
     | {stritem_data=Str_module (ident, modl)} :: items ->
-       norm_modterm env modl >>= fun value ->
+       eval_modterm env modl >>= fun value ->
        let env = Env.add ident value env in
        let rev_bindings = (Ident.name ident, value) :: rev_bindings in
-       norm_structure env rev_bindings items
+       eval_structure env rev_bindings items
 
     | {stritem_data=Str_modty _} :: items ->
-       norm_structure env rev_bindings items
+       eval_structure env rev_bindings items
 
-  and norm_modterm env = function
+  and eval_modterm env = function
     | {modterm_data=Mod_longident lid} ->
        (match Env.find lid env with
          | Some value ->
             return value
          | None ->
-            failwith "internal error: module identifier not found during evaluation")
+            failwith
+              "internal error: module identifier not found during evaluation")
 
     | {modterm_data=Mod_structure items} ->
-       norm_structure env [] items >>= fun bindings ->
+       eval_structure env [] items >>= fun bindings ->
        return (`Structure bindings)
 
     | {modterm_data=Mod_functor (arg_name, _, body)} ->
        return (`Functor (env, arg_name, body))
 
     | {modterm_data=Mod_apply (funct, arg)} ->
-       (norm_modterm env funct >>= function
+       (eval_modterm env funct >>= function
          | `Functor (clo_env, arg_name, body) ->
-            norm_modterm env arg >>= fun value ->
+            eval_modterm env arg >>= fun value ->
             let env = Env.add arg_name value clo_env in
-            norm_modterm env body
+            eval_modterm env body
          | _ ->
             failwith "internal error: not a functor in application")
 
     | {modterm_data=Mod_constraint (modl, _)} ->
-       norm_modterm env modl
+       eval_modterm env modl
 
-  let norm_structure str =
-    norm_structure Env.empty [] str >>= fun _ -> return ()
+  let eval_structure str =
+    eval_structure Env.empty [] str >>= fun _ -> return ()
 
 end
