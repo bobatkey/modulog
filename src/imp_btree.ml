@@ -123,6 +123,11 @@ end = struct
             incr i
           end;
 
+        ifthen (not (!i == !(!x #-> nkeys)) || is_empty) break;
+
+        x := !(fst top);
+        i := !(snd top);
+
         ifthen (not (key_le !(!(!x #-> keys) #@ !i) upto)) break;
 
         body !(!(!x #-> keys) #@ !i);
