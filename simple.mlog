@@ -1,0 +1,13 @@
+def a : int
+    a(?x) :- b(?x), c(?x)
+
+and b : int
+    b(1)
+    b(?x) :- c(?x), d(?x)
+
+and c : int
+    c(2)
+    c(?x) :- b(?x), d(?x)
+
+and d : int
+    d(3)
