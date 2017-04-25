@@ -21,6 +21,7 @@ module BTree (S : Imp_syntax.S) (P : BTREE_PARAMS with module S = S) : sig
   val with_tree : (tree_var -> comm) -> comm
   val insert    : P.key exp -> tree_var -> comm
   val ifmember  : P.key exp -> tree_var -> comm -> comm -> comm
+  val ifmember_range : P.key exp -> P.key exp -> tree_var -> comm -> comm -> comm
   val iterate_range :
     P.key exp -> P.key exp -> tree_var -> (P.key exp -> comm) -> comm
 end = struct
@@ -90,6 +91,19 @@ end = struct
     loop begin%monoid
       find_key i !x key;
       ifthen (!i < !(!x #-> nkeys) && key_eq !(!(!x #-> keys) #@ !i) key)
+        begin%monoid yes; break end;
+      ifthen !(!x #-> leaf)
+        begin%monoid no; break end;
+      x := !(!(!x #-> children) #@ !i)
+    end
+
+  (************************************************************)
+  let ifmember_range from upto t yes no =
+    with_nodeptr !t @@ fun x ->
+    with_int @@ fun i ->
+    loop begin%monoid
+      find_key i !x from;
+      ifthen (!i < !(!x #-> nkeys) && key_le !(!(!x #-> keys) #@ !i) upto)
         begin%monoid yes; break end;
       ifthen !(!x #-> leaf)
         begin%monoid no; break end;
