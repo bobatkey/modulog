@@ -32,6 +32,7 @@ module type S = sig
   val ( < ) : int exp -> int exp -> bool exp
   val ( > ) : int exp -> int exp -> bool exp
   val ( >= ) : int exp -> int exp -> bool exp
+  val ( <= ) : int exp -> int exp -> bool exp
   val ( == ) : int exp -> int exp -> bool exp
   val ( + ) : int exp -> int exp -> int exp
   val ( - ) : int exp -> int exp -> int exp

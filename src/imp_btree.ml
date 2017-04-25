@@ -246,3 +246,15 @@ end = struct
     insert_nonfull x key
   end
 end
+
+module Test (S : Imp_syntax.S) =
+  BTree (S) (struct
+    module S = S
+    let min_children = 8l
+    type key = int
+    let key = S.int
+
+    let key_lt = S.(<)
+    let key_le = S.(<=)
+    let key_eq = S.(==)
+  end)
