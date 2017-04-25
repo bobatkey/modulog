@@ -285,6 +285,7 @@ module C () = struct
   let ( >= ) e1 e2 = Binop (e1, Ge, e2)
   let ( <= ) e1 e2 = Binop (e1, Le, e2)
   let ( == ) e1 e2 = Binop (e1, Eq, e2)
+  let ( != ) e1 e2 = Binop (e1, Ne, e2)
   let ( +  ) e1 e2 = Binop (e1, Plus, e2)
   let ( -  ) e1 e2 = Binop (e1, Sub, e2)
 end

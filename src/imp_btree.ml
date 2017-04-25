@@ -123,7 +123,7 @@ end = struct
             incr i
           end;
 
-        ifthen (not (!i == !(!x #-> nkeys)) || is_empty) break;
+        ifthen (!i != !(!x #-> nkeys) || is_empty) break;
 
         x := !(fst top);
         i := !(snd top);
