@@ -2,4 +2,6 @@
 *.o
 *.s
 /_build
-/driver.native
+/*.native
+/*.byte
+
