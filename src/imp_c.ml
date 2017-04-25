@@ -209,6 +209,7 @@ module C () = struct
 
   let gen comm = match comm 0 with `Open stmts | `Closed stmts -> stmts
 
+  type (_,_) expr = c_exp
   type 'a exp = c_exp
   type 'a var = c_exp
   type comm   = namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
@@ -230,8 +231,6 @@ module C () = struct
   let structure name = Struct name
   let field (Struct name) fname typ = fname
   let seal (Struct name) = ()
-
-  let (!) e = e
 
   let true_ = BoolLit true
   let false_ = BoolLit false
@@ -260,16 +259,16 @@ module C () = struct
   let (:=) v e ng =
     `Open [Statement (Assign (v, e))]
 
-  let while_ cond body ng =
+  let while_ cond ~do_:body ng =
     `Open [Statement (While (cond, block (body ng)))]
 
   let break ng =
     `Open [Statement Break]
 
-  let ifthen cond body ng =
+  let ifthen cond ~then_:body ng =
     `Open [Statement (If (cond, block (body ng), None))]
 
-  let ifthenelse cond ~then_ ~else_ ng =
+  let if_ cond ~then_ ~else_ ng =
     `Open [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
 
   let declare typ body ng =

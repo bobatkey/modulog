@@ -2,5 +2,6 @@ PKG ocamlgraph
 PKG rresult
 PKG fmt
 PKG cmdliner
+PKG ppx_monoid
 S .
 B ../_build/src

@@ -1,6 +1,7 @@
 module type S = sig
-  type 'a exp
-  type 'a var
+  type ('a,_) expr
+  type 'a exp = ('a,[`exp]) expr
+  type 'a var = ('a,[`var|`exp]) expr
   type comm
 
   type 'a typ
@@ -20,46 +21,47 @@ module type S = sig
   val field     : 's structure typ -> string -> 'a typ -> ('s, 'a) field
   val seal      : 's structure typ -> unit
 
-  val (!) : 'a var -> 'a exp
-
-  val true_  : bool exp
-  val false_ : bool exp
-  val ( && ) : bool exp -> bool exp -> bool exp
-  val ( || ) : bool exp -> bool exp -> bool exp
-  val not    : bool exp -> bool exp
+  val true_  : (bool, [`exp]) expr
+  val false_ : (bool, [`exp]) expr
+  val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> (bool, [`exp]) expr
+  val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> (bool, [`exp]) expr
+  val not    : (bool, [>`exp]) expr -> (bool, [>`exp]) expr
 
   val const : int32 -> int exp
-  val ( < ) : int exp -> int exp -> bool exp
-  val ( > ) : int exp -> int exp -> bool exp
-  val ( >= ) : int exp -> int exp -> bool exp
-  val ( <= ) : int exp -> int exp -> bool exp
-  val ( == ) : int exp -> int exp -> bool exp
-  val ( != ) : int exp -> int exp -> bool exp
-  val ( + ) : int exp -> int exp -> int exp
-  val ( - ) : int exp -> int exp -> int exp
+  val ( < ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( > ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( >= ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( <= ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( == ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( != ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
+  val ( + ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
+  val ( - ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
 
   val empty : comm
+
   val (^^) : comm -> comm -> comm
 
-  val (:=) : 'a var -> 'a exp -> comm
+  val (:=) : ('a,[`exp|`var]) expr -> ('a,[>`exp]) expr -> comm
 
-  val while_ : bool exp -> comm -> comm
+  val while_ : bool exp -> do_:comm -> comm
+
   val break : comm
 
-  val ifthenelse : bool exp -> then_:comm -> else_:comm -> comm
-  val ifthen : bool exp -> comm -> comm
+  val if_ : (bool, [>`exp]) expr -> then_:comm -> else_:comm ->  comm
 
-  val declare : 'a typ -> ('a var -> comm) -> comm
+  val ifthen : (bool, [>`exp]) expr -> then_:comm -> comm
 
-  val malloc : 'a ptr var -> 'a typ -> comm
+  val declare : 'a typ -> (('a,[`exp|`var]) expr -> comm) -> comm
 
-  val (#@) : 'a array exp -> int exp -> 'a var
+  val malloc : ('a ptr, [`exp|`var]) expr -> 'a typ -> comm
 
-  val deref : 'a ptr exp -> 'a var
+  val (#@) : ('a array, [>`exp]) expr -> (int, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
-  val (#.) : 's structure exp -> ('s, 'a) field -> 'a var
+  val deref : ('a ptr, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
-  val (#->) : 's structure ptr exp -> ('s, 'a) field -> 'a var
+  val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+
+  val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
 end
 
 
