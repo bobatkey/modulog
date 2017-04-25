@@ -74,11 +74,6 @@ and block_stmt =
   | Declaration : 'a typ * string -> block_stmt
   | Statement   : stmt            -> block_stmt
 
-let block = function
-  | [Statement (Block stmts)] -> Block stmts
-  | [Statement stmt]          -> stmt
-  | stmts                     -> Block stmts
-
 module PP = struct
   let rec pp_typ : type a. (bool -> Format.formatter -> unit) ->
     Format.formatter -> a typ -> unit =
@@ -212,11 +207,11 @@ end
 module C () = struct
   type namegen = int
 
-  let gen comm = comm 0
+  let gen comm = match comm 0 with `Open stmts | `Closed stmts -> stmts
 
   type 'a exp = c_exp
   type 'a var = c_exp
-  type comm   = namegen -> block_stmt list
+  type comm   = namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
 
   type nonrec 'a typ = 'a typ
   type nonrec 'a ptr = 'a ptr
@@ -244,31 +239,48 @@ module C () = struct
   let (||) e1 e2 = Binop (e1, LOr, e2)
   let not e = Unop (LNot, e)
 
-  let empty ng = []
-  let (^^) c1 c2 ng = c1 ng @ c2 ng
+  let empty ng =
+    `Open []
+
+  let (^^) c1 c2 ng =
+    match c1 ng, c2 ng with
+      | `Open stmts1,   `Open stmts2   -> `Open (stmts1 @ stmts2)
+      | `Open stmts1,   `Closed stmts2 -> `Closed (stmts1 @ stmts2)
+      | `Closed stmts1, `Open stmts2   -> `Open (Statement (Block stmts1) :: stmts2)
+      | `Closed stmts1, `Closed stmts2 -> `Closed (Statement (Block stmts1) :: stmts2)
+
+  let block = function
+    | `Open [Statement (Block stmts)]
+    | `Closed [Statement (Block stmts)] -> Block stmts
+    | `Open [Statement stmt]
+    | `Closed [Statement stmt]          -> stmt
+    | `Open stmts
+    | `Closed stmts                     -> Block stmts
 
   let (:=) v e ng =
-    [Statement (Assign (v, e))]
+    `Open [Statement (Assign (v, e))]
 
   let while_ cond body ng =
-    [Statement (While (cond, block (body ng)))]
+    `Open [Statement (While (cond, block (body ng)))]
 
-  let break ng = [Statement Break]
+  let break ng =
+    `Open [Statement Break]
 
   let ifthen cond body ng =
-    [Statement (If (cond, block (body ng), None))]
+    `Open [Statement (If (cond, block (body ng), None))]
 
   let ifthenelse cond ~then_ ~else_ ng =
-    [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
+    `Open [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
 
   let declare typ body ng =
     let nm = Printf.sprintf "x%d" ng and ng = ng+1 in
     let decl = Declaration (typ, nm) in
     match body (Var nm) ng with
-      | [Statement (Block stmts)] ->
-         [Statement (Block (decl::stmts))]
-      | stmts ->
-         [Statement (Block (decl::stmts))]
+      | `Closed stmts | `Open stmts ->
+         `Closed (decl :: stmts)
+
+  let malloc v typ ng =
+    `Open [Statement (Malloc (v, typ))]
 
   let deref e = Deref e
 
@@ -280,9 +292,6 @@ module C () = struct
 
   let (#->) struct_ptr_exp field =
     Field (Deref struct_ptr_exp, field)
-
-  let malloc v typ ng =
-    [Statement (Malloc (v, typ))]
 
   let const i = IntLit i
   let ( <  ) e1 e2 = Binop (e1, Lt, e2)
