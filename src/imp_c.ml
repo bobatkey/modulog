@@ -74,6 +74,11 @@ and block_stmt =
   | Declaration : 'a typ * string -> block_stmt
   | Statement   : stmt            -> block_stmt
 
+let block = function
+  | [Statement (Block stmts)] -> Block stmts
+  | [Statement stmt]          -> stmt
+  | stmts                     -> Block stmts
+
 module PP = struct
   let rec pp_typ : type a. (bool -> Format.formatter -> unit) ->
     Format.formatter -> a typ -> unit =
@@ -246,15 +251,15 @@ module C () = struct
     [Statement (Assign (v, e))]
 
   let while_ cond body ng =
-    [Statement (While (cond, Block (body ng)))]
+    [Statement (While (cond, block (body ng)))]
 
   let break ng = [Statement Break]
 
   let ifthen cond body ng =
-    [Statement (If (cond, Block (body ng), None))]
+    [Statement (If (cond, block (body ng), None))]
 
   let ifthenelse cond ~then_ ~else_ ng =
-    [Statement (If (cond, Block (then_ ng), Some (Block (else_ ng))))]
+    [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
 
   let declare typ body ng =
     let nm = Printf.sprintf "x%d" ng and ng = ng+1 in
