@@ -61,6 +61,8 @@ module type S = sig
 
   val (=*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
 
+  val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
+
   val (#@) : ('a array, [>`exp]) expr -> (int, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
   val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr

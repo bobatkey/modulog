@@ -52,6 +52,8 @@ type unop =
 type c_exp =
   | Var of string
 
+  | Null
+
   | BoolLit of bool
   | IntLit of int32
 
@@ -140,6 +142,8 @@ module PP = struct
          Format.fprintf fmt "(!%a)" (pp_expr 2) expr
        else
          Format.fprintf fmt "!%a" (pp_expr 2) expr
+    | Null ->
+       Format.pp_print_string fmt "NULL"
 
   let pp_expr fmt e =
     Format.fprintf fmt "@[<hv>%a@]" (pp_expr 20) e
@@ -332,4 +336,8 @@ module C () = struct
   let ( != ) e1 e2 = Binop (e1, Ne, e2)
   let ( +  ) e1 e2 = Binop (e1, Plus, e2)
   let ( -  ) e1 e2 = Binop (e1, Sub, e2)
+
+  let ( =*= ) e1 e2 = Binop (e1, Eq, e2)
+  let ( =!*= ) e1 e2 = Binop (e1, Ne, e2)
+  let null = Null
 end

@@ -44,7 +44,7 @@ module Make (S : Imp_syntax.S) = struct
     begin%monoid
       node := head;
 
-      while_ (not (node =*= null)) ~do_:begin%monoid
+      while_ (node =!*= null) ~do_:begin%monoid
         i := const 0l;
         while_ (i < node#->occupied) ~do_:begin%monoid
           body (node#->values#@i);
