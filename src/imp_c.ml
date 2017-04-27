@@ -146,25 +146,37 @@ module PP = struct
 
   let rec pp_stmts fmt stmts =
     Format.fprintf fmt "@[<v>";
-    let rec loop = function
-      | [] ->
-         ()
-      | [stmt] ->
-         pp_block_stmt fmt stmt
-      | stmt::stmts ->
-         pp_block_stmt fmt stmt;
-         Format.pp_print_cut fmt ();
-         Format.pp_print_cut fmt ();
-         loop stmts
+    let rec loop previous stmts =
+      match stmts with
+        | Statement stmt :: stmts ->
+           (match previous with
+             | `Start ->
+                pp_stmt fmt stmt
+             | `Decl ->
+                Format.pp_print_cut fmt ();
+                Format.pp_print_cut fmt ();
+                pp_stmt fmt stmt
+             | `Stmt ->
+                Format.pp_print_cut fmt ();
+                pp_stmt fmt stmt);
+           loop `Stmt stmts
+        | Declaration (typ, ident) :: stmts ->
+           (match previous with
+             | `Start ->
+                pp_decl fmt (typ, ident)
+             | `Decl ->
+                Format.pp_print_cut fmt ();
+                pp_decl fmt (typ, ident)
+             | `Stmt ->
+                Format.pp_print_cut fmt ();
+                Format.pp_print_cut fmt ();
+                pp_decl fmt (typ, ident));
+           loop `Decl stmts
+        | [] ->
+           ()
     in
-    loop stmts;
+    loop `Start stmts;
     Format.fprintf fmt "@]"
-
-  and pp_block_stmt fmt = function
-    | Declaration (typ, nm) ->
-       pp_decl fmt (typ, nm)
-    | Statement stmt ->
-       pp_stmt fmt stmt
 
   and pp_stmt fmt = function
     | Assign (l_value, expr) ->
@@ -187,6 +199,21 @@ module PP = struct
        Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,}"
          pp_expr expr
          pp_stmt then_stmt
+    | If (expr, Block then_stmt, Some (Block else_stmt)) ->
+       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+         pp_expr expr
+         pp_stmts then_stmt
+         pp_stmts else_stmt
+    | If (expr, Block then_stmt, Some else_stmt) ->
+       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+         pp_expr expr
+         pp_stmts then_stmt
+         pp_stmt else_stmt
+    | If (expr, then_stmt, Some (Block else_stmt)) ->
+       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+         pp_expr expr
+         pp_stmt then_stmt
+         pp_stmts else_stmt
     | If (expr, then_stmt, Some else_stmt) ->
        Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
          pp_expr expr
@@ -196,7 +223,7 @@ module PP = struct
        Format.fprintf fmt "@[<v4>{@,%a@]@,}"
          pp_stmts block_stmts
     | Break ->
-       Format.fprintf fmt "break;"
+       Format.fprintf fmt "break;@,"
     | Malloc (l_value, typ) ->
        (* FIXME: abort if allocation fails *)
        Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a))@];"
@@ -243,14 +270,18 @@ module C () = struct
 
   let (^^) c1 c2 ng =
     match c1 ng, c2 ng with
-      | `Open stmts1,   `Open stmts2   -> `Open (stmts1 @ stmts2)
-      | `Open stmts1,   `Closed stmts2 -> `Closed (stmts1 @ stmts2)
-      | `Closed stmts1, `Open stmts2   -> `Open (Statement (Block stmts1) :: stmts2)
-      | `Closed stmts1, `Closed stmts2 -> `Closed (Statement (Block stmts1) :: stmts2)
+      | `Open stmts1,   `Open stmts2   ->
+         `Open (stmts1 @ stmts2)
+      | `Open stmts1,   `Closed stmts2 ->
+         `Closed (stmts1 @ stmts2)
+      | `Closed stmts1, `Open stmts2   ->
+         `Open (Statement (Block stmts1) :: stmts2)
+      | `Closed stmts1, `Closed stmts2 ->
+         `Closed (Statement (Block stmts1) :: stmts2)
 
-  let block = function
+  let rec block = function
     | `Open [Statement (Block stmts)]
-    | `Closed [Statement (Block stmts)] -> Block stmts
+    | `Closed [Statement (Block stmts)] -> block (`Open stmts)
     | `Open [Statement stmt]
     | `Closed [Statement stmt]          -> stmt
     | `Open stmts
@@ -271,8 +302,8 @@ module C () = struct
   let if_ cond ~then_ ~else_ ng =
     `Open [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
 
-  let declare typ body ng =
-    let nm = Printf.sprintf "x%d" ng and ng = ng+1 in
+  let declare ?(name="x") typ body ng =
+    let nm = Printf.sprintf "%s%d" name ng and ng = ng+1 in
     let decl = Declaration (typ, nm) in
     match body (Var nm) ng with
       | `Closed stmts | `Open stmts ->

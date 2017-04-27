@@ -51,7 +51,7 @@ module type S = sig
 
   val ifthen : (bool, [>`exp]) expr -> then_:comm -> comm
 
-  val declare : 'a typ -> (('a,[`exp|`var]) expr -> comm) -> comm
+  val declare : ?name:string -> 'a typ -> (('a,[`exp|`var]) expr -> comm) -> comm
 
   val malloc : ('a ptr, [`exp|`var]) expr -> 'a typ -> comm
 

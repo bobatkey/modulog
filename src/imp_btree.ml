@@ -56,20 +56,20 @@ end = struct
     end
 
   let with_nodeptr init body =
-    declare (ptr node) @@ fun x ->
+    declare ~name:"node" (ptr node) @@ fun x ->
     begin%monoid
       x := init; body x
     end
 
   let alloc_node body =
-    declare (ptr node) @@ fun x ->
+    declare ~name:"node" (ptr node) @@ fun x ->
     begin%monoid
       malloc x node;
       body x
     end
 
   let with_int body =
-    declare int body
+    declare ~name:"i" int body
 
   let loop body =
     while_ true_ body
