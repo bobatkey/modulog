@@ -38,6 +38,14 @@ module Make (S : Imp_syntax.S) = struct
           end
       end
 
+  let dispose head =
+    declare (ptr list_node) @@ fun ahead ->
+    while_ (head =!*= null) ~do_:begin%monoid
+      ahead := head#->next;
+      free head;
+      head := ahead
+    end
+
   let iterate head body =
     declare (ptr list_node) @@ fun node ->
     declare int @@ fun i ->

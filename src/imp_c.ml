@@ -67,6 +67,7 @@ type c_exp =
 type stmt =
   | Assign  of c_exp * c_exp
   | Malloc  : c_exp * 'a typ -> stmt
+  | Free    : c_exp -> stmt
   | If      of c_exp * stmt * stmt option
   | While   of c_exp * stmt
   | Break
@@ -233,9 +234,16 @@ module PP = struct
        Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a))@];"
          pp_expr     l_value
          pp_typename typ
+    | Free expr ->
+       Format.fprintf fmt "@[<hv>free (%a)@];"
+         pp_expr     expr
 end
 
-module C () = struct
+module C () : sig
+  include Imp_syntax.S with type ('a,'b) expr = c_exp
+
+  val gen : comm -> block_stmt list
+end = struct
   type namegen = int
 
   let gen comm = match comm 0 with `Open stmts | `Closed stmts -> stmts
@@ -315,6 +323,9 @@ module C () = struct
 
   let malloc v typ ng =
     `Open [Statement (Malloc (v, typ))]
+
+  let free expr ng =
+    `Open [Statement (Free expr)]
 
   let deref e = Deref e
 

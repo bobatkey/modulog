@@ -55,6 +55,8 @@ module type S = sig
 
   val malloc : ('a ptr, [`exp|`var]) expr -> 'a typ -> comm
 
+  val free : ('a ptr, [>`exp]) expr -> comm
+
   val deref : ('a ptr, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
   val null : 'a ptr exp
