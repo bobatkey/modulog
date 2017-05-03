@@ -83,21 +83,17 @@ end = struct
       (* FIXME: free the tree afterwards? *)
     end
 
-  module Array = struct
-    let get = (#@)
-  end
-
   (************************************************************)
   let ifmember key t yes no =
     with_nodeptr t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
       find_key i x key;
-      ifthen (i < x#->nkeys && key_eq (x#->keys).(i) key)
+      ifthen (i < x#->nkeys && key_eq x#->keys#@i key)
         ~then_:begin%monoid yes; break end;
       ifthen x#->leaf
         ~then_:begin%monoid no; break end;
-      x := (x#->children).(i)
+      x := x#->children#@i
     end
 
   (************************************************************)
@@ -106,10 +102,10 @@ end = struct
     with_int @@ fun i ->
     loop begin%monoid
       find_key i x from;
-      ifthen (i < x#->nkeys && key_le (x #-> keys).(i) upto)
+      ifthen (i < x#->nkeys && key_le x#->keys#@i upto)
         begin%monoid yes; break end;
       ifthen x#->leaf ~then_:begin%monoid no; break end;
-      x := (x #-> children).(i)
+      x := x#->children#@i
     end
 
   (************************************************************)
@@ -130,12 +126,12 @@ end = struct
         find_key i x from;
         ifthen x#->leaf ~then_:break;
         ifthen (i < x#->nkeys) ~then_:(push x i);
-        x := (x #-> children).(i)
+        x := x#->children#@i
       end;
       loop begin%monoid
-        while_ (i < x #-> nkeys && key_le (x #-> keys).(i) upto)
+        while_ (i < x#->nkeys && key_le x#->keys#@i upto)
           ~do_:begin%monoid
-            body (x #-> keys).(i);
+            body x#->keys#@i;
             incr i
           end;
 
@@ -145,21 +141,21 @@ end = struct
         x := fst top;
         i := snd top;
 
-        ifthen (not (key_le (x #-> keys).(i) upto))
+        ifthen (not (key_le x#->keys#@i upto))
           ~then_:break;
 
-        body (x #-> keys).(i);
+        body x#->keys#@i;
 
         if_ (i == x#->nkeys)
           ~then_:pop
           ~else_:(incr (snd top));
 
-        x := (x #-> children).(i + const 1l);
+        x := x#->children#@(i + const 1l);
 
         while_ (not x#->leaf)
           ~do_:begin%monoid
             pop;
-            x := (x #-> children).(const 0l)
+            x := x#-> children#@(const 0l)
           end;
 
         i := const 0l;
@@ -173,7 +169,7 @@ end = struct
     begin%monoid
       j := x#->nkeys - const 1l;
       while_ (j >= i) ~do_:begin%monoid
-        (x#->keys).(j + const 1l) := (x#->keys).(j)
+        x#->keys#@(j + const 1l) := x#->keys#@j
       end
     end
 
@@ -188,7 +184,7 @@ end = struct
     end
 
   let split_child x i =
-    with_nodeptr (x #-> children).(i) @@ fun y ->
+    with_nodeptr x#->children#@i @@ fun y ->
     alloc_node @@ fun z ->
     begin%monoid
       z#->leaf := y#->leaf;
@@ -197,14 +193,14 @@ end = struct
       (* copy the keys over *)
       copy
         ~n:(const min_keys)
-        ~src:(fun j -> (y #-> keys).(j + const min_children))
-        ~dst:(fun j -> (z #-> keys).(j));
+        ~src:(fun j -> y#->keys#@(j + const min_children))
+        ~dst:(fun j -> z#->keys#@j);
 
       (* copy the children over (if not a leaf node) *)
       ifthen (not y#->leaf) begin
         copy ~n:(const min_children)
-          ~src:(fun j -> (y #-> children).(j + const min_children))
-          ~dst:(fun j -> (z #-> children).(j))
+          ~src:(fun j -> y#->children#@(j + const min_children))
+          ~dst:(fun j -> z#->children#@j)
       end;
 
       (* truncate y *)
@@ -216,7 +212,7 @@ end = struct
         begin%monoid
           j := x#->nkeys;
           while_ (j > i) ~do_:begin%monoid
-            (x #-> children).(j + const 1l) := (x #-> children).(j);
+            x#->children#@(j + const 1l) := x#->children#@j;
             decr j
           end
         end
@@ -224,8 +220,8 @@ end = struct
 
       move_keys_up x i;
 
-      (x #-> children). (i + const 1l) := z;
-      (x #-> keys).(i) := (y #-> keys).(const min_keys);
+      x#->children#@(i + const 1l) := z;
+      x#->keys#@i := y#->keys#@(const min_keys);
       incr (x #-> nkeys)
     end
 
@@ -237,18 +233,18 @@ end = struct
     begin%monoid
       while_ (not x#->leaf) begin%monoid
         find_key i x key;
-        ifthen (node_is_full (x #-> children).(i))
+        ifthen (node_is_full x#->children#@i)
           ~then_:begin%monoid
             split_child x i;
-            ifthen (key_lt (x #-> keys).(i) key)
+            ifthen (key_lt x#->keys#@i key)
               ~then_:(incr i)
           end;
-        x:= (x #-> children).(i)
+        x:= x#->children#@i
       end;
 
       find_key i x key;
       move_keys_up x i;
-      (x #-> keys).(i) := key;
+      x#->keys#@i := key;
       incr (x #-> nkeys)
     end
 
@@ -260,7 +256,7 @@ end = struct
       begin%monoid
         s #-> leaf := false_;
         s #-> nkeys := const 0l;
-        (s #-> children).(const 0l) := root;
+        s#->children#@(const 0l) := root;
         split_child s (const 0l);
         root := s
       end
