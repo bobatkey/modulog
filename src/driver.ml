@@ -24,7 +24,7 @@ let relmachine filename with_indexes =
          let indexes = Relmachine_indexes.indexes code in
          Format.printf
            "\n@[<v>%a@]\n%!"
-           Relmachine_indexes.pp_all_indexes indexes
+           Relmachine_indexes.pp_all_orderings indexes
        end
 
     | Error err ->

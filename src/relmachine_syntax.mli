@@ -40,4 +40,6 @@ type program =
   ; commands    : comms
   }
 
+val arity_of_relvar : relvar -> program -> int
+
 val pp_program : Format.formatter -> program -> unit

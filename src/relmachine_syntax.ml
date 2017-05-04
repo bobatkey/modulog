@@ -40,6 +40,10 @@ type program =
   ; commands    : comms
   }
 
+let arity_of_relvar relvar {edb_relvars;idb_relvars} =
+  try List.assoc relvar edb_relvars
+  with Not_found -> List.assoc relvar idb_relvars
+
 (**********************************************************************)
 
 let pp_scalar fmt = function

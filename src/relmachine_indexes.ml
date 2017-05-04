@@ -11,9 +11,9 @@ open Relmachine_syntax
   *)
 
 module PatternSet = struct
-  (* FIXME: this could be more efficiently implemented with using
-     BDDs, but it is probably not worth it for the sizes of sets we
-     will be dealing with. *)
+  (* This could be more efficiently implemented with using BDDs, but
+     it is probably not worth it for the sizes of sets we will be
+     dealing with. *)
 
   module Pattern = struct
     include Set.Make (struct type t = int let compare = compare end)
@@ -95,35 +95,61 @@ end = struct
          PatternSet.pp)
 end
 
-let rec search_patterns_of_expr = function
+let rec search_patterns_of_expr pats = function
   | Select { relation; conditions; projections; body } ->
-     let pat = PatternSet.Pattern.of_list (List.map fst conditions) in
-     fun set -> PredicatePats.add relation pat (search_patterns_of_expr body set)
+     let pat  = PatternSet.Pattern.of_list (List.map fst conditions) in
+     let pats = PredicatePats.add relation pat pats in
+     search_patterns_of_expr pats body
   | Return { guard_relation = None } ->
-     fun set -> set
+     pats
   | Return { guard_relation = Some relation; values } ->
      let pat = PatternSet.Pattern.complete (List.length values) in
-     PredicatePats.add relation pat
+     PredicatePats.add relation pat pats
 
-let rec search_patterns_of_comm = function
+let rec search_patterns_of_command pats = function
   | WhileNotEmpty (_, comms) | Declare (_, comms) ->
-     search_patterns_of_comms comms
+     search_patterns_of_commands pats comms
   | Insert (_, expr) ->
-     search_patterns_of_expr expr
+     search_patterns_of_expr pats expr
   | Move _ | Merge _ ->
-     fun set -> set
+     pats
 
-and search_patterns_of_comms comms =
-  List.fold_right search_patterns_of_comm comms
+and search_patterns_of_commands pats commands =
+  List.fold_left search_patterns_of_command pats commands
 
-let search_patterns comms =
-  search_patterns_of_comms comms PredicatePats.empty
+let search_patterns {commands} =
+  search_patterns_of_commands PredicatePats.empty commands
 
-let indexes {commands} : (string * PatternSet.Pattern.t list list) list =
-  commands
+let ordering_of_pattern_path arity pats =
+  let included = Array.make arity false in
+  let ordering = Array.make arity (-1) in
+  let pos      = ref 0 in
+  pats |> List.iter begin fun pat ->
+    let elems = PatternSet.Pattern.elements pat in
+    elems |> List.iter begin fun idx ->
+      if not included.(idx) then
+        (ordering.(!pos) <- idx; included.(idx) <- true; incr pos)
+    end
+  end;
+  included |> Array.iteri begin fun i visited ->
+    if not visited then (ordering.(!pos) <- i; incr pos)
+  end;
+  assert (!pos = arity);
+  ordering
+
+let orderings_of_patterns program pred pats =
+  let arity = Relmachine_syntax.arity_of_relvar pred program in
+  let pattern_paths =
+    MPC.minimal_path_cover pats
+    |> List.map List.rev
+    |> List.map (ordering_of_pattern_path arity)
+  in
+  (pred, pattern_paths)
+
+let indexes program : (string * int array list) list =
+  program
   |> search_patterns
-  |> (PredicatePats.map_to_list
-        (fun pred pats -> (pred, List.rev (MPC.minimal_path_cover pats))))
+  |> PredicatePats.map_to_list (orderings_of_patterns program)
 
 (* Now:
    - generate a variable ordering for each index
@@ -141,6 +167,17 @@ let pp_all_indexes =
   Fmt.(braces
          (list ~sep:(always ";@ ")
             (pair ~sep:(always " =>@ ") string pp_indexes)))
+
+let pp_orderings =
+  Fmt.(brackets
+         (list ~sep:(always ";@ ")
+            (brackets
+              (array ~sep:(always ";@ ") int))))
+
+let pp_all_orderings =
+  Fmt.(braces
+         (list ~sep:(always ";@ ")
+            (pair ~sep:(always " =>@ ") string pp_orderings)))
 
 (* Now to work out the indexes required for each relation:
    - run "search_patterns program"
