@@ -1,3 +1,14 @@
+(* TODO
+   - Improve name generation
+   - Generation of struct decalarations
+   - Generation of complete function declarations (and calls?)
+
+   To be able to generate code for the Btrees:
+   - a thing to turn a command into a function
+   - to be able to use that function in later code (i.e., we get a new 'primitive')
+*)
+
+
 type _ ptr = Ptr
 type _ array = Array
 type _ structure = Structure
@@ -8,6 +19,9 @@ type 'a typ =
   | Pointer : 'a typ -> 'a ptr typ
   | Array   : 'a typ * int32 -> 'a array typ
   | Struct  : string -> 'a structure typ
+
+type c_type =
+  | A_type : 'a typ -> c_type
 
 type binop =
   | Plus
@@ -72,10 +86,18 @@ type stmt =
   | While   of c_exp * stmt
   | Break
   | Block   of block_stmt list
+  | Return  of c_exp
 
 and block_stmt =
   | Declaration : 'a typ * string -> block_stmt
   | Statement   : stmt            -> block_stmt
+
+type fundecl =
+  { return_type : c_type
+  ; name        : string
+  ; arg_decls   : (c_type * string) list
+  ; body        : block_stmt list
+  }
 
 module PP = struct
   let rec pp_typ : type a. (bool -> Format.formatter -> unit) ->
@@ -237,6 +259,23 @@ module PP = struct
     | Free expr ->
        Format.fprintf fmt "@[<hv>free (%a)@];"
          pp_expr     expr
+    | Return expr ->
+       Format.fprintf fmt "return %a;" pp_expr expr
+
+  let pp_arg_decls =
+    let pp_arg_decl fmt (A_type ty, ident) =
+      pp_decl fmt (ty, ident)
+    in
+    Fmt.(list ~sep:(Fmt.always ", ") pp_arg_decl)
+
+  let pp_fundecl fmt { return_type; name; arg_decls; body } =
+    let A_type return_type = return_type in
+    Format.fprintf fmt
+      "@[<v 0>]%a %s(%a)@,@[<v 5>{@,%a@]@,}@]"
+      pp_typename return_type
+      name
+      pp_arg_decls arg_decls
+      pp_stmts body
 end
 
 module C () : sig
@@ -251,7 +290,8 @@ end = struct
   type (_,_) expr = c_exp
   type 'a exp = c_exp
   type 'a var = c_exp
-  type comm   = namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
+  type comm   =
+    namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
 
   type nonrec 'a typ = 'a typ
   type nonrec 'a ptr = 'a ptr
@@ -266,10 +306,44 @@ end = struct
   type ('s,'a) field = string
 
   (* FIXME: keep a record of each structure type, and generate the
-     appropriate decls. *)
-  let structure name = Struct name
-  let field (Struct name) fname typ = fname
-  let seal (Struct name) = ()
+     appropriate decls when asked to. *)
+  type structure_field =
+    | StructField : { fld_name : string; fld_type : 'a typ } -> structure_field
+
+  let structures : (string, structure_field list) Hashtbl.t =
+    Hashtbl.create 12
+
+  let structure name =
+    let name = Name_freshener.fresh_for (Hashtbl.mem structures) name in
+    Hashtbl.add structures name [];
+    Struct name
+
+  let field (Struct name) fname typ =
+    let rec add = function
+      | [] -> [StructField { fld_name = fname; fld_type = typ }]
+      | StructField { fld_name } as head :: rest ->
+         if fld_name = fname then
+           invalid_arg "Imp_syntax.S.field: duplicate fields in structure"
+         else
+           head :: add rest
+    in
+    let fields = Hashtbl.find structures name in
+    Hashtbl.replace structures name (add fields);
+    fname
+
+  let seal (Struct name) =
+    (* FIXME: do something here -- mark this structure as finished. *)
+    ()
+
+(*
+  type (_,_) arg_spec =
+    | Arg : 'a typ * ('r,'s) arg_spec -> ('a exp -> 'r,'a var -> 's) arg_spec
+    | End : (comm, comm) arg_spec
+*)
+
+  (* type 'a arg_spec = *)
+  (*   | Return : comm arg_spec *)
+  (*   | Arg    : 'a typ * 'b arg_spec -> ('a var -> 'b) arg_spec *)
 
   let true_ = BoolLit true
   let false_ = BoolLit false
