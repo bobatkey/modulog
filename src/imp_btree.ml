@@ -19,11 +19,25 @@ module BTree (S : Imp_syntax.S) (P : BTREE_PARAMS with module S = S) : sig
   type tree_var
 
   val with_tree : (tree_var -> comm) -> comm
+
   val insert    : (P.key,[>`exp]) expr -> tree_var -> comm
+
   val ifmember  : (P.key,[>`exp]) expr -> tree_var -> comm -> comm -> comm
-  val ifmember_range : (P.key,[>`exp]) expr -> (P.key,[>`exp]) expr -> tree_var -> comm -> comm -> comm
+
+  val ifmember_range :
+    (P.key,[>`exp]) expr ->
+    (P.key,[>`exp]) expr ->
+    tree_var ->
+    comm ->
+    comm ->
+    comm
+
   val iterate_range :
-    (P.key,[>`exp]) expr -> (P.key,[>`exp]) expr -> tree_var -> (P.key exp -> comm) -> comm
+    (P.key,[>`exp]) expr ->
+    (P.key,[>`exp]) expr ->
+    tree_var ->
+    (P.key exp -> comm) ->
+    comm
 end = struct
   open S
   open P
