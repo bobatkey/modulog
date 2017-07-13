@@ -1,0 +1,5 @@
+B ../_build/default/lib_imp
+FLG -open Imp -ppx /home/jjb15109/.opam/4.04.2/lib/ppx_monoid/./ppx_monoid.native
+PKG fmt
+PKG result
+PKG uchar

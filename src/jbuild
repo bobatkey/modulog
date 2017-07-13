@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(executable
+ ((name driver)
+  (libraries (ocamlgraph fmt cmdliner rresult))))
+
+(menhir
+ ((modules (modlog_parser))))
+
+(ocamllex
+ (modlog_lexer))

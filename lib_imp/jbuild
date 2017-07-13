@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name imp)
+  (libraries  (fmt))
+  (flags (-ppx /home/jjb15109/.opam/4.04.2/lib/ppx_monoid/./ppx_monoid.native))))
