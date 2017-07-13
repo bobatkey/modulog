@@ -1,4 +1,11 @@
-module Make (S : Imp_syntax.S) = struct
+module Make (S : Imp_syntax.S) () : sig
+  type handle
+
+  val is_empty : handle -> bool S.exp
+  val insert : handle -> int S.exp -> S.comm
+  val dispose : handle -> S.comm
+  val iterate : handle -> (int S.exp -> S.comm) -> S.comm
+end = struct
   open S
 
   let block_size = 16l
@@ -9,6 +16,11 @@ module Make (S : Imp_syntax.S) = struct
   let values   = field list_node "values" (array int block_size)
   let next     = field list_node "next" (ptr list_node)
   let ()       = seal list_node
+
+  type handle = list_node S.structure S.ptr S.var
+
+  let is_empty head =
+    head =*= null
 
   let insert head value =
     if_ (head =*= null)
