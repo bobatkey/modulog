@@ -1,5 +1,5 @@
 module type BTREE_PARAMS = sig
-  module S : Imp_syntax.S
+  module S : Syntax.S
   open S
 
   val min_children : int32
@@ -13,7 +13,7 @@ module type BTREE_PARAMS = sig
   val key_eq : (key,[>`exp]) expr -> (key,[>`exp]) expr -> bool exp
 end
 
-module BTree (S : Imp_syntax.S) (P : BTREE_PARAMS with module S = S) : sig
+module BTree (S : Syntax.S) (P : BTREE_PARAMS with module S = S) : sig
   open S
 
   type tree_var
@@ -123,7 +123,7 @@ end = struct
     end
 
   (************************************************************)
-  module Stk = Imp_stack.Make (S)
+  module Stk = Stack.Make (S)
 
   (* FIXME: compute this from the min_children and a reasonable
      estimate of the maximum size of any tree. *)
@@ -281,7 +281,7 @@ end = struct
   end
 end
 
-module Test (S : Imp_syntax.S) =
+module Test (S : Syntax.S) =
   BTree (S) (struct
     module S = S
     let min_children = 8l

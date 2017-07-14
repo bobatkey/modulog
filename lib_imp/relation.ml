@@ -1,4 +1,4 @@
-module Make (S : Imp_syntax.S) = struct
+module Make (S : Syntax.S) = struct
 
   (* given an arity and a list of index patterns, create the
      implementation of a relation variable with those indexes. *)

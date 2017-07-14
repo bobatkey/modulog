@@ -1,4 +1,4 @@
-module Make (S : Imp_syntax.S) : sig
+module Make (S : Syntax.S) : sig
   open S
 
   type ('a, 'b) stack_ops =

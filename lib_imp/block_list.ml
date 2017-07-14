@@ -1,4 +1,4 @@
-module Make (S : Imp_syntax.S) () : sig
+module Make (S : Syntax.S) () : sig
   type handle
 
   val is_empty : handle -> bool S.exp

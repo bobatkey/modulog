@@ -3,4 +3,4 @@
 (library
  ((name imp)
   (libraries  (fmt))
-  (flags (-ppx /home/jjb15109/.opam/4.04.2/lib/ppx_monoid/./ppx_monoid.native))))
+  (flags (:standard -w -49 -ppx /home/jjb15109/.opam/4.04.2/lib/ppx_monoid/./ppx_monoid.native))))

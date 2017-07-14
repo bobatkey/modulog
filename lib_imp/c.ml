@@ -279,7 +279,7 @@ module PP = struct
 end
 
 module C () : sig
-  include Imp_syntax.S with type ('a,'b) expr = c_exp
+  include Syntax.S with type ('a,'b) expr = c_exp
 
   val gen : comm -> block_stmt list
 end = struct
