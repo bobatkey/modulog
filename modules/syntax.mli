@@ -27,8 +27,8 @@ end
 val pp_path : Format.formatter -> string list -> unit
 
 module Bound_names : sig
-  type ident = Modules_ident.t
-  type longident = Modules_path.t
+  type ident = Ident.t
+  type longident = Path.t
 
   include NAMES with type ident := ident
                  and type longident := longident
@@ -128,12 +128,12 @@ module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW)
 
 module type CORE_SYNTAX = sig
   include CORE_SYNTAX_RAW
-    with type Names.ident     = Modules_ident.t
-     and type Names.longident = Modules_path.t
+    with type Names.ident     = Ident.t
+     and type Names.longident = Path.t
 
-  val subst_valtype : Modules_subst.t -> val_type -> val_type
-  val subst_deftype : Modules_subst.t -> def_type -> def_type
-  val subst_kind : Modules_subst.t -> kind -> kind
+  val subst_valtype : Subst.t -> val_type -> val_type
+  val subst_deftype : Subst.t -> def_type -> def_type
+  val subst_kind : Subst.t -> kind -> kind
 end
 
 module type MOD_SYNTAX = sig
@@ -141,9 +141,9 @@ module type MOD_SYNTAX = sig
 
   include MOD_SYNTAX_RAW with module Core := Core
 
-  val subst_typedecl : Modules_subst.t -> type_decl -> type_decl
+  val subst_typedecl : Subst.t -> type_decl -> type_decl
 
-  val subst_modtype : Modules_subst.t -> mod_type -> mod_type
+  val subst_modtype : Subst.t -> mod_type -> mod_type
 end
 
 module Mod_Syntax (Core_syntax : CORE_SYNTAX)

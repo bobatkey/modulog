@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name modules)
+  (flags (:standard -w -49))))
+

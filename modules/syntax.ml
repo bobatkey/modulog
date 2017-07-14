@@ -39,12 +39,6 @@ let rec pp_path fmt = function
   | nm::nms ->
      Format.fprintf fmt "%s.%a" nm pp_path nms
 
-module Ident = Modules_ident
-
-module Path = Modules_path
-
-module Subst = Modules_subst
-
 module Bound_names = struct
   type ident = Ident.t
   type longident = Path.t

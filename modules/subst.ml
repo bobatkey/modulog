@@ -1,6 +1,3 @@
-module Ident = Modules_ident
-module Path = Modules_path
-
 type t = Path.t Ident.Table.t
 
 let identity = Ident.Table.empty

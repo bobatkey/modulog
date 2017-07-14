@@ -1,8 +1,3 @@
-module Ident  = Modules_ident
-module Subst  = Modules_subst
-module Path   = Modules_path
-module Syntax = Modules_syntax
-
 module type EVAL_ENV = sig
   type eval_value
 

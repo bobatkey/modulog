@@ -2,7 +2,7 @@
 
 (executable
  ((name driver)
-  (libraries (ocamlgraph fmt cmdliner rresult))))
+  (libraries (ocamlgraph fmt cmdliner rresult modules))))
 
 (menhir
  ((modules (modlog_parser))))
