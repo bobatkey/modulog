@@ -1,5 +1,3 @@
-module Ruleset = Datalog_ruleset
-
 let dot_of_ruleset fmt ruleset =
   let module G = struct
     include Ruleset.G

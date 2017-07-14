@@ -1,4 +1,4 @@
-module Ruleset = Datalog_ruleset
+module Ruleset = Datalog.Ruleset
 
 open Relmachine_syntax
 

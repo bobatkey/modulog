@@ -39,7 +39,7 @@ let rules filename =
        let rules = Modlog.To_rules.from_structure str in
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_ruleset.pp rules
+         Datalog.Ruleset.pp rules
 
     | Error err ->
        Format.printf
@@ -53,7 +53,7 @@ let rules_graph filename =
        let rules = Modlog.To_rules.from_structure str in
        Format.printf
          "@[<v>%a@]\n"
-         Datalog_ruleset_graphviz.dot_of_ruleset rules
+         Datalog.Graphviz.dot_of_ruleset rules
 
     | Error err ->
        Format.printf

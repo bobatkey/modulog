@@ -1,4 +1,4 @@
-module RS = Datalog_ruleset
+module RS = Datalog.Ruleset
 
 module Eval = struct
   module Core = Modlog_checker.Core_syntax
