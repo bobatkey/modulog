@@ -3,3 +3,4 @@
 *.s
 /_build
 .merlin
+/*.install

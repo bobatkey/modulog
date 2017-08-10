@@ -2,5 +2,6 @@
 
 (library
  ((name modules)
+  (public_name modules)
   (flags (:standard -w -49))))
 
