@@ -1,7 +1,7 @@
 module RS = Datalog.Ruleset
 
 module Eval = struct
-  module Core = Modlog_checker.Core_syntax
+  module Core = Modlog_checker.Core
 
   open Core
 
