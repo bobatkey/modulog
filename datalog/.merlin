@@ -1,6 +1,0 @@
-B ../_build/default/datalog
-FLG -open Datalog -w -40
-PKG fmt
-PKG ocamlgraph
-PKG result
-PKG uchar
