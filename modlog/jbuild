@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name modlog)
+  (libraries (modules datalog fmt rresult))))
+
+(menhir
+ ((modules (parser))))
+
+(ocamllex
+ (lexer))

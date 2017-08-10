@@ -1,5 +1,5 @@
 module Core : sig
-  include module type of (Modlog_core_syntax.Make (Modules.Syntax.Bound_names))
+  include module type of (Core_syntax.Make (Modules.Syntax.Bound_names))
 
   include Modules.Syntax.CORE_SYNTAX
     with type term       := term
@@ -20,7 +20,7 @@ module Mod : Modules.Syntax.MOD_SYNTAX
 type error
 
 val type_structure :
-  Modlog_syntax.Mod.structure ->
+  Syntax.Mod.structure ->
   (Mod.structure * Mod.signature, error) result
 
 val pp_error : Format.formatter -> error -> unit

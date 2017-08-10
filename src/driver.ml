@@ -1,5 +1,7 @@
+open Modlog.Std
+
 let typecheck filename =
-  let structure = Modlog.read_structure_from_file filename in
+  let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        Format.printf
@@ -12,7 +14,7 @@ let typecheck filename =
          Modlog.Checker.pp_error err
 
 let relmachine filename with_indexes =
-  let structure = Modlog.read_structure_from_file filename in
+  let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Modlog.To_rules.from_structure str in
@@ -33,7 +35,7 @@ let relmachine filename with_indexes =
          Modlog.Checker.pp_error err
 
 let rules filename =
-  let structure = Modlog.read_structure_from_file filename in
+  let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules = Modlog.To_rules.from_structure str in
@@ -47,7 +49,7 @@ let rules filename =
          Modlog.Checker.pp_error err
 
 let rules_graph filename =
-  let structure = Modlog.read_structure_from_file filename in
+  let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules = Modlog.To_rules.from_structure str in
@@ -61,7 +63,7 @@ let rules_graph filename =
          Modlog.Checker.pp_error err
 
 let exec filename =
-  let structure = Modlog.read_structure_from_file filename in
+  let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Modlog.To_rules.from_structure str in

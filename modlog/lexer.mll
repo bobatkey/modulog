@@ -1,5 +1,5 @@
 {
-open Modlog_parser
+open Parser
 }
 
 rule token = parse

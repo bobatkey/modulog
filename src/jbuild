@@ -2,10 +2,4 @@
 
 (executable
  ((name driver)
-  (libraries (ocamlgraph fmt cmdliner rresult modules datalog))))
-
-(menhir
- ((modules (modlog_parser))))
-
-(ocamllex
- (modlog_lexer))
+  (libraries (ocamlgraph cmdliner modules datalog modlog))))

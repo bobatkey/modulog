@@ -1,9 +1,3 @@
-module Syntax   = Modlog_syntax
-module Lexer    = Modlog_lexer
-module Parser   = Modlog_parser
-module Checker  = Modlog_checker
-module To_rules = Modlog_to_rules
-
 let read_structure_from_file filename =
   let ch = open_in filename in
   try

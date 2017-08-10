@@ -1,6 +1,6 @@
 %{
-open Modlog_syntax.Core
-open Modlog_syntax.Mod
+open Syntax.Core
+open Syntax.Mod
 %}
 
 %token COMMA
@@ -13,7 +13,7 @@ open Modlog_syntax.Mod
 %token<string> IDENT ENUM_IDENT MV_IDENT
 %token EOF
 
-%start <Modlog_syntax.Mod.structure> program
+%start <Syntax.Mod.structure> program
 
 %%
 

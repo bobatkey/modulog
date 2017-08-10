@@ -1,5 +1,5 @@
 module Core = struct
-  include Modlog_core_syntax.Make (Modules.Syntax.Bound_names)
+  include Core_syntax.Make (Modules.Syntax.Bound_names)
 
   let rec subst_deftype sub domtype =
     { domtype with
@@ -30,7 +30,7 @@ module Mod = Modules.Syntax.Mod_Syntax (Core)
 module Env = Modules.Typing.Env (Mod)
 
 module Core_typing = struct
-  module Src  = Modlog_syntax.Core
+  module Src  = Syntax.Core
   module Core = Core
 
   module Env = Env
@@ -407,7 +407,7 @@ module Core_typing = struct
          }
 end
 
-module Typing = Modules.Typing.Mod_typing (Modlog_syntax.Mod) (Mod) (Core_typing)
+module Typing = Modules.Typing.Mod_typing (Syntax.Mod) (Mod) (Core_typing)
 
 let type_structure structure =
   Typing.type_structure Env.empty structure
