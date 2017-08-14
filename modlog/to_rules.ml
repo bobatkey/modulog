@@ -13,6 +13,10 @@ module Eval = struct
     let a, rules = c rules in
     f a rules
 
+  let run c =
+    let _, rules = c RS.Builder.empty in
+    RS.Builder.finish rules
+
   type eval_type =
     | Itype_int
     | Itype_tuple of eval_type list
@@ -168,7 +172,4 @@ module Evaluator =
   Modules.Evaluator.Make (Checker.Mod) (Eval)
 
 let from_structure structure =
-  RS.Builder.empty
-  |> Evaluator.eval_structure structure
-  |> snd
-  |> RS.Builder.finish
+  Eval.run (Evaluator.eval_structure structure)
