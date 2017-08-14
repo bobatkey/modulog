@@ -4,8 +4,14 @@
  ((name modlog)
   (libraries (modules datalog fmt rresult))))
 
-(menhir
- ((modules (parser))))
+; (menhir
+;  ((merge_into parser)
+;   (modules (datalog_grammar modules_grammar))))
+
+(rule
+ ((targets (parser.ml parser.mli))
+  (deps    (datalog_grammar.mly))
+  (action  (chdir ${ROOT} (run ${bin:menhir} --base modlog/parser ${<} ${lib:modules:modules_grammar.mly})))))
 
 (ocamllex
  (lexer))

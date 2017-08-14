@@ -28,6 +28,7 @@ in_parens(X):
 
 /* Long identifiers */
 
+%public
 longident:
 | id=IDENT
     { Lid_ident id }
@@ -84,7 +85,8 @@ pred_decl:
       ; decl_type  = types
       ; decl_rules = rules } }
 
-def:
+%public
+str_value:
 | DEF; d=pred_decl; ds=list(AND; d=pred_decl {d})
     { PredicateDefs (d :: ds) }
 | CONSTANT; name=IDENT; COLON; ty=domain_type; EQUALS; e=expr
@@ -125,99 +127,21 @@ predicate_type:
     { { predty_loc  = Location.mk $startpos $endpos
       ; predty_data = dtys } }
 
-/* the module language */
+%public
+str_type(NAME):
+| TYPE; id=NAME; EQUALS; ty=domain_type
+    { (id, (), ty) }
 
-with_path:
-| mod_path=separated_nonempty_list(DOT, IDENT)
-    { mod_path }
-
-mod_type:
-| FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
-    { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
-| mty=mod_type2
-    { mty }
-
-mod_type2:
-| lid=longident
-    { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_longident lid } }
-| SIG; s=list(sig_item); END
-    { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_signature s } }
-| mty=mod_type2; WITH; TYPE; path=with_path; EQUALS; ty=domain_type
-    { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_withtype (mty, path, (), ty) } }
-| LPAREN; mty=mod_type; RPAREN
-    { mty }
-
-sig_item:
+%public
+sig_value:
 | id=IDENT; COLON; ty=predicate_type
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_value (id, Predicate ty) } }
+    { (id, Predicate ty) }
 | CONSTANT; id=IDENT; COLON; ty=domain_type
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_value (id, Value ty) } }
+    { (id, Value ty) }
+
+%public
+sig_type:
 | TYPE; id=IDENT
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_type (id, { kind = (); manifest = None }) } }
+    { (id, (), None) }
 | TYPE; id=IDENT; EQUALS; ty=domain_type
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_type (id, { kind = (); manifest = Some ty }) } }
-| MODULE; id=IDENT; mty=functor_type_decls
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_module (id, mty) } }
-| MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-    { { sigitem_loc  = Location.mk $startpos $endpos
-      ; sigitem_data = Sig_modty (id, mty) } }
-
-functor_type_decls:
-| COLON; mty=mod_type
-    { mty }
-| LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; mty2=functor_type_decls
-    { { modtype_loc  = Location.mk $startpos $endpos
-      ; modtype_data = Modtype_functor (id, mty1, mty2) } }
-
-mod_term:
-| FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_functor (id, mty, modl) } }
-| m=mod_term2
-    { m }
-
-mod_term2:
-| mod1=mod_term2; LPAREN; mod2=mod_term; RPAREN
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_apply (mod1, mod2) } }
-| lid=longident
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_longident lid } }
-| STRUCT; items=list(str_item); END
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_structure items } }
-| LPAREN; modl=mod_term; COLON; mty=mod_type; RPAREN
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_constraint (modl, mty) } }
-| LPAREN; m=mod_term; RPAREN
-    { m }
-
-str_item:
-| d=def
-    { { stritem_loc  = Location.mk $startpos $endpos
-      ; stritem_data = Str_value d } }
-| TYPE; id=IDENT; EQUALS; ty=domain_type
-    { { stritem_loc  = Location.mk $startpos $endpos
-      ; stritem_data = Str_type (id, (), ty) } }
-| MODULE; id=IDENT; modl=functor_decls
-    { { stritem_loc  = Location.mk $startpos $endpos
-      ; stritem_data = Str_module (id, modl) } }
-| MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
-    { { stritem_loc  = Location.mk $startpos $endpos
-      ; stritem_data = Str_modty (id, mty) } }
-
-functor_decls:
-| EQUALS; modl=mod_term
-    { modl }
-| LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; modl=functor_decls
-    { { modterm_loc  = Location.mk $startpos $endpos
-      ; modterm_data = Mod_functor (id, mty, modl) } }
+    { (id, (), Some ty ) }

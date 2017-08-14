@@ -5,3 +5,7 @@
   (public_name modules)
   (flags (:standard -w -49))))
 
+(install
+ ((section lib)
+  (package modules)
+  (files   (modules_grammar.mly))))
