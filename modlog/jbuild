@@ -2,6 +2,7 @@
 
 (library
  ((name modlog)
+  (public_name modlog)
   (libraries (modules datalog fmt rresult))))
 
 ; (menhir
