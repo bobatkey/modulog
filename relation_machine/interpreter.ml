@@ -48,7 +48,7 @@ module RelvarEnv = MakeEnv (Relation)
 
 module AttrEnv   = MakeEnv (struct type t = int32 end)
 
-open Relmachine_syntax
+open Syntax
 
 let eval_scalar attr_env = function
   | Attr attr -> AttrEnv.find attr attr_env

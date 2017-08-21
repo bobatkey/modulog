@@ -2,4 +2,4 @@
 
 (executable
  ((name driver)
-  (libraries (ocamlgraph cmdliner modules datalog modlog))))
+  (libraries (cmdliner datalog modlog relation_machine))))

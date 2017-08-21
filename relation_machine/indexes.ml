@@ -1,4 +1,4 @@
-open Relmachine_syntax
+open Syntax
 
 (* Indexes:
      - work out which indexes are needed:
@@ -138,7 +138,7 @@ let ordering_of_pattern_path arity pats =
   ordering
 
 let orderings_of_patterns program pred pats =
-  let arity = Relmachine_syntax.arity_of_relvar pred program in
+  let arity = Syntax.arity_of_relvar pred program in
   let pattern_paths =
     MPC.minimal_path_cover pats
     |> List.map List.rev

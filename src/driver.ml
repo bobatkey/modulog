@@ -18,15 +18,15 @@ let relmachine filename with_indexes =
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Modlog.To_rules.from_structure str in
-       let code     = Relmachine_of_rules.translate rules in
+       let code     = Relation_machine.Of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n%!"
-         Relmachine_syntax.pp_program code;
+         Relation_machine.Syntax.pp_program code;
        if with_indexes then begin
-         let indexes = Relmachine_indexes.indexes code in
+         let indexes = Relation_machine.Indexes.indexes code in
          Format.printf
            "\n@[<v>%a@]\n%!"
-           Relmachine_indexes.pp_all_orderings indexes
+           Relation_machine.Indexes.pp_all_orderings indexes
        end
 
     | Error err ->
@@ -67,11 +67,11 @@ let exec filename =
   match Modlog.Checker.type_structure structure with
     | Ok (str, sg) ->
        let rules    = Modlog.To_rules.from_structure str in
-       let code     = Relmachine_of_rules.translate rules in
-       let env      = Relmachine_interpreter.eval code in
+       let code     = Relation_machine.Of_rules.translate rules in
+       let env      = Relation_machine.Interpreter.eval code in
        Format.printf
          "@[<v>%a@]\n"
-         Relmachine_interpreter.pp_relvarenv env
+         Relation_machine.Interpreter.pp_relvarenv env
 
     | Error err ->
        Format.printf

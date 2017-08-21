@@ -1,6 +1,6 @@
 module Ruleset = Datalog.Ruleset
 
-open Relmachine_syntax
+open Syntax
 
 module RelvarSet  = struct
   include (Set.Make (String) : Set.S with type elt = relvar)
