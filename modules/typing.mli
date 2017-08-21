@@ -50,8 +50,10 @@ end
 module Env (Mod_syntax : MOD_SYNTAX) : ENV with module Mod = Mod_syntax
 
 module type CORE_TYPING = sig
-  module Src : CORE_SYNTAX_RAW with type Names.ident = string
-                                and type Names.longident = String_names.longident
+  module Src : CORE_SYNTAX_RAW
+    with type Names.ident = string
+     and type Names.longident = String_names.longident
+
   module Core : CORE_SYNTAX
 
   module Env : ENV with module Mod.Core = Core
@@ -100,8 +102,9 @@ module type MOD_TYPING = sig
 end
 
 module Mod_typing
-    (Src : MOD_SYNTAX_RAW with type Core.Names.ident = string
-                           and type Core.Names.longident = String_names.longident)
+    (Src : MOD_SYNTAX_RAW
+     with type Core.Names.ident = string
+      and type Core.Names.longident = String_names.longident)
     (Tgt : MOD_SYNTAX
      with type Core.Location.t = Src.Core.Location.t)
     (CT  : CORE_TYPING

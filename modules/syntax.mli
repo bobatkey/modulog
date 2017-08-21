@@ -1,3 +1,5 @@
+(** Abstract Syntax of the Module Language. *)
+
 module type SOURCE_LOCATION = sig
   type t
 
@@ -8,39 +10,49 @@ end
 
 module type NAMES = sig
   type ident
+
   type longident
 
   val pp_ident : Format.formatter -> ident -> unit
+
   val pp_longident : Format.formatter -> longident -> unit
 end
 
 module String_names : sig
   type ident = string
+
   type longident =
     | Lid_ident of ident
     | Lid_dot   of longident * string
 
-  include NAMES with type ident := ident
-                 and type longident := longident
+  include NAMES
+    with type ident := ident
+     and type longident := longident
 end
 
 val pp_path : Format.formatter -> string list -> unit
 
 module Bound_names : sig
   type ident = Ident.t
+
   type longident = Path.t
 
-  include NAMES with type ident := ident
-                 and type longident := longident
+  include NAMES
+    with type ident := ident
+     and type longident := longident
 end
 
 module type CORE_SYNTAX_RAW = sig
   module Location : SOURCE_LOCATION
+
   module Names : NAMES
 
   type term
+
   type val_type
+
   type def_type
+
   type kind
 
   val pp_term : Format.formatter -> term -> unit
@@ -90,7 +102,9 @@ module type MOD_SYNTAX_RAW = sig
     | Sig_modty  of Core.Names.ident * mod_type
 
   val pp_modtype : Format.formatter -> mod_type -> unit
+
   val pp_signature : Format.formatter -> signature -> unit
+
   val pp_sig_item : Format.formatter -> sig_item -> unit
 
   type mod_term =
@@ -120,11 +134,20 @@ module type MOD_SYNTAX_RAW = sig
     | Str_modty  of Core.Names.ident * mod_type
 
   val pp_modterm : Format.formatter -> mod_term -> unit
+
   val pp_structure : Format.formatter -> structure -> unit
 end
 
 module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW)
   : MOD_SYNTAX_RAW with module Core = Core
+
+(**{2 Abstract syntax with subsitution}
+
+   The {!CORE_SYNTAX} and {!MOD_SYNTAX} signatures constrain the
+   corresponding [*_RAW] signatures so that the names are fixed to be
+   {!Ident.t} and {!Path.t}, and add substitution operations that
+   allow substitution of paths for identifiers. These are the
+   representations used internally in the type checker. *)
 
 module type CORE_SYNTAX = sig
   include CORE_SYNTAX_RAW
@@ -132,7 +155,9 @@ module type CORE_SYNTAX = sig
      and type Names.longident = Path.t
 
   val subst_valtype : Subst.t -> val_type -> val_type
+
   val subst_deftype : Subst.t -> def_type -> def_type
+
   val subst_kind : Subst.t -> kind -> kind
 end
 
