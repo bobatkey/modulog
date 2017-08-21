@@ -433,6 +433,7 @@ struct
        Tgt.{ modtype_loc
            ; modtype_data = Modtype_functor (param, arg, res)
            }
+
     | Src.{modtype_loc;modtype_data=Modtype_withtype (mty, path, kind, dty)} ->
        let sig_loc = mty.Src.modtype_loc in
        check_modtype env mty >>= fun mty ->
@@ -448,6 +449,9 @@ struct
             Error (modtype_loc, Kind_mismatch_in_with (ident, expected_kind, path, kind, dty))
          | Error `path_not_found ->
             Error (modtype_loc, Path_not_found path))
+  (** TODO: destructive update of a type. Removes the type declaration
+      from the signature and substitutes the new definition for that
+      declared name in the rest of the signature. *)
 
   and check_signature env rev_sig seen = function
     | [] ->
