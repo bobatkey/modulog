@@ -37,19 +37,19 @@ module ExprGrammar = struct
 
   type rhs = [ `E1_0 | `E1_1 | `E2_0 | `E2_1 | `E2_2 | `E2_3 ]
 
-  def nt_to_rhs : non_terminal * rhs
+  define nt_to_rhs : non_terminal * rhs
       nt_to_rhs (`E, `E1_0)
       nt_to_rhs (`E, `E2_0)
 
-  def rhs_tok : rhs * token * rhs
+  define rhs_tok : rhs * token * rhs
       rhs_tok (`E1_0, `x, `E1_1)
       rhs_tok (`E2_1, `plus, `E2_2)
 
-  def rhs_nt : rhs * non_terminal * rhs
+  define rhs_nt : rhs * non_terminal * rhs
       rhs_nt (`E2_0, `E, `E2_1)
       rhs_nt (`E2_2, `E, `E2_3)
 
-  def rhs_stop : rhs
+  define rhs_stop : rhs
       rhs_stop (`E1_1)
       rhs_stop (`E2_3)
 end
@@ -61,7 +61,7 @@ struct
   (* parse (i, nt, j) if the symbol 'nt' is recognised between 'i' and
   'j' in the input. *)
 
-  def
+  define
     parse : I.index * G.non_terminal * I.index
     parse (?i, ?nt, ?j) :-
       G.nt_to_rhs (?nt, ?rhs), parse_rhs (?i, ?rhs, ?j)
@@ -78,7 +78,7 @@ struct
        G.rhs_nt (?rhs, ?nt, ?rhs'),
        parse (?i, ?nt, ?i'), parse_rhs (?i', ?rhs', ?j)
 
-  def
+  define
     parse_between : I.index * I.index
     parse_between (?i, ?j) :- parse (?i, G.start, ?j)
 
@@ -89,13 +89,13 @@ module TestInput = struct
 
   type token = [`x | `plus]
 
-  def is_index : index
+  define is_index : index
       is_index (0)
       is_index (1)
       is_index (2)
       is_index (3)
 
-  def token_at : index * token * index
+  define token_at : index * token * index
       token_at (0,`x,1)
       token_at (1,`plus,2)
       token_at (2,`x,3)

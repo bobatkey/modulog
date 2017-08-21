@@ -7,18 +7,17 @@ end
 module MyEdges = struct
   type vertex = int
 
-  def
-    edge : vertex * vertex
+  define edge : vertex * vertex
     edge(1, 2)
     edge(2, 3)
+    edge(3, 4)
 end
 
-module Path = functor (E : Edges) -> struct
+module Path (E : Edges) = struct
 
   type vertex = E.vertex
 
-  def
-    path : E.vertex * E.vertex
+  define path : E.vertex * E.vertex
     path(?X,?Y) :- E.edge(?X,?Y)
     path(?X,?Z) :- path(?X,?Y), E.edge(?Y,?Z)
 

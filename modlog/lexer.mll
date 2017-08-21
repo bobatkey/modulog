@@ -21,7 +21,7 @@ rule token = parse
 | "functor"  { FUNCTOR }
 | "int"      { INT }
 | "and"      { AND }
-| "def"      { DEF }
+| "define"   { DEFINE }
 | "constant" { CONSTANT }
 | "with"     { WITH }
 | '('        { LPAREN }

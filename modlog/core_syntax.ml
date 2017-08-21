@@ -176,7 +176,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | [] -> ()
     | decl :: decls ->
        Format.pp_open_vbox pp 0;
-       Format.fprintf pp "def %a" pp_decl decl;
+       Format.fprintf pp "define %a" pp_decl decl;
        List.iter (Format.fprintf pp "@ @,and %a" pp_decl) decls;
        Format.pp_close_box pp ()
 

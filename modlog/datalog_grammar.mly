@@ -7,7 +7,7 @@ open Syntax.Mod
 %token COLON_DASH
 %token COLON
 %token STAR DOT ARROW EQUALS BAR UNDERSCORE
-%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEF CONSTANT WITH
+%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEFINE CONSTANT WITH
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
 %token<string> IDENT ENUM_IDENT MV_IDENT
@@ -87,7 +87,7 @@ pred_decl:
 
 %public
 str_value:
-| DEF; d=pred_decl; ds=list(AND; d=pred_decl {d})
+| DEFINE; d=pred_decl; ds=list(AND; d=pred_decl {d})
     { PredicateDefs (d :: ds) }
 | CONSTANT; name=IDENT; COLON; ty=domain_type; EQUALS; e=expr
     { ConstantDef { const_loc  = Location.mk $startpos $endpos
