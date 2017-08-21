@@ -142,15 +142,11 @@ module Builder = struct
     | [] ->
        Ok ()
     | Atom {pred;args} :: atoms ->
-(*       match PredicateNameMap.find pred pred_info with
-         | exception Not_found ->
-            Error (Undeclared_predicate pred)
-         | {arity} ->*)
-            let used_arity = List.length args in
-            if pred.arity <> used_arity then
-              Error (Arity_mismatch { pred; used_arity })
-            else
-              check_atoms pred_info atoms
+       let used_arity = List.length args in
+       if pred.arity <> used_arity then
+         Error (Arity_mismatch { pred; used_arity })
+       else
+         check_atoms pred_info atoms
 
   let add_rule ({pred;args;rhs} as rule) t =
     match check_atoms t.predicates_so_far rhs with

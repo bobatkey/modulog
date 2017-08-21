@@ -1,3 +1,5 @@
+(** Datalog programs as sets of rulesets. *)
+
 type predicate_name =
   { ident : string
   ; arity : int
