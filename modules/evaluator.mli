@@ -1,3 +1,5 @@
+(** Evaluation of the module language. *)
+
 module type EVAL_ENV = sig
   type eval_value
 
@@ -29,8 +31,9 @@ module type CORE_EVAL = sig
 
   type eval_type
 
-  module Eval (Env : EVAL_ENV with type eval_value = eval_value
-                               and type eval_type = eval_type) :
+  module Eval (Env : EVAL_ENV
+               with type eval_value = eval_value
+                and type eval_type = eval_type) :
   sig
 
     val eval_type : Env.t -> Core.kind -> Core.def_type -> eval_type
