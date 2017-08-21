@@ -27,7 +27,7 @@ end
 
 module Mod = Modules.Syntax.Mod_Syntax (Core)
 
-module Env = Modules.Typing.Env (Mod)
+module Env = Modules.Typing_environment.Make (Mod)
 
 module Core_typing = struct
   module Src  = Syntax.Core
@@ -38,7 +38,7 @@ module Core_typing = struct
   open Rresult
 
   type core_error_detail =
-    | Lookup_error of Modules.Typing.lookup_error
+    | Lookup_error of Modules.Typing_environment.lookup_error
     | Type_mismatch of { expected : Core.def_type
                        ; actual   : Core.def_type }
     | Expr_is_tuple of { expected : Core.def_type }
@@ -60,7 +60,7 @@ module Core_typing = struct
       Location.pp_without_filename loc;
     match detail with
       | Lookup_error lookup_error ->
-         Modules.Typing.pp_lookup_error pp lookup_error
+         Modules.Typing_environment.pp_lookup_error pp lookup_error
       | Type_mismatch { expected; actual } ->
          Format.fprintf pp
            "@[<hv 0>This expression has type@[<4>@ %a@]@ but was expected to have type@[<4>@ %a@]@]@;"
