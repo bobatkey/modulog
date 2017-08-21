@@ -28,8 +28,8 @@ mod_type2:
 | SIG; s=list(sig_item); END
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_signature s } }
-| mty=mod_type2; WITH; ty=str_type(separated_nonempty_list(DOT, IDENT))
-    { let path, kind, ty = ty in
+| mty=mod_type2; WITH; ty_constraint=str_type(separated_nonempty_list(DOT, IDENT))
+    { let path, kind, ty = ty_constraint in
       { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_withtype (mty, path, kind, ty) } }
 | LPAREN; mty=mod_type; RPAREN
