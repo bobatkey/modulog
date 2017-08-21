@@ -71,7 +71,7 @@ let exec filename =
        let env      = Relation_machine.Interpreter.eval code in
        Format.printf
          "@[<v>%a@]\n"
-         Relation_machine.Interpreter.pp_relvarenv env
+         Relation_machine.Interpreter.Env.pp env
 
     | Error err ->
        Format.printf

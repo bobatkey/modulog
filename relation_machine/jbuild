@@ -2,4 +2,4 @@
 
 (library
  ((name relation_machine)
-  (libraries (ocamlgraph datalog))))
+  (libraries (ocamlgraph fmt datalog))))

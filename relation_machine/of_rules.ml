@@ -3,9 +3,15 @@ module Ruleset = Datalog.Ruleset
 open Syntax
 
 module RelvarSet  = struct
-  include (Set.Make (String) : Set.S with type elt = relvar)
+  module Relvar = struct
+    type t = relvar
+    let compare = compare
+  end
+  include (Set.Make (Relvar) : Set.S with type elt = relvar)
+
   let map_to_list f set =
     fold (fun x -> List.cons (f x)) set []
+
   let concat_map_to_list f set =
     List.concat (map_to_list f set)
 end
@@ -18,6 +24,12 @@ let scalar_of_expr = function
   | Ruleset.Var x      -> Attr x
   | Ruleset.Lit i      -> Lit i
   | Ruleset.Underscore -> failwith "internal error: underscore found in head"
+
+let relvar_of_predname Ruleset.{ ident; arity } =
+  { ident; arity }
+
+let predname_of_relvar { ident; arity } =
+  Ruleset.{ ident; arity }
 
 let expr_of_rule guard_relation head atoms =
   let rec transl_rhs env = function
@@ -69,23 +81,31 @@ let expr_of_rule guard_relation head atoms =
            reqd
            conditions
        in
+       let relation = relvar_of_predname relation in
        Select {relation; projections; conditions; body}, reqd
   in
   let expr, reqd = transl_rhs AttrSet.empty atoms in
   assert (AttrSet.is_empty reqd);
   expr
 
-let translate_rule ruleset Ruleset.{pred; args; rhs} =
+let relvar_of_rule { Ruleset.pred } =
+  relvar_of_predname pred
+
+let translate_rule ruleset (Ruleset.{pred; args; rhs} as rule) =
   let expr = expr_of_rule None args rhs in
-  Insert (pred, expr)
+  let rel  = relvar_of_rule rule in
+  Insert (rel, expr)
 
 let predicates_of_rules =
   List.fold_left
-    (fun set rule -> RelvarSet.add rule.Ruleset.pred set)
+    (fun set rule -> RelvarSet.add (relvar_of_rule rule) set)
     RelvarSet.empty
 
-let delta_ nm = "delta_"^nm
-let new_ nm = "new_"^nm
+let delta_ relvar =
+  { relvar with ident = "delta:" ^ relvar.ident }
+
+let new_ relvar =
+  { relvar with ident = "new:" ^ relvar.ident }
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -93,8 +113,9 @@ let extract_predicate dpred rhs =
        []
     | (Ruleset.Atom { pred; args } as atom) :: after ->
        let rest = loop (atom :: before) after in
-       if pred = dpred then
-         let hatom = Ruleset.Atom { pred = delta_ dpred; args} in
+       if relvar_of_predname pred = dpred then
+         let hatom = Ruleset.Atom { pred = predname_of_relvar (delta_ dpred)
+                                  ; args } in
          (hatom :: List.rev_append before after) :: rest
        else
          rest
@@ -113,6 +134,7 @@ let translate_recursive ruleset rules =
     List.concat @@
     List.map
       begin fun Ruleset.{pred; args; rhs} ->
+        let pred = relvar_of_predname pred in
         RelvarSet.concat_map_to_list
           (fun delta'd_predicate ->
              List.map
@@ -128,7 +150,7 @@ let translate_recursive ruleset rules =
       predicates
   and moves =
     RelvarSet.map_to_list
-      (fun nm -> Move {tgt="delta_"^nm; src="new_"^nm})
+      (fun nm -> Move {tgt=delta_ nm; src=new_ nm})
       predicates
   in
   Declare
@@ -147,8 +169,8 @@ let translate_rules ruleset =
 let translate ruleset =
   let edb_relvars, idb_relvars =
     List.fold_left
-      (fun (edb, idb) (pred_name, Ruleset.{arity; intensional}) ->
-         let decl = (pred_name, arity) in
+      (fun (edb, idb) (pred_name, Ruleset.{intensional}) ->
+         let decl = relvar_of_predname pred_name in
          if intensional then
            (edb, decl :: idb)
          else

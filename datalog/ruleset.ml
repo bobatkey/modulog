@@ -1,4 +1,7 @@
-type predicate_name = string
+type predicate_name =
+  { ident : string
+  ; arity : int
+  }
 
 type expr =
   | Var of string
@@ -23,12 +26,13 @@ let pp_expr fmt = function
   | Underscore ->
      Format.fprintf fmt "_"
 
-let pp_exprs = Fmt.list ~sep:(Fmt.always ", ") pp_expr
+let pp_exprs =
+  Fmt.list ~sep:(Fmt.always ", ") pp_expr
 
 let pp_atom fmt = function
   | Atom { pred; args } ->
      Format.fprintf fmt "%s(%a)"
-       pred
+       pred.ident
        pp_exprs args
 
 let pp_rhs = Fmt.list ~sep:(Fmt.always ",@ ") pp_atom
@@ -38,35 +42,36 @@ let pp_rule fmt {pred; args; rhs} =
     | [] ->
        Format.fprintf fmt
          "%s(@[<h>%a@])."
-         pred
+         pred.ident
          pp_exprs args
     | rhs ->
        Format.fprintf fmt
          "@[<v4>%s(@[<h>%a@]) :-@ %a.@]"
-         pred
+         pred.ident
          pp_exprs args
          pp_rhs rhs
 
 (**********************************************************************)
-module PredicateNameMap = Map.Make (String)
+module PredicateNameMap =
+  Map.Make (struct type t = predicate_name let compare = compare end)
 
 type predicate_info =
-  { arity       : int
-  ; intensional : bool
+  { (*arity       : int
+      ; *) intensional : bool
   }
 
 type ruleset =
   { rules         : rule array
   ; rules_of_pred : int list PredicateNameMap.t
-  ; pred_info     : predicate_info PredicateNameMap.t
+  ; pred_info     : predicate_info PredicateNameMap.t 
   }
 
-let pp_pred_info fmt (name, {arity; intensional}) =
+let pp_pred_info fmt (name, {intensional}) =
   Format.fprintf fmt
-    "%s %s : %d"
+    "%s %s/%d"
     (if intensional then "int" else "ext")
-    name
-    arity
+    name.ident
+    name.arity
 
 let pp fmt set =
   Format.fprintf fmt "@[<v>%a@]"
@@ -102,8 +107,7 @@ module Builder = struct
   type error =
     | Undeclared_predicate of predicate_name
     | Arity_mismatch of
-        { pred  : predicate_name
-        ; arity : int
+        { pred       : predicate_name
         ; used_arity : int
         }
     | Definition_of_extensional_predicate of predicate_name
@@ -117,8 +121,14 @@ module Builder = struct
     }
 
   let freshen_name base {predicates_so_far} =
-    let used candidate = PredicateNameMap.mem candidate predicates_so_far in
-    Name_freshener.fresh_for used base
+    let used candidate =
+      PredicateNameMap.mem
+        { ident = candidate; arity = base.arity }
+        predicates_so_far
+    in
+    { ident = Name_freshener.fresh_for used base.ident
+    ; arity = base.arity
+    }
 
   let update_index pred f map =
     let existing =
@@ -132,13 +142,13 @@ module Builder = struct
     | [] ->
        Ok ()
     | Atom {pred;args} :: atoms ->
-       match PredicateNameMap.find pred pred_info with
+(*       match PredicateNameMap.find pred pred_info with
          | exception Not_found ->
             Error (Undeclared_predicate pred)
-         | {arity} ->
+         | {arity} ->*)
             let used_arity = List.length args in
-            if arity <> used_arity then
-              Error (Arity_mismatch { pred; arity; used_arity })
+            if pred.arity <> used_arity then
+              Error (Arity_mismatch { pred; used_arity })
             else
               check_atoms pred_info atoms
 
@@ -151,10 +161,10 @@ module Builder = struct
               Error (Undeclared_predicate pred)
            | {intensional=false} ->
               Error (Definition_of_extensional_predicate pred)
-           | {arity} ->
+           | _ ->
               let used_arity = List.length args in
-              if arity <> used_arity then
-                Error (Arity_mismatch {pred; arity; used_arity})
+              if pred.arity <> used_arity then
+                Error (Arity_mismatch {pred; used_arity})
               else
                 let id = t.next_rule_id in
                 Ok { t with rules_so_far = rule :: t.rules_so_far
@@ -166,7 +176,7 @@ module Builder = struct
   let add_predicate name arity intensional t =
     match PredicateNameMap.find name t.predicates_so_far with
       | exception Not_found ->
-         let info = { arity; intensional } in
+         let info = { intensional } in
          Ok { t with predicates_so_far =
                        PredicateNameMap.add name info t.predicates_so_far
             }

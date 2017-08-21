@@ -1,4 +1,7 @@
-type relvar = string
+type relvar =
+  { ident : string
+  ; arity : int
+  }
 
 type attr = string
 
@@ -26,6 +29,7 @@ type comm =
       variable. *)
 
   | Merge of { tgt : relvar; src : relvar }
+  (** Merge the contents of 'src' into 'tgt'. Does not alter 'src'. *)
 
   | Move of { tgt : relvar; src : relvar }
   (** Move the contents of 'src' into 'tgt', leaving 'src' empty. *)
@@ -35,11 +39,11 @@ type comm =
 and comms = comm list
 
 type program =
-  { edb_relvars : (relvar * int) list
-  ; idb_relvars : (relvar * int) list
+  { edb_relvars : relvar list
+  ; idb_relvars : relvar list
   ; commands    : comms
   }
 
-val arity_of_relvar : relvar -> program -> int
+val pp_relvar : Format.formatter -> relvar -> unit
 
 val pp_program : Format.formatter -> program -> unit

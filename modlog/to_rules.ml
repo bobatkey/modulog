@@ -33,7 +33,7 @@ module Eval = struct
     List.fold_left (fun a typ -> arity_of_eval_type typ + a) 0 typs
 
   type eval_value =
-    | Val_predicate of string * eval_type list
+    | Val_predicate of RS.predicate_name * eval_type list
     | Val_const     of expr
 
   module Eval (Env : Modules.Evaluator.EVAL_ENV
@@ -132,10 +132,10 @@ module Eval = struct
       let bindings, rules =
         List.fold_right
           (fun {decl_name; decl_type} (bindings, rules) ->
-             let name =
-               RS.Builder.freshen_name (Modules.Ident.name decl_name) rules in
+             let ident     = Modules.Ident.name decl_name in
              let decl_type = List.map (eval_type env ()) decl_type.predty_data in
-             let arity = arity_of_decl_type decl_type in
+             let arity     = arity_of_decl_type decl_type in
+             let name      = RS.Builder.freshen_name RS.{ident;arity} rules in
              let rules =
                ignore_builder_error (RS.Builder.add_idb_predicate name arity rules)
              in

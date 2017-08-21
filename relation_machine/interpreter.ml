@@ -1,19 +1,19 @@
-exception Variable_not_found of string
-
-module MakeEnv (T : sig type t end) : sig
+module MakeEnv (K : Map.OrderedType) (T : sig type t end) : sig
   type t
   type value = T.t
+  exception No_binding of K.t
   val empty : t
-  val find : string -> t -> value
-  val add : string -> value -> t -> t
-  val iter : (string -> value -> unit) -> t -> unit
+  val find : K.t -> t -> value
+  val add : K.t -> value -> t -> t
+  val iter : (K.t -> value -> unit) -> t -> unit
 end = struct
-  module M = Map.Make (String)
+  module M = Map.Make (K)
   type t = T.t M.t
   type value = T.t
+  exception No_binding of K.t
   let empty = M.empty
   let find k env =
-    try M.find k env with Not_found -> raise (Variable_not_found k)
+    try M.find k env with Not_found -> raise (No_binding k)
   let add k v env = M.add k v env
   let iter = M.iter
 end
@@ -44,9 +44,20 @@ end = struct
   let copy = H.copy
 end
 
-module RelvarEnv = MakeEnv (Relation)
+let pp_rel =
+  Fmt.(braces
+         (iter ~sep:(always ",@ ") Relation.iter
+            (brackets (array ~sep:(always ",") int32))))
 
-module AttrEnv   = MakeEnv (struct type t = int32 end)
+module Env = struct
+  include MakeEnv (struct type t = Syntax.relvar let compare = compare end) (Relation)
+
+  let pp =
+    Fmt.iter_bindings ~sep:(Fmt.always ",@ ") iter
+      (Fmt.pair ~sep:(Fmt.always " = ") Syntax.pp_relvar pp_rel)  
+end
+
+module AttrEnv = MakeEnv (String) (struct type t = int32 end)
 
 open Syntax
 
@@ -60,14 +71,14 @@ let check_condition attr_env values (i, scalar) =
 let rec eval_expr rel_env attr_env f = function
   | Return { guard_relation = Some rel; values } ->
      let values = Array.of_list (List.map (eval_scalar attr_env) values) in
-     let guard_relation = RelvarEnv.find rel rel_env in
+     let guard_relation = Env.find rel rel_env in
      if not (Relation.mem guard_relation values) then
        f values
   | Return { guard_relation = None; values } ->
      let values = Array.of_list (List.map (eval_scalar attr_env) values) in
      f values
   | Select { relation; conditions; projections; body } ->
-     let relation = RelvarEnv.find relation rel_env in
+     let relation = Env.find relation rel_env in
      relation |> Relation.iter begin fun values ->
        if List.for_all (check_condition attr_env values) conditions then begin
          let attr_env =
@@ -82,7 +93,7 @@ let rec eval_expr rel_env attr_env f = function
 
 let rec eval_comm rel_env = function
   | WhileNotEmpty (rels, body) ->
-     let rels = List.map (fun rel -> RelvarEnv.find rel rel_env) rels in
+     let rels = List.map (fun rel -> Env.find rel rel_env) rels in
      let rec loop () =
        if not (List.for_all Relation.is_empty rels) then
          (eval_comms rel_env body; loop ())
@@ -90,18 +101,18 @@ let rec eval_comm rel_env = function
      loop ()
 
   | Insert (rel, expr) ->
-     let rel = RelvarEnv.find rel rel_env in
+     let rel = Env.find rel rel_env in
      eval_expr rel_env AttrEnv.empty (Relation.add rel) expr
 
   | Merge { tgt; src } ->
-     let src = RelvarEnv.find src rel_env
-     and tgt = RelvarEnv.find tgt rel_env
+     let src = Env.find src rel_env
+     and tgt = Env.find tgt rel_env
      in
      Relation.iter (Relation.add tgt) src
 
   | Move { tgt; src } ->
-     let src = RelvarEnv.find src rel_env
-     and tgt = RelvarEnv.find tgt rel_env
+     let src = Env.find src rel_env
+     and tgt = Env.find tgt rel_env
      in
      Relation.clear tgt;
      Relation.iter (Relation.add tgt) src;
@@ -110,10 +121,10 @@ let rec eval_comm rel_env = function
   | Declare (inits, comms) ->
      let initialise rel_env = function
        | rel, None ->
-          RelvarEnv.add rel (Relation.create 128) rel_env
+          Env.add rel (Relation.create 128) rel_env
        | rel, Some init ->
-          let init = RelvarEnv.find init rel_env in
-          RelvarEnv.add rel (Relation.copy init) rel_env
+          let init = Env.find init rel_env in
+          Env.add rel (Relation.copy init) rel_env
      in
      let rel_env = List.fold_left initialise rel_env inits in
      eval_comms rel_env comms
@@ -125,18 +136,9 @@ and eval_comms rel_env comms =
 let eval {edb_relvars; idb_relvars; commands} =
   let rel_env =
     List.fold_left
-      (fun rel_env (nm, _) -> RelvarEnv.add nm (Relation.create 128) rel_env)
-      RelvarEnv.empty
+      (fun rel_env nm -> Env.add nm (Relation.create 128) rel_env)
+      Env.empty
       idb_relvars
   in
   eval_comms rel_env commands;
   rel_env
-
-let pp_rel =
-  Fmt.(braces
-         (iter ~sep:(always ",@ ") Relation.iter
-            (brackets (array ~sep:(always ",") int32))))
-
-let pp_relvarenv =
-  Fmt.(iter_bindings ~sep:(always ",@ ") RelvarEnv.iter
-         (pair ~sep:(always " = ") string pp_rel))

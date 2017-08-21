@@ -1,4 +1,7 @@
-type predicate_name = string
+type predicate_name =
+  { ident : string
+  ; arity : int
+  }
 
 type expr =
   | Var of string
@@ -29,8 +32,7 @@ val rule : rule_id -> ruleset -> rule
 val rule_is_self_recursive : ruleset -> rule_id -> bool
 
 type predicate_info =
-  { arity       : int
-  ; intensional : bool
+  { intensional : bool
   }
 
 val predicates : ruleset -> (predicate_name * predicate_info) list
@@ -41,8 +43,7 @@ module Builder : sig
   type error =
     | Undeclared_predicate of predicate_name
     | Arity_mismatch of
-        { pred  : predicate_name
-        ; arity : int
+        { pred       : predicate_name
         ; used_arity : int
         }
     | Definition_of_extensional_predicate of predicate_name

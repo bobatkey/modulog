@@ -58,17 +58,17 @@ module PredicatePats : sig
 
   val empty : t
 
-  val pats : string -> t -> PatternSet.t
+  val pats : relvar -> t -> PatternSet.t
 
-  val add : string -> PatternSet.pattern -> t -> t
+  val add : relvar -> PatternSet.pattern -> t -> t
 
-  val fold : (string -> PatternSet.t -> 'a -> 'a) -> t -> 'a -> 'a
+  val fold : (relvar -> PatternSet.t -> 'a -> 'a) -> t -> 'a -> 'a
 
-  val map_to_list : (string -> PatternSet.t -> 'a) -> t -> 'a list
+  val map_to_list : (relvar -> PatternSet.t -> 'a) -> t -> 'a list
 
   val pp : Format.formatter -> t -> unit
 end = struct
-  module VarMap = Map.Make (String)
+  module VarMap = Map.Make (struct type t = relvar let compare = compare end)
 
   type t = PatternSet.t VarMap.t
 
@@ -91,7 +91,7 @@ end = struct
   let pp =
     Fmt.iter_bindings VarMap.iter
       (Fmt.pair ~sep:(Fmt.always " => ")
-         Fmt.string
+         Syntax.pp_relvar
          PatternSet.pp)
 end
 
@@ -138,7 +138,7 @@ let ordering_of_pattern_path arity pats =
   ordering
 
 let orderings_of_patterns program pred pats =
-  let arity = Syntax.arity_of_relvar pred program in
+  let arity = pred.arity in
   let pattern_paths =
     MPC.minimal_path_cover pats
     |> List.map List.rev
@@ -146,7 +146,7 @@ let orderings_of_patterns program pred pats =
   in
   (pred, pattern_paths)
 
-let indexes program : (string * int array list) list =
+let indexes program : (relvar * int array list) list =
   program
   |> search_patterns
   |> PredicatePats.map_to_list (orderings_of_patterns program)
@@ -166,7 +166,7 @@ let pp_indexes =
 let pp_all_indexes =
   Fmt.(braces
          (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ") string pp_indexes)))
+            (pair ~sep:(always " =>@ ") Syntax.pp_relvar pp_indexes)))
 
 let pp_orderings =
   Fmt.(brackets
@@ -177,7 +177,7 @@ let pp_orderings =
 let pp_all_orderings =
   Fmt.(braces
          (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ") string pp_orderings)))
+            (pair ~sep:(always " =>@ ") Syntax.pp_relvar pp_orderings)))
 
 (* Now to work out the indexes required for each relation:
    - run "search_patterns program"
