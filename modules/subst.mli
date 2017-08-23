@@ -1,3 +1,5 @@
+(** Identifier to Path substitutions *)
+
 type t
 
 val identity : t
