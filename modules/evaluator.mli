@@ -5,13 +5,11 @@ module type EVAL_ENV = sig
 
   type eval_type
 
-  type t
-
   type value = private [> `Value of eval_value | `Type of eval_type ]
 
-  val empty : t
+  type t
 
-  val add : Ident.t -> value -> t -> t
+  val empty : t
 
   val add_values : (Ident.t * eval_value) list -> t -> t
 
@@ -33,7 +31,7 @@ module type CORE_EVAL = sig
 
   module Eval (Env : EVAL_ENV
                with type eval_value = eval_value
-                and type eval_type = eval_type) :
+                and type eval_type  = eval_type) :
   sig
 
     val eval_type : Env.t -> Core.kind -> Core.def_type -> eval_type

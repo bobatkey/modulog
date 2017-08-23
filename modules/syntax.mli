@@ -62,6 +62,7 @@ module type CORE_SYNTAX_RAW = sig
   val pp_def_decl :
     Format.formatter -> Names.ident * kind * def_type option -> unit
 
+  (* FIXME: make this match the way the grammar is set up *)
   val pp_type_constraint :
     Format.formatter -> string list * kind * def_type -> unit
 end
@@ -140,6 +141,18 @@ end
 
 module Mod_Syntax_Raw (Core : CORE_SYNTAX_RAW)
   : MOD_SYNTAX_RAW with module Core = Core
+
+(**{2 Abstract syntax with concrete names} *)
+
+module type CORE_SYNTAX_CONCRETE =
+  CORE_SYNTAX_RAW
+  with type Names.ident = string
+   and type Names.longident = String_names.longident
+
+module type MOD_SYNTAX_CONCRETE =
+  MOD_SYNTAX_RAW
+  with type Core.Names.ident     = String_names.ident
+   and type Core.Names.longident = String_names.longident
 
 (**{2 Abstract syntax with subsitution}
 

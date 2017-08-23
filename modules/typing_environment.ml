@@ -53,7 +53,7 @@ module type S = sig
 
   val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 
-  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, lookup_error) result
+  val find_type : String_names.longident -> t -> (Path.t * Mod.Core.kind, lookup_error) result
 
   val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, lookup_error) result
 
@@ -62,7 +62,7 @@ module type S = sig
 
   val lookup_modtype : Path.t -> t -> Mod.mod_type
 
-  val lookup_type : Path.t -> t -> Mod.type_decl
+  val lookup_type : Path.t -> t -> Mod.Core.kind * Mod.Core.def_type option
 end
 
 module Make (Mod_syntax : MOD_SYNTAX) : S with module Mod = Mod_syntax =
@@ -197,7 +197,7 @@ struct
 
   let lookup_type path {bindings} =
     match find path bindings with
-      | Ok (Type ty) -> ty
+      | Ok (Type ty) -> ty.kind, ty.manifest
       | _ -> failwith "internal: type lookup failed"
 
   let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
@@ -221,7 +221,7 @@ struct
     reword_lookup_error ~target_path:lid begin
       transl_path names lid >>= fun path ->
       find path bindings >>= function
-      | Type decl -> Ok (path, decl)
+      | Type decl -> Ok (path, decl.kind)
       | _         -> Error (lid, `not_a_type)
     end
 

@@ -8,9 +8,11 @@ end
 
 module type NAMES = sig
   type ident
+
   type longident
 
   val pp_ident : Format.formatter -> ident -> unit
+
   val pp_longident : Format.formatter -> longident -> unit
 end
 
@@ -306,6 +308,11 @@ struct
          pp_modtype mty
 end
 
+module type CORE_SYNTAX_CONCRETE =
+  CORE_SYNTAX_RAW
+  with type Names.ident = string
+   and type Names.longident = String_names.longident
+
 module type CORE_SYNTAX = sig
   include CORE_SYNTAX_RAW
     with type Names.ident     = Ident.t
@@ -325,6 +332,12 @@ module type MOD_SYNTAX = sig
 
   val subst_modtype : Subst.t -> mod_type -> mod_type
 end
+
+module type MOD_SYNTAX_CONCRETE =
+  MOD_SYNTAX_RAW
+  with type Core.Names.ident     = String_names.ident
+   and type Core.Names.longident = String_names.longident
+
 
 module Mod_Syntax (Core_syntax : CORE_SYNTAX)
   : MOD_SYNTAX with module Core = Core_syntax =

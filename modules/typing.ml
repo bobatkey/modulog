@@ -1,40 +1,72 @@
 open Syntax
 
+module type TYPING_ENV = sig
+  type val_type
+  type def_type
+  type kind
+
+  type t
+
+  (* FIXME: this is needed to handle mutually recursive values. Could
+     there be another way? *)
+  val add_value : string -> val_type -> t -> Ident.t * t
+
+  val find_value :
+    String_names.longident ->
+    t -> (Path.t * val_type, Typing_environment.lookup_error) result
+
+  val find_type :
+    String_names.longident ->
+    t -> (Path.t * kind, Typing_environment.lookup_error) result
+
+  (* FIXME: this is used to get definitions of types during type
+     equality checking. *)
+  val lookup_type : Path.t -> t -> kind * def_type option
+end
+
 module type CORE_TYPING = sig
-  module Src : CORE_SYNTAX_RAW with type Names.ident = string
-                                and type Names.longident = String_names.longident
+  module Src  : CORE_SYNTAX_CONCRETE
   module Core : CORE_SYNTAX
 
-  module Env : Typing_environment.S with module Mod.Core = Core
+  type error
 
-  type core_error
+  val pp_error : Format.formatter -> error -> unit
 
-  val pp_error : Format.formatter -> core_error -> unit
+  module Checker
+      (Env : TYPING_ENV
+       with type val_type = Core.val_type
+        and type def_type = Core.def_type
+        and type kind     = Core.kind) :
+  sig
+    val type_term :
+      Env.t -> Src.term ->
+      (Core.term * (Ident.t * Core.val_type) list, error) result
 
-  val type_term : Env.t -> Src.term -> (Core.term * (Ident.t * Core.val_type) list, core_error) result
+    val check_deftype :
+      Env.t -> Core.kind -> Src.def_type -> (Core.def_type, error) result
 
-  val check_deftype : Env.t -> Core.kind -> Src.def_type -> (Core.def_type, core_error) result
+    val check_valtype :
+      Env.t -> Src.val_type -> (Core.val_type, error) result
 
-  val check_valtype : Env.t -> Src.val_type -> (Core.val_type, core_error) result
+    val check_kind : Env.t -> Src.kind -> (Core.kind, error) result
 
-  val check_kind : Env.t -> Src.kind -> (Core.kind, core_error) result
+    val valtype_match : Env.t -> Core.val_type -> Core.val_type -> bool
 
-  val valtype_match : Env.t -> Core.val_type -> Core.val_type -> bool
+    val deftype_equiv :
+      Env.t -> Core.kind -> Core.def_type -> Core.def_type -> bool
 
-  val deftype_equiv : Env.t -> Core.kind -> Core.def_type -> Core.def_type -> bool
+    val kind_match : Env.t -> Core.kind -> Core.kind -> bool
 
-  val kind_match : Env.t -> Core.kind -> Core.kind -> bool
-
-  val deftype_of_path : Path.t -> Core.kind -> Core.def_type
+    val deftype_of_path : Path.t -> Core.kind -> Core.def_type
+  end
 end
 
 module type MOD_TYPING = sig
-  module Src : MOD_SYNTAX_RAW
+  module Src : MOD_SYNTAX_CONCRETE
     with type Core.Names.ident     = String_names.ident
      and type Core.Names.longident = String_names.longident
 
   module Tgt : MOD_SYNTAX
-    with type Core.Location.t = Src.Core.Location.t
 
   module Env : Typing_environment.S with module Mod = Tgt
 
@@ -50,22 +82,19 @@ module type MOD_TYPING = sig
 end
 
 module Mod_typing
-    (Src : MOD_SYNTAX_RAW with type Core.Names.ident = string
-                           and type Core.Names.longident = String_names.longident)
+    (Src : MOD_SYNTAX_CONCRETE)
     (Tgt : MOD_SYNTAX
      with type Core.Location.t = Src.Core.Location.t)
     (CT  : CORE_TYPING
-     with module Src     = Src.Core
-      and module Core    = Tgt.Core
-      and module Env.Mod = Tgt)
+     with module Src  = Src.Core
+      and module Core = Tgt.Core)
   : MOD_TYPING with module Src = Src
                 and module Tgt = Tgt
-                and module Env = CT.Env
 =
 struct
   module Src = Src
   module Tgt = Tgt
-  module Env = CT.Env
+  module Env = Typing_environment.Make (Tgt)
   module Location = Src.Core.Location
 
   let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
@@ -123,6 +152,15 @@ struct
        Format.fprintf pp "the modules named %a are not equal. Specifically, %a/"
          Ident.pp id
          pp_match_error err
+
+  module TypingEnv = struct
+    type def_type = Tgt.Core.def_type
+    type val_type = Tgt.Core.val_type
+    type kind     = Tgt.Core.kind
+    include Env
+  end
+
+  module CTC = CT.Checker (TypingEnv)
 
   let rec modtype_match env mty1 mty2 : (unit, match_error) result =
     let open Tgt in
@@ -186,7 +224,7 @@ struct
 
   and specification_match env sub = function
     | Tgt.Sig_value (id, vty1), Tgt.Sig_value (_, vty2) ->
-       if CT.valtype_match env vty1 (Tgt.Core.subst_valtype sub vty2) then
+       if CTC.valtype_match env vty1 (Tgt.Core.subst_valtype sub vty2) then
          Ok ()
        else
          Error (Value_mismatch (id, vty1, vty2))
@@ -221,15 +259,15 @@ struct
 
   and typedecl_match env id decl1 decl2 =
     let open Tgt in
-    CT.kind_match env decl1.kind decl2.kind &&
+    CTC.kind_match env decl1.kind decl2.kind &&
     (match decl1.manifest, decl2.manifest with
       | _, None ->
          true
       | Some typ1, Some typ2 ->
-         CT.deftype_equiv env decl2.kind typ1 typ2
+         CTC.deftype_equiv env decl2.kind typ1 typ2
       | None, Some typ2 ->
-         CT.deftype_equiv env decl2.kind
-           (CT.deftype_of_path (Path.Pident id) decl1.kind)
+         CTC.deftype_equiv env decl2.kind
+           (CTC.deftype_of_path (Path.Pident id) decl1.kind)
            typ2)
 
 
@@ -256,7 +294,7 @@ struct
        let m =
          match decl.Tgt.manifest with
            | None ->
-              Some (CT.deftype_of_path
+              Some (CTC.deftype_of_path
                       (Path.Pdot (path, Ident.name id))
                       decl.Tgt.kind)
            | Some ty ->
@@ -277,12 +315,10 @@ struct
 
   module SeenSet = Set.Make (String)
 
-  type core_error = CT.core_error
-
   type error_detail =
     | Application_of_nonfunctor
     | Application_to_non_path
-    | Core_error of CT.core_error
+    | Core_error of CT.error
     | Lookup_error of Typing_environment.lookup_error
     | Match_error of string * match_error
     | Repeated_name of Src.Core.Names.ident
@@ -352,7 +388,7 @@ struct
   let check_manifest env loc kind = function
     | None -> Ok None
     | Some dty ->
-       lift_core_error loc @@ CT.check_deftype env kind dty
+       lift_core_error loc @@ CTC.check_deftype env kind dty
        >>= fun dty ->
        Ok (Some dty)
 
@@ -362,7 +398,7 @@ struct
     | Tgt.({sigitem_data=Sig_type (ident, decl)} as item)::items
       when Ident.name ident = typename ->
        let open Tgt in
-       if CT.kind_match env kind decl.kind then
+       if CTC.kind_match env kind decl.kind then
          (match decl.manifest with
            | None ->
               let sigitem_data = Sig_type (ident, { kind; manifest=Some dty }) in
@@ -437,8 +473,8 @@ struct
     | Src.{modtype_loc;modtype_data=Modtype_withtype (mty, path, kind, dty)} ->
        let sig_loc = mty.Src.modtype_loc in
        check_modtype env mty >>= fun mty ->
-       lift_core_error modtype_loc (CT.check_kind env kind) >>= fun kind ->
-       lift_core_error modtype_loc (CT.check_deftype env kind dty) >>= fun dty ->
+       lift_core_error modtype_loc (CTC.check_kind env kind) >>= fun kind ->
+       lift_core_error modtype_loc (CTC.check_deftype env kind dty) >>= fun dty ->
        (match subst_type env mty path kind dty with
          | Ok mty -> Ok mty
          | Error `Not_a_signature  ->
@@ -462,7 +498,7 @@ struct
          Error (sigitem_loc, Repeated_name id)
        else
          let seen = SeenSet.add id seen in
-         lift_core_error sigitem_loc @@ CT.check_valtype env vty >>= fun vty ->
+         lift_core_error sigitem_loc @@ CTC.check_valtype env vty >>= fun vty ->
          let id, env = Env.add_value id vty env in
          check_signature
            env
@@ -475,7 +511,7 @@ struct
          Error (sigitem_loc, Repeated_name id)
        else
          let seen = SeenSet.add id seen in
-         lift_core_error sigitem_loc @@ CT.check_kind env kind >>= fun kind ->
+         lift_core_error sigitem_loc @@ CTC.check_kind env kind >>= fun kind ->
          check_manifest env sigitem_loc kind manifest >>= fun manifest ->
          let decl    = Tgt.{ kind; manifest } in
          let id, env = Env.add_type id decl env in
@@ -579,7 +615,7 @@ struct
           )
 
     | Src.{stritem_loc; stritem_data=Str_value term} :: items ->
-       lift_core_error stritem_loc (CT.type_term env term)
+       lift_core_error stritem_loc (CTC.type_term env term)
        >>= fun (term, val_items) ->
        (* FIXME: also do 'seen' *)
        let rec collect env rev_sigitems = function
@@ -628,8 +664,8 @@ struct
          Error (stritem_loc, Repeated_name id)
        else
          let seen = SeenSet.add id seen in
-         lift_core_error stritem_loc (CT.check_kind env kind) >>= fun kind ->
-         lift_core_error stritem_loc (CT.check_deftype env kind typ)
+         lift_core_error stritem_loc (CTC.check_kind env kind) >>= fun kind ->
+         lift_core_error stritem_loc (CTC.check_deftype env kind typ)
          >>= fun typ ->
          let tydecl = {Tgt.kind = kind; manifest = Some typ} in
          let id, env = Env.add_type id tydecl env in

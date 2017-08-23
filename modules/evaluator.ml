@@ -9,8 +9,6 @@ module type EVAL_ENV = sig
 
   val empty : t
 
-  val add : Ident.t -> value -> t -> t
-
   val add_values : (Ident.t * eval_value) list -> t -> t
 
   val find : Path.t -> t -> value option

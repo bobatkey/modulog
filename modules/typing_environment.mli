@@ -35,7 +35,7 @@ module type S = sig
 
   val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 
-  val find_type : String_names.longident -> t -> (Path.t * Mod.type_decl, lookup_error) result
+  val find_type : String_names.longident -> t -> (Path.t * Mod.Core.kind, lookup_error) result
 
   val find_module : String_names.longident -> t -> (Path.t * Mod.mod_type, lookup_error) result
 
@@ -44,7 +44,7 @@ module type S = sig
 
   val lookup_modtype : Path.t -> t -> Mod.mod_type
 
-  val lookup_type : Path.t -> t -> Mod.type_decl
+  val lookup_type : Path.t -> t -> Mod.Core.kind * Mod.Core.def_type option
 end
 
 module Make (Mod_syntax : MOD_SYNTAX) : S with module Mod = Mod_syntax
