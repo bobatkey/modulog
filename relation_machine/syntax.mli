@@ -10,14 +10,16 @@ type scalar =
   | Lit  of int32
 
 type expr =
-  | Return of { guard_relation : relvar option
-              ; values         : scalar list
-              }
-  | Select of { relation    : relvar
-              ; conditions  : (int * scalar) list
-              ; projections : (int * attr) list
-              ; body        : expr
-              }
+  | Return of
+      { guard_relation : relvar option
+      ; values         : scalar list
+      }
+  | Select of
+      { relation    : relvar
+      ; conditions  : (int * scalar) list
+      ; projections : (int * attr) list
+      ; cont        : expr
+      }
 
 type comm =
   | WhileNotEmpty of relvar list * comms
@@ -28,15 +30,13 @@ type comm =
   (** Insert the results of the expression into the named
       variable. *)
 
-  | Merge of { tgt : relvar; src : relvar }
-  (** Merge the contents of 'src' into 'tgt'. Does not alter 'src'. *)
-
   | Move of { tgt : relvar; src : relvar }
   (** Move the contents of 'src' into 'tgt', leaving 'src' empty. *)
 
   | Declare of (relvar * relvar option) list * comms
 
-and comms = comm list
+and comms =
+  comm list
 
 type program =
   { edb_relvars : relvar list

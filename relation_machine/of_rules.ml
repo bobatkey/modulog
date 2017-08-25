@@ -62,7 +62,7 @@ let expr_of_rule guard_relation head atoms =
            args
        in
        let env = List.fold_right (fun (_,x) -> AttrSet.add x) projections env in
-       let body, reqd = transl_rhs env atoms in
+       let cont, reqd = transl_rhs env atoms in
        (* remove any attrs not in reqd from projections. *)
        let projections =
          List.filter (fun (_,x) -> AttrSet.mem x reqd) projections
@@ -82,7 +82,7 @@ let expr_of_rule guard_relation head atoms =
            conditions
        in
        let relation = relvar_of_predname relation in
-       Select {relation; projections; conditions; body}, reqd
+       Select {relation; projections; conditions; cont}, reqd
   in
   let expr, reqd = transl_rhs AttrSet.empty atoms in
   assert (AttrSet.is_empty reqd);
@@ -106,6 +106,20 @@ let delta_ relvar =
 
 let new_ relvar =
   { relvar with ident = "new:" ^ relvar.ident }
+
+let mk_merge src tgt =
+  let projections =
+    Array.to_list (Array.init src.arity (fun i -> (i, Printf.sprintf "X%d" i)))
+  in
+  let values =
+    List.map (fun (_, nm) -> Attr nm) projections
+  in
+  Insert (tgt,
+          Select { relation = src
+                 ; conditions = []
+                 ; projections
+                 ; cont = Return { guard_relation = None; values }
+                 })
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -146,7 +160,7 @@ let translate_recursive ruleset rules =
       rules
   and merges =
     RelvarSet.map_to_list
-      (fun nm -> Merge { src = new_ nm; tgt = nm })
+      (fun nm -> mk_merge (new_ nm) nm)
       predicates
   and moves =
     RelvarSet.map_to_list

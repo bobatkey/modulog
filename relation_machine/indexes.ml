@@ -96,10 +96,10 @@ end = struct
 end
 
 let rec search_patterns_of_expr pats = function
-  | Select { relation; conditions; projections; body } ->
+  | Select { relation; conditions; projections; cont } ->
      let pat  = PatternSet.Pattern.of_list (List.map fst conditions) in
      let pats = PredicatePats.add relation pat pats in
-     search_patterns_of_expr pats body
+     search_patterns_of_expr pats cont
   | Return { guard_relation = None } ->
      pats
   | Return { guard_relation = Some relation; values } ->
@@ -111,7 +111,7 @@ let rec search_patterns_of_command pats = function
      search_patterns_of_commands pats comms
   | Insert (_, expr) ->
      search_patterns_of_expr pats expr
-  | Move _ | Merge _ ->
+  | Move _ ->
      pats
 
 and search_patterns_of_commands pats commands =

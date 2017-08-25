@@ -18,13 +18,12 @@ type expr =
       { relation    : relvar
       ; conditions  : (int * scalar) list
       ; projections : (int * attr) list
-      ; body        : expr
+      ; cont        : expr
       }
 
 type comm =
   | WhileNotEmpty of relvar list * comms
   | Insert of relvar * expr
-  | Merge of { tgt : relvar; src : relvar }
   | Move of { tgt : relvar; src : relvar }
   | Declare of (relvar * relvar option) list * comms
 
@@ -74,10 +73,11 @@ let rec pp_expr fmt = function
      Format.fprintf fmt "(@[<h>%a@])"
        Fmt.(list ~sep:(always ",@ ") pp_scalar) values
   | Return {guard_relation=Some rel; values} ->
-     Format.fprintf fmt "guard (not in %a);@ (@[<h>%a@])"
+     Format.fprintf fmt "where (@[<h>%a@]) not in %a;@ (@[<h>%a@])"
+       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
        pp_relvar                                rel
        Fmt.(list ~sep:(always ",@ ") pp_scalar) values
-  | Select { relation; conditions; projections; body } ->
+  | Select { relation; conditions; projections; cont } ->
      Format.fprintf fmt
        "@[<hv 0>select @[<hv 0>%a from %a@];@]@ %a"
        pp_matching_spec (merge_projections_conditions
@@ -85,7 +85,7 @@ let rec pp_expr fmt = function
                            conditions
                            projections)
        pp_relvar        relation
-       pp_expr          body
+       pp_expr          cont
 
 let pp_initialiser fmt = function
   | vnm, None ->
@@ -102,10 +102,6 @@ let rec pp_comm fmt = function
      Format.fprintf fmt "@[<hv 4>%a +=@ { @[<v>%a@] };@]"
        pp_relvar rel
        pp_expr   expr
-  | Merge {tgt; src} ->
-     Format.fprintf fmt "@[<hv 4>%a +=@ %a;@]"
-       pp_relvar tgt
-       pp_relvar src
   | Move {tgt; src} ->
      Format.fprintf fmt "%a <- %a;"
        pp_relvar tgt
