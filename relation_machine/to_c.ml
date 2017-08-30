@@ -91,7 +91,7 @@ module type BLOCK_LIST = sig
 
   val arity : 'n handle -> 'n is_nat
 
-  val declare : arity:'n is_nat -> ('n handle -> S.comm) -> S.comm
+  val declare : name:string -> arity:'n is_nat -> ('n handle -> S.comm) -> S.comm
 
   (* FIXME: these ought to have the same arity, but this is easier for
      now *)
@@ -142,6 +142,7 @@ module type INDEXED_TABLE = sig
   (** The [indexes] argument ought to be a list of permutations of the
       allowed slots. There will be one B-tree for each index. *)
   val declare :
+    name:string ->
     arity:'n is_nat ->
     indexes:int array list -> (* ('n fin,'n) vec list *)
     ('n handle -> S.comm) ->
@@ -230,7 +231,7 @@ module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
       ~else_:begin%monoid
         if_ (var#->occupied == const block_size)
           ~then_:begin%monoid
-            declare (ptr node) @@ fun new_head ->
+            declare ~name:"new_head" (ptr node) @@ fun new_head ->
             begin%monoid
               new_block new_head ~arity ~vals ~next:var;
               var := new_head
@@ -249,12 +250,12 @@ module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
       | Succ n -> Cons (arr#@idx, read arr (idx + const 1l) n)
 
   let iterate { var; arity } body =
-    declare (ptr node) @@ fun node ->
+    declare ~name:"block_iterator" (ptr node) @@ fun node ->
     begin%monoid
       node := var;
 
       while_ (node =!*= null) ~do_:begin%monoid
-        declare int @@ fun i -> begin%monoid
+        declare ~name:"i" int @@ fun i -> begin%monoid
           i := const 0l;
 
           while_ (i < node#->occupied) ~do_:begin%monoid
@@ -284,12 +285,12 @@ module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
       end
     end
 
-  let declare ~arity k =
-    declare (ptr node) @@ fun var ->
+  let declare ~name ~arity k =
+    declare ~name (ptr node) @@ fun var ->
     begin%monoid
       var := null;
       k { arity; var };
-      declare (ptr node) @@ fun ahead ->
+      declare ~name:"ahead" (ptr node) @@ fun ahead ->
       while_ (var =!*= null) ~do_:begin%monoid
         ahead := var#->next;
         free var;
@@ -411,7 +412,9 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
          List.fold_right
            (fun varnm k env ->
               let Nat n = nat_of_int varnm.Syntax.arity in
-              BL.declare n
+              BL.declare
+                ~name:varnm.Syntax.ident
+                ~arity:n
                 (fun handle -> k (Env.add varnm handle env)))
            vars
            (translate_comms body)
@@ -434,7 +437,10 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
     List.fold_right
       (fun relvar k env ->
          let Nat arity = nat_of_int relvar.Syntax.arity in
-         BL.declare ~arity @@ fun handle -> begin%monoid.S
+         BL.declare
+           ~name:relvar.Syntax.ident
+           ~arity
+         @@ fun handle -> begin%monoid.S
            k (Env.add relvar handle env);
            BL.print_out relvar.Syntax.ident handle
          end)
