@@ -1,4 +1,5 @@
-def a : int
+define
+    a : int
     a(?x) :- b(?x), c(?x)
 
 and b : int

@@ -14,9 +14,9 @@ module type PROGRAM = sig
   fwrite : variable * fieldname * variable
 end
 
-module PointsTo = functor (P : PROGRAM) -> struct
+module PointsTo (P : PROGRAM) = struct
 
-  def
+  define
     ptsto : P.variable * P.object
     ptsto(?v,?o) :- P.alloc(?v,?o)
     ptsto(?v,?o) :- P.assign(?v,?v2), ptsto(?v2,?o)
@@ -31,10 +31,13 @@ end
 module TestProg = struct
 
   type variable = int
+
   type object = int
+
   type fieldname = int
 
-  def alloc : int * int
+  define
+      alloc : int * int
   and assign : int * int
   and fread : int * int * int
   and fwrite : int * int * int

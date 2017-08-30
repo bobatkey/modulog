@@ -1,12 +1,12 @@
 type vertex = int
 
-def
+define
     edge : vertex * vertex
     edge(1, 2)
     edge(2, 3)
     edge(3, 4)
 
-def
+define
     path : vertex * vertex
     path(?X,?Y) :- edge(?X,?Y)
     path(?X,?Z) :- path(?X,?Y), edge(?Y,?Z)

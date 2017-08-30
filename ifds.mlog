@@ -27,28 +27,28 @@ end
    mergable (a new kind!), and change the meaning of the relation in that case? *)
 module IFDS = functor (P : IFDS_PROGRAM) -> struct
 
-  def
+  define
     intra : P.procedure * P.entry_fact * P.point * P.fact
-    intra (p, ef, n, s) :- invoked (p, ef), P.start_edge (p, ef, n, s)
-    intra (p, ef, n, s) :- intra (p, ef, n', s'), P.edge (n', s', n, s)
-    intra (p, ef, n, s) :- intra (p, ef, n', s'), callreturn (n', s', n, s)
+    intra (?p, ?ef, ?n, ?s) :- invoked (?p, ?ef), P.start_edge (?p, ?ef, ?n, ?s)
+    intra (?p, ?ef, ?n, ?s) :- intra (?p, ?ef, ?n', ?s'), P.edge (?n', ?s', ?n, ?s)
+    intra (?p, ?ef, ?n, ?s) :- intra (?p, ?ef, ?n', ?s'), callreturn (?n', ?s', ?n, ?s)
 
   and
     invoked : P.procedure * P.entry_fact
-    invoked (p, ef) :- P.initial (p, ef)
-    invoked (p, ef) :- callsite(n, s, p, ef)
+    invoked (?p, ?ef) :- P.initial (?p, ?ef)
+    invoked (?p, ?ef) :- callsite(?n, ?s, ?p, ?ef)
 
   and
    callsite : P.point * P.fact * P.procedure * P.entry_fact
-   callsite (n,s,p',ef') :-
-      intra (p, ef, n, s),
-      P.call (n, s, p', ef')
+   callsite (?n, ?s, ?p', ?ef') :-
+      intra (?p, ?ef, ?n, ?s),
+      P.call (?n, ?s, ?p', ?ef')
 
   and
     callreturn : P.point * P.fact * P.point * P.fact
-    callreturn(n, s, n', s') :-
-      callsite (n, s, p, ef),
-      intra (p, ef, ne, se),
-      P.return (n, s, ne, se, n', s')
+    callreturn(?n, ?s, ?n', ?s') :-
+      callsite (?n, ?s, ?p, ?ef),
+      intra (?p, ?ef, ?ne, ?se),
+      P.return (?n, ?s, ?ne, ?se, ?n', ?s')
 
 end

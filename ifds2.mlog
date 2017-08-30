@@ -40,31 +40,31 @@ module IFDS_of_Extended (P : IFDS_PROGRAM_EXT) = struct
   type procedure = P.procedure * P.entry_fact
   type point = P.point * P.fact
 
-  def
+  define
     edge : point * point
     edge ((?n,?s), (?n',?s')) :- P.edge (?n, ?s, ?n', ?s')
 
-  def
+  define
     start_edge : procedure * point
     start_edge ((?p, ?ef), (?n, ?s)) :- P.start_edge (?p, ?ef, ?n, ?s)
 
-  def
+  define
     call : point * procedure
     call ((?n, ?s), (?p, ?ef)) :- P.call (?n, ?s, ?p, ?ef)
 
-  def
+  define
     return : point * point * point
     return ((?nc,?sc), (?ne, ?se), (?nr, ?sr)) :-
       P.return (?nc, ?sc, ?ne, ?se, ?nr, ?sr)
 
-  def
+  define
     initial : procedure
     initial ((?p, ?ef)) :- P.initial (?p, ?ef)
 end
 
 module IFDS (P : IFDS_PROGRAM) = struct
 
-  def
+  define
     intra : P.procedure * P.point
     intra (?Proc, ?Node) :- invoked (?Proc), P.start_edge (?Proc, ?Node)
     intra (?Proc, ?Node) :- intra (?Proc, ?Node'), P.edge (?Node', ?Node)
@@ -101,19 +101,24 @@ module P = struct
 
   type point = int * int
 
-  def edge : point * point
+  define
+      edge : point * point
       edge ((1,4),(2,5))
       edge ((1,2),(4,3))
 
-  def start_edge : procedure * point
+  define
+      start_edge : procedure * point
       start_edge (2,(1,4))
 
-  def call : point * procedure
+  define
+      call : point * procedure
       call ((2,5),2)
 
-  def return : point * point * point
+  define
+      return : point * point * point
 
-  def initial : procedure
+  define
+      initial : procedure
       initial (1)
 end
 
