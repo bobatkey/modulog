@@ -1,5 +1,3 @@
-open Syntax
-
 (* Plan:
    1. Compute the indexes required for each idb and edb relvar
       - make a separate btree for each index
@@ -85,29 +83,29 @@ let rec init_vec : type a n. n is_nat -> a -> (a, n) vec =
     | Succ n -> Cons (x, init_vec n x)
 
 module type BLOCK_LIST = sig
-  module S : Imp.Syntax.S
+  module IA : Idealised_algol.Syntax.S
 
   type 'n handle
 
   val arity : 'n handle -> 'n is_nat
 
-  val declare : name:string -> arity:'n is_nat -> ('n handle -> S.comm) -> S.comm
+  val declare : name:string -> arity:'n is_nat -> ('n handle -> IA.comm) -> IA.comm
 
   (* FIXME: these ought to have the same arity, but this is easier for
      now *)
-  val move : src:'n handle -> tgt:'n2 handle -> S.comm
+  val move : src:'n handle -> tgt:'n2 handle -> IA.comm
 
-  val insert : 'n handle -> (int S.exp, 'n) vec -> S.comm
+  val insert : 'n handle -> (int IA.exp, 'n) vec -> IA.comm
 
-  val iterate : 'n handle -> ((int S.exp, 'n) vec -> S.comm) -> S.comm
+  val iterate : 'n handle -> ((int IA.exp, 'n) vec -> IA.comm) -> IA.comm
 
-  val is_empty : 'n handle -> bool S.exp
+  val is_empty : 'n handle -> bool IA.exp
 
-  val print_out : string -> 'n handle -> S.comm
+  val print_out : string -> 'n handle -> IA.comm
 end
 
 module type B_TREE = sig
-  module S : Imp.Syntax.S
+  module S : Idealised_algol.Syntax.S
 
   type 'n handle
 
@@ -124,7 +122,7 @@ module type B_TREE = sig
 end
 
 module type INDEXED_TABLE = sig
-  module S : Imp.Syntax.S
+  module IA : Idealised_algol.Syntax.S
 
   type 'n handle
 
@@ -145,8 +143,8 @@ module type INDEXED_TABLE = sig
     name:string ->
     arity:'n is_nat ->
     indexes:int array list -> (* ('n fin,'n) vec list *)
-    ('n handle -> S.comm) ->
-    S.comm
+    ('n handle -> IA.comm) ->
+    IA.comm
 
   (** Given a pattern:
       - find the index suitable for this query: it will contain all the fixed parts of the pattern as a prefix.
@@ -154,32 +152,33 @@ module type INDEXED_TABLE = sig
   *)
   val iterate :
     'n handle ->
-    pat:([`Wild | `Fixed of int S.exp], 'n) vec ->
-    ((int S.exp, 'n) vec -> S.comm) ->
-    S.comm
+    pat:([`Wild | `Fixed of int IA.exp], 'n) vec ->
+    ((int IA.exp, 'n) vec -> IA.comm) ->
+    IA.comm
 
   (** Translate to insertion commands for each of the underlying
       B-trees. *)
   val insert :
     'n handle ->
-    (int S.exp, 'n) vec ->
-    S.comm
+    (int IA.exp, 'n) vec ->
+    IA.comm
 
   val ifmember :
     'n handle ->
-    pat:([`Wild | `Fixed of int S.exp], 'n) vec ->
-    S.comm ->
-    S.comm
+    pat:([`Wild | `Fixed of int IA.exp], 'n) vec ->
+    IA.comm ->
+    IA.comm
 
   (** All of the B-trees ought to be the same size, so we just check
      if the first one is empty. *)
-  val is_empty : 'n handle -> bool S.exp
+  val is_empty : 'n handle -> bool IA.exp
 end
 
-module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
-  module S = S
+module BL_Make (IA : Idealised_algol.Syntax.S) () : BLOCK_LIST with module IA = IA =
+struct
+  module IA = IA
 
-  open S
+  open IA
 
   let block_size = 16l
 
@@ -192,7 +191,7 @@ module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
 
   type 'n handle =
     { arity : 'n is_nat
-    ; var   : node S.structure S.ptr S.var
+    ; var   : node structure ptr var
     }
 
   let arity handle =
@@ -300,13 +299,18 @@ module BL_Make (S : Imp.Syntax.S) () : BLOCK_LIST with module S = S = struct
 
 end
 
-module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = struct
+module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
-  module BL = BL_Make (S) ()
+  module BL = BL_Make (IA) ()
+
+  open Syntax
 
   module Env = struct
     include Map.Make
-        (struct type t = Syntax.relvar let compare = Pervasives.compare end)
+        (struct
+          type t = Syntax.relvar
+          let compare = Pervasives.compare
+        end)
 
     type value =
       | Plain   : 'n BL.handle -> value
@@ -319,18 +323,18 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
   module LEnv = Map.Make (String)
 
   let rec and_list = function
-    | [] -> S.true_
+    | [] -> IA.true_
     | [e] -> e
-    | e::es -> S.(&&) e (and_list es)
+    | e::es -> IA.(&&) e (and_list es)
 
   let condition lenv exps = function
-    | (i, Syntax.Attr nm) -> S.(List.nth exps i == LEnv.find nm lenv)
-    | (i, Syntax.Lit j)   -> S.(List.nth exps i == const j)
+    | (i, Syntax.Attr nm) -> IA.(List.nth exps i == LEnv.find nm lenv)
+    | (i, Syntax.Lit j)   -> IA.(List.nth exps i == const j)
 
   let rec translate_expr expr env lenv k = match expr with
     | Return { guard_relation; values } ->
        let vals =
-         List.map (function Lit i   -> S.const i
+         List.map (function Lit i   -> IA.const i
                           | Attr nm -> LEnv.find nm lenv)
            values
        in
@@ -366,7 +370,7 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
          | Env.Plain handle ->
             BL.iterate handle @@ fun attrs ->
             let attrs = list_of_vec attrs in
-            S.ifthen (and_list (List.map (condition lenv attrs) conditions))
+            IA.ifthen (and_list (List.map (condition lenv attrs) conditions))
               ~then_:begin
                 let lenv =
                   List.fold_right
@@ -396,7 +400,7 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
              | Env.Plain handle -> BL.is_empty handle
              (*| Env.Indexed handle -> Indx.is_empty handle*)
          in
-         S.while_ (S.not (and_list (List.map check_empty vars)))
+         IA.while_ (IA.not (and_list (List.map check_empty vars)))
            ~do_:(translate_comms body env)
 
       | Insert (relvar, expr) ->
@@ -429,8 +433,8 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
 
   and translate_comms comms env =
     List.fold_left
-      (fun code comm -> S.(code ^^ translate_comm comm env))
-      S.empty
+      (fun code comm -> IA.(code ^^ translate_comm comm env))
+      IA.empty
       comms
 
   let translate_prog { idb_relvars; commands } =
@@ -440,7 +444,7 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
          BL.declare
            ~name:relvar.Syntax.ident
            ~arity
-         @@ fun handle -> begin%monoid.S
+         @@ fun handle -> begin%monoid.IA
            k (Env.add relvar handle env);
            BL.print_out relvar.Syntax.ident handle
          end)
@@ -449,11 +453,11 @@ module Gen (S : Imp.Syntax.S) (*(Indx : INDEXED_TABLE with module S = S)*) () = 
       Env.empty
 end
 
-module C          = Imp.C.C ()
+module C          = Idealised_algol.C.C ()
 module Translator = Gen (C) ()
 
 let translate program =
   let stmts = C.gen (Translator.translate_prog program) in
   Format.set_margin 300;
   Format.set_max_indent 280;
-  Imp.C.PP.pp_stmts Format.std_formatter stmts
+  Idealised_algol.C.PP.pp_stmts Format.std_formatter stmts
