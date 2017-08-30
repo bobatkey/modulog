@@ -2,4 +2,5 @@
 
 (library
  ((name relation_machine)
-  (libraries (ocamlgraph fmt datalog))))
+  (preprocess (pps (ppx_monoid)))
+  (libraries (ocamlgraph fmt datalog imp))))

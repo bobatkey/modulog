@@ -33,7 +33,7 @@ type comm =
   | Move of { tgt : relvar; src : relvar }
   (** Move the contents of 'src' into 'tgt', leaving 'src' empty. *)
 
-  | Declare of (relvar * relvar option) list * comms
+  | Declare of relvar list * comms
 
 and comms =
   comm list

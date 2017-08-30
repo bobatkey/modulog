@@ -25,7 +25,7 @@ type comm =
   | WhileNotEmpty of relvar list * comms
   | Insert of relvar * expr
   | Move of { tgt : relvar; src : relvar }
-  | Declare of (relvar * relvar option) list * comms
+  | Declare of relvar list * comms
 
 and comms = comm list
 
@@ -87,12 +87,6 @@ let rec pp_expr fmt = function
        pp_relvar        relation
        pp_expr          cont
 
-let pp_initialiser fmt = function
-  | vnm, None ->
-     Format.fprintf fmt "%a" pp_relvar vnm
-  | vnm, Some vnm' ->
-     Format.fprintf fmt "%a as %a" pp_relvar vnm pp_relvar vnm'
-
 let rec pp_comm fmt = function
   | WhileNotEmpty (rels, body) ->
      Format.fprintf fmt "while_not_empty (@[<hov>%a@])@ {@[<v 4>@,%a@]@,}"
@@ -108,7 +102,7 @@ let rec pp_comm fmt = function
        pp_relvar src
   | Declare (initialisers, body) ->
      Format.fprintf fmt "declare (@[<hv>%a@])@ {@[<v 4>@,%a@]@,}"
-       Fmt.(list ~sep:(always ",@ ") pp_initialiser) initialisers
+       Fmt.(list ~sep:(always ",@ ") pp_relvar) initialisers
        pp_comms body
 
 and pp_comms fmt = function

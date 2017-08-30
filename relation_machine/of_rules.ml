@@ -107,19 +107,21 @@ let delta_ relvar =
 let new_ relvar =
   { relvar with ident = "new:" ^ relvar.ident }
 
-let mk_merge src tgt =
+let select_all src =
   let projections =
     Array.to_list (Array.init src.arity (fun i -> (i, Printf.sprintf "X%d" i)))
   in
   let values =
     List.map (fun (_, nm) -> Attr nm) projections
   in
-  Insert (tgt,
-          Select { relation = src
-                 ; conditions = []
-                 ; projections
-                 ; cont = Return { guard_relation = None; values }
-                 })
+  Select { relation = src
+         ; conditions = []
+         ; projections
+         ; cont = Return { guard_relation = None; values }
+         }
+
+let mk_merge src tgt =
+  Insert (tgt, select_all src)
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -141,7 +143,11 @@ let translate_recursive ruleset rules =
   let delta_predicates = RelvarSet.map_to_list delta_ predicates in
   let declarations =
     RelvarSet.concat_map_to_list
-      (fun pred_nm -> [new_ pred_nm, None; delta_ pred_nm, Some pred_nm])
+      (fun pred_nm -> [new_ pred_nm; delta_ pred_nm])
+      predicates
+  and initialisations =
+    RelvarSet.map_to_list
+      (fun pred_nm -> mk_merge pred_nm (delta_ pred_nm))
       predicates
   in
   let updates =
@@ -168,7 +174,7 @@ let translate_recursive ruleset rules =
       predicates
   in
   Declare
-    (declarations, [ WhileNotEmpty (delta_predicates, updates @ merges @ moves) ])
+    (declarations, initialisations @ [ WhileNotEmpty (delta_predicates, updates @ merges @ moves) ])
 
 let translate_component ruleset = function
   | `Direct rule ->

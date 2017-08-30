@@ -17,6 +17,7 @@ module type S = sig
   type ('s, 'a) field
 
   (* Creation of types; a Ctypes style interface *)
+  (* FIXME: do variable length ones too *)
   val structure : string -> 's structure typ
   val field     : 's structure typ -> string -> 'a typ -> ('s, 'a) field
   val seal      : 's structure typ -> unit
@@ -35,6 +36,7 @@ module type S = sig
   val ( == ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
   val ( != ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
   val ( + ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
+  val ( * ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
   val ( - ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
 
   val empty : comm
@@ -55,6 +57,8 @@ module type S = sig
 
   val malloc : ('a ptr, [`exp|`var]) expr -> 'a typ -> comm
 
+  val malloc_ext : ('a ptr, [`exp|`var]) expr -> 'a typ -> (int,[>`exp]) expr -> _ typ -> comm
+
   val free : ('a ptr, [>`exp]) expr -> comm
 
   val deref : ('a ptr, [>`exp]) expr -> ('a,[<`exp|`var]) expr
@@ -70,4 +74,10 @@ module type S = sig
   val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
 
   val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+
+  val print_int : (int, [>`exp]) expr -> comm
+
+  val print_newline : comm
+
+  val print_str : string -> comm
 end

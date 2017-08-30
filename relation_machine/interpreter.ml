@@ -113,12 +113,8 @@ let rec eval_comm rel_env = function
      Relation.clear src
 
   | Declare (inits, comms) ->
-     let initialise rel_env = function
-       | rel, None ->
-          Env.add rel (Relation.create 128) rel_env
-       | rel, Some init ->
-          let init = Env.find init rel_env in
-          Env.add rel (Relation.copy init) rel_env
+     let initialise rel_env rel =
+       Env.add rel (Relation.create 128) rel_env
      in
      let rel_env = List.fold_left initialise rel_env inits in
      eval_comms rel_env comms

@@ -70,6 +70,7 @@ type c_exp =
 
   | BoolLit of bool
   | IntLit of int32
+  | StrLit of string
 
   | Binop of c_exp * binop * c_exp
   | Unop  of unop * c_exp
@@ -80,13 +81,14 @@ type c_exp =
 
 type stmt =
   | Assign  of c_exp * c_exp
-  | Malloc  : c_exp * 'a typ -> stmt
+  | Malloc  : c_exp * 'a typ * (c_exp * 'b typ) option -> stmt
   | Free    : c_exp -> stmt
   | If      of c_exp * stmt * stmt option
   | While   of c_exp * stmt
   | Break
   | Block   of block_stmt list
   | Return  of c_exp
+  | Call    of string * c_exp list
 
 and block_stmt =
   | Declaration : 'a typ * string -> block_stmt
@@ -149,7 +151,7 @@ module PP = struct
     | Field (expr, fnm) ->
        Format.fprintf fmt "%a.%s" (pp_expr 1) expr fnm
     | Idx (expr, iexpr) ->
-       Format.fprintf fmt "%a[%a]" (pp_expr 1) expr (pp_expr 19) iexpr
+       Format.fprintf fmt "%a[@[<hv>%a@]]" (pp_expr 1) expr (pp_expr 19) iexpr
     | Deref expr ->
        if prec < 3 then
          Format.fprintf fmt "(*%a)" (pp_expr 2) expr
@@ -167,6 +169,8 @@ module PP = struct
          Format.fprintf fmt "!%a" (pp_expr 2) expr
     | Null ->
        Format.pp_print_string fmt "NULL"
+    | StrLit s ->
+       Format.fprintf fmt "%S" s
 
   let pp_expr fmt e =
     Format.fprintf fmt "@[<hv>%a@]" (pp_expr 20) e
@@ -251,16 +255,27 @@ module PP = struct
          pp_stmts block_stmts
     | Break ->
        Format.fprintf fmt "break;@,"
-    | Malloc (l_value, typ) ->
+    | Malloc (l_value, typ, None) ->
        (* FIXME: abort if allocation fails *)
        Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a))@];"
          pp_expr     l_value
          pp_typename typ
+    | Malloc (l_value, typ, Some (num, typ')) ->
+       (* FIXME: abort if allocation fails *)
+       Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a) + %a * sizeof(%a))@];"
+         pp_expr     l_value
+         pp_typename typ
+         pp_expr     num
+         pp_typename typ'
     | Free expr ->
        Format.fprintf fmt "@[<hv>free (%a)@];"
          pp_expr     expr
     | Return expr ->
        Format.fprintf fmt "return %a;" pp_expr expr
+    | Call (nm, exps) ->
+       Format.fprintf fmt "@[<hov>%s@,(@[<hv>%a)@]@];"
+         nm
+         Fmt.(list ~sep:(Fmt.always ",@ ") pp_expr) exps
 
   let pp_arg_decls =
     let pp_arg_decl fmt (A_type ty, ident) =
@@ -396,7 +411,10 @@ end = struct
          `Closed (decl :: stmts)
 
   let malloc v typ ng =
-    `Open [Statement (Malloc (v, typ))]
+    `Open [Statement (Malloc (v, typ, None))]
+
+  let malloc_ext v typ n typ' ng =
+    `Open [Statement (Malloc (v, typ, Some (n, typ')))]
 
   let free expr ng =
     `Open [Statement (Free expr)]
@@ -420,9 +438,19 @@ end = struct
   let ( == ) e1 e2 = Binop (e1, Eq, e2)
   let ( != ) e1 e2 = Binop (e1, Ne, e2)
   let ( +  ) e1 e2 = Binop (e1, Plus, e2)
+  let ( *  ) e1 e2 = Binop (e1, Mult, e2)
   let ( -  ) e1 e2 = Binop (e1, Sub, e2)
 
   let ( =*= ) e1 e2 = Binop (e1, Eq, e2)
   let ( =!*= ) e1 e2 = Binop (e1, Ne, e2)
   let null = Null
+
+  let print_int e ng =
+    `Open [Statement (Call ("printf", [StrLit "%d"; e]))]
+
+  let print_newline ng =
+    `Open [Statement (Call ("printf", [StrLit "\n"]))]
+
+  let print_str str ng =
+    `Open [Statement (Call ("printf", [StrLit "%s"; StrLit str]))]
 end

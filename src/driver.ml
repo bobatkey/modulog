@@ -34,6 +34,20 @@ let relmachine filename with_indexes =
          "@[<v>%a@]\n"
          Modlog.Checker.pp_error err
 
+let gen_c filename =
+  let structure = read_structure_from_file filename in
+  match Modlog.Checker.type_structure structure with
+    | Ok (str, sg) ->
+       let rules    = Modlog.To_rules.from_structure str in
+       let code     = Relation_machine.Of_rules.translate rules in
+       Relation_machine.To_c.translate code
+
+    | Error err ->
+       Format.printf
+         "@[<v>%a@]\n"
+         Modlog.Checker.pp_error err
+
+
 let rules filename =
   let structure = read_structure_from_file filename in
   match Modlog.Checker.type_structure structure with
@@ -104,6 +118,11 @@ let relmachine_cmd =
   Term.(const relmachine $ filename_arg $ with_indexes_opt),
   Term.info "relmachine" ~doc ~exits:Term.default_exits
 
+let gen_c_cmd =
+  let doc = "Compile a Modular Datalog program to C" in
+  Term.(const gen_c $ filename_arg),
+  Term.info "gen_c" ~doc ~exits:Term.default_exits
+
 let rules_cmd =
   let doc = "Compile a Modular Datalog program to flat datalog rules" in
   Term.(const rules $ filename_arg),
@@ -130,6 +149,7 @@ let default_cmd =
 let () =
   Term.(exit (eval_choice default_cmd [ typecheck_cmd
                                       ; relmachine_cmd
+                                      ; gen_c_cmd
                                       ; rules_cmd
                                       ; rules_graph_cmd
                                       ; exec_cmd ]))
