@@ -404,6 +404,7 @@ end = struct
     `Open [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
 
   let declare ?(name="x") typ body ng =
+    let name = String.map (function ':' -> '_' | x -> x) name in
     let nm = Printf.sprintf "%s%d" name ng and ng = ng+1 in
     let decl = Declaration (typ, nm) in
     match body (Var nm) ng with
