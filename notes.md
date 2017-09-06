@@ -36,6 +36,8 @@
 - https://github.com/tomjridge/tjr_btree
   A B-Tree implementation in OCaml, extracted from Isabelle/HOL. By Tom Ridge.
 
+- https://github.com/spacejam/rsdb/blob/master/README.md
+  A Rust implementation of something called "BW-Trees", which apparently work better on SSDs
 
 # Compilation
 
