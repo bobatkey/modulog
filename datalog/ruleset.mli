@@ -1,4 +1,4 @@
-(** Datalog programs as sets of rulesets. *)
+(** Datalog programs as sets of rules. *)
 
 type predicate_name =
   { ident : string
