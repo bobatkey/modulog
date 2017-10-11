@@ -137,7 +137,7 @@ module Eval = struct
              let arity     = arity_of_decl_type decl_type in
              let name      = RS.Builder.freshen_name RS.{ident;arity} rules in
              let rules =
-               ignore_builder_error (RS.Builder.add_idb_predicate name arity rules)
+               ignore_builder_error (RS.Builder.add_idb_predicate name rules)
              in
              ((decl_name, Val_predicate (name, decl_type)) :: bindings, rules))
           defs

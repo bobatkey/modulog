@@ -53,8 +53,8 @@ module Builder : sig
 
   val empty : t
   val add_rule : rule -> t -> (t, error) result
-  val add_idb_predicate : predicate_name -> int -> t -> (t, error) result
-  val add_edb_predicate : predicate_name -> int -> t -> (t, error) result
+  val add_idb_predicate : predicate_name -> t -> (t, error) result
+  val add_edb_predicate : predicate_name -> t -> (t, error) result
 
   val freshen_name : predicate_name -> t -> predicate_name
 

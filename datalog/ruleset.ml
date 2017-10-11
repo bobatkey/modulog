@@ -3,6 +3,15 @@ type predicate_name =
   ; arity : int
   }
 
+module PredicateName = struct
+  type t = predicate_name
+
+  let compare x y =
+    match Pervasives.compare x.ident y.ident with
+      | 0 -> Pervasives.compare x.arity y.arity
+      | c -> c
+end
+
 type expr =
   | Var of string
   | Lit of int32
@@ -52,12 +61,10 @@ let pp_rule fmt {pred; args; rhs} =
          pp_rhs rhs
 
 (**********************************************************************)
-module PredicateNameMap =
-  Map.Make (struct type t = predicate_name let compare = compare end)
+module PredicateNameMap = Map.Make (PredicateName)
 
 type predicate_info =
-  { (*arity       : int
-      ; *) intensional : bool
+  { intensional : bool
   }
 
 type ruleset =
@@ -169,7 +176,7 @@ module Builder = struct
                               update_index pred (List.cons id) t.index_so_far
                    }
 
-  let add_predicate name arity intensional t =
+  let add_predicate name intensional t =
     match PredicateNameMap.find name t.predicates_so_far with
       | exception Not_found ->
          let info = { intensional } in
@@ -179,11 +186,11 @@ module Builder = struct
       | _ ->
          Error (Predicate_already_declared name)
 
-  let add_edb_predicate name arity t =
-    add_predicate name arity false t
+  let add_edb_predicate name t =
+    add_predicate name false t
 
-  let add_idb_predicate name arity t =
-    add_predicate name arity true t
+  let add_idb_predicate name t =
+    add_predicate name true t
 
   let finish { rules_so_far; next_rule_id; index_so_far; predicates_so_far } =
     let rules_of_pred = index_so_far
