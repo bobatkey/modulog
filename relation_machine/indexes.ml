@@ -137,7 +137,7 @@ let ordering_of_pattern_path arity pats =
   assert (!pos = arity);
   ordering
 
-let orderings_of_patterns program pred pats =
+let orderings_of_patterns pred pats =
   let arity = pred.arity in
   let pattern_paths =
     MPC.minimal_path_cover pats
@@ -147,9 +147,9 @@ let orderings_of_patterns program pred pats =
   (pred, pattern_paths)
 
 let indexes program : (relvar * int array list) list =
-  program
-  |> search_patterns
-  |> PredicatePats.map_to_list (orderings_of_patterns program)
+  PredicatePats.map_to_list
+    orderings_of_patterns
+    (search_patterns program)
 
 (* Now:
    - generate a variable ordering for each index
