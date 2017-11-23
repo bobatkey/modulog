@@ -154,7 +154,7 @@ module type MOD_SYNTAX_CONCRETE =
   with type Core.Names.ident     = String_names.ident
    and type Core.Names.longident = String_names.longident
 
-(**{2 Abstract syntax with subsitution}
+(**{2 Abstract syntax with substitution}
 
    The {!CORE_SYNTAX} and {!MOD_SYNTAX} signatures constrain the
    corresponding [*_RAW] signatures so that the names are fixed to be
