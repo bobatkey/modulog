@@ -327,9 +327,9 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | [e] -> e
     | e::es -> IA.(&&) e (and_list es)
 
-  let condition lenv exps = function
-    | (i, Syntax.Attr nm) -> IA.(List.nth exps i == LEnv.find nm lenv)
-    | (i, Syntax.Lit j)   -> IA.(List.nth exps i == const j)
+  let condition lenv exps = let open! IA in function
+    | (i, Syntax.Attr nm) -> List.nth exps i == LEnv.find nm lenv
+    | (i, Syntax.Lit j)   -> List.nth exps i == const j
 
   let rec translate_expr expr env lenv k = match expr with
     | Return { guard_relation; values } ->
@@ -432,8 +432,9 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
                  failwith "Attempted move between indexed relations" *))
 
   and translate_comms comms env =
+    let open! IA in
     List.fold_left
-      (fun code comm -> IA.(code ^^ translate_comm comm env))
+      (fun code comm -> code ^^ translate_comm comm env)
       IA.empty
       comms
 

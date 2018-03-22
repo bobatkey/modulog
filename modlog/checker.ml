@@ -176,9 +176,9 @@ module Core_typing = struct
     module LocalEnv = Map.Make (String)
 
     let ty_int =
-      Core.{ domtype_loc  = Location.generated
-           ; domtype_data = Type_int
-           }
+      { Core.domtype_loc  = Location.generated
+      ;      domtype_data = Type_int
+      }
 
     let rec domtype_is_tuple env = function
       | Core.{domtype_data=Type_typename path} ->
@@ -403,9 +403,9 @@ module Core_typing = struct
 
 
     let deftype_of_path path () =
-      Core.{ domtype_loc  = Location.generated
-           ; domtype_data = Type_typename path
-           }
+      { Core.domtype_loc  = Location.generated
+      ;      domtype_data = Type_typename path
+      }
   end
 end
 

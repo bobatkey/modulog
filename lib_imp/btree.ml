@@ -39,8 +39,8 @@ module BTree (S : Syntax.S) (P : BTREE_PARAMS with module S = S) : sig
     (P.key exp -> comm) ->
     comm
 end = struct
-  open S
-  open P
+  open! S
+  open! P
 
   let min_keys = Int32.sub min_children 1l
   let max_keys = Int32.(sub (mul min_children 2l) 1l)

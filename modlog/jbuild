@@ -3,8 +3,8 @@
 (library
  ((name modlog)
   (public_name modlog)
-  (libraries (modules datalog fmt rresult))))
-
+  (libraries (modules datalog fmt rresult))
+  (flags (:standard -w -49+44 -safe-string))))
 ; (menhir
 ;  ((merge_into parser)
 ;   (modules (datalog_grammar modules_grammar))))

@@ -5,4 +5,4 @@
   (public_name idealised_algol)
   (libraries  (fmt))
   (preprocess (pps (ppx_monoid)))
-  (flags (:standard -w -49 -safe-string))))
+  (flags (:standard -w -49+44 -safe-string))))

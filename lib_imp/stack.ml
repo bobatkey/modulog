@@ -11,7 +11,7 @@ module Make (S : Syntax.S) : sig
   val with_stack :
     int32 -> 'a typ -> 'b typ -> (('a,'b) stack_ops -> comm) -> comm
 end = struct
-  open S
+  open! S
 
   let incr i =
     i := i + const 1l
