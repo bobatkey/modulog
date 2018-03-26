@@ -253,12 +253,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Plain   : BL.handle -> value
     | Indexed : (module INDEXED_TABLE with type handle = 'h) * 'h -> value
 
-  module Env =
-    Map.Make
-      (struct
-        type t = Syntax.relvar
-        let compare = Pervasives.compare
-      end)
+  module Env = Map.Make (Syntax.RelVar)
 
   module LEnv = Map.Make (String)
 

@@ -3,6 +3,11 @@ type relvar =
   ; arity : int
   }
 
+module RelVar : sig
+  type t = relvar
+  val compare : t -> t -> int
+end
+
 type attr = string
 
 type scalar =

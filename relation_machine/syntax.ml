@@ -3,6 +3,11 @@ type relvar =
   ; arity : int
   }
 
+module RelVar = struct
+  type t = relvar
+  let compare = Pervasives.compare
+end
+
 type attr = string
 
 type scalar =
