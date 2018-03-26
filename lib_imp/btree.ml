@@ -21,11 +21,11 @@ module type S = sig
 
   type handle
 
-  val with_tree : (handle -> S.comm) -> S.comm
+  val declare : (handle -> S.comm) -> S.comm
 
-  val insert    : (key,[>`exp]) S.expr -> handle -> S.comm
+  val insert : (key,[>`exp]) S.expr -> handle -> S.comm
 
-  val ifmember  : (key,[>`exp]) S.expr -> handle -> S.comm -> S.comm -> S.comm
+  val ifmember : (key,[>`exp]) S.expr -> handle -> S.comm -> S.comm -> S.comm
 
   val ifmember_range :
     (key,[>`exp]) S.expr ->
@@ -109,7 +109,7 @@ module Make
     while_ true_ body
 
 
-  let with_tree body =
+  let declare body =
     alloc_node @@ fun x ->
     begin%monoid
       x#->leaf := true_;

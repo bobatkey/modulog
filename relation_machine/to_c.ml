@@ -136,7 +136,7 @@ struct
       if i = Array.length A.indexes then
         k (Array.of_list (List.rev l))
       else
-        BT.with_tree (fun v -> loop (i+1) (v::l))
+        BT.declare (fun v -> loop (i+1) (v::l))
     in
     loop 0 []
 
@@ -386,10 +386,8 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
       | Declare (vars, body) ->
          List.fold_right
-           (fun varnm k env ->
-              BL.declare
-                ~name:varnm.Syntax.ident
-                ~arity:varnm.Syntax.arity
+           (fun (Syntax.{ident;arity} as varnm) k env ->
+              BL.declare ~name:ident ~arity
                 (fun handle -> k (Env.add varnm (Plain handle) env)))
            vars
            (translate_comms body)
