@@ -1,454 +1,424 @@
-(* Plan:
-   1. Compute the indexes required for each idb and edb relvar
-      - make a separate btree for each index
-      - insertion inserts into all relevant btrees
-      - iteration and search uses the appropriate index
+module IntTupleKey (S : Idealised_algol.Syntax.S) (W : sig val width : int end) ()
+  : sig
+    include Idealised_algol.Btree.KEY with module S = S
 
-   2. Code generated:
+    val create : int S.exp array -> t S.exp
 
-      1. Load all the EDB relvars
-      2. Initialise all the IDB relvars
-      3. Translate all the commands (see below)
-      4. Output the intensional db to disk (all of it?)
+    val get    : t S.exp -> int -> int S.exp
+  end =
+struct
+  module S = S
 
-   3. For each command:
+  type key
+  type t = key S.structure
+  let t : t S.typ = S.structure "key"
+  let val_fields =
+    Array.init W.width (fun i -> S.field t (Printf.sprintf "x%d" i) S.int)
+  let () = S.seal t
 
-      a) WhileNotEmpty: a while loop
+  let create exps =
+    S.struct_const t (Array.to_list (Array.map (fun e -> S.Exp e) exps))
 
-      b) Insert (relvar, expr):
-           i) translate 'Select' into an iteration over the structure
-              (or an 'if' when there are no projections)
-          ii) translate 'Return' into an insertion
-              (with an 'if', if there is a guard)
+  let get x i =
+    let open! S in
+    x#.val_fields.(i)
 
-      d) Move { src; tgt }: assume that they are both flat, and do src := tgt; tgt := null;
+  let eq x y =
+    let rec loop i acc =
+      if i = W.width then
+        acc
+      else
+        loop (i+1)
+          (let open! S in
+           acc && x#.val_fields.(i) == y#.val_fields.(i))
+    in
+    loop 1
+      (let open! S in x#.val_fields.(0) == y#.val_fields.(0))
 
-      e) Declare (relvars, body): initialise several new 'flat' relvars
-*)
+  let le x y =
+    let rec loop i =
+      if i = W.width - 1 then
+        let open! S in
+        x#.val_fields.(i) <= y#.val_fields.(i)
+      else
+        let e = loop (i+1) in
+        let open! S in
+        x#.val_fields.(i) < y#.val_fields.(i)
+        || (x#.val_fields.(i) == y#.val_fields.(i) && e)
+    in
+    loop 0
 
-(* Environment provides access to:
-   - for each IDB predicate:
-     - an iterator (later, with search facilities)
-     - an insertion command
-     - a ismember predicate
-   - for each temporary predicate:
-     - an iterator
-     - an insertion command
-     - emptiness check
-     - a move operation (between predicates)
-*)
-
-type ze = Ze
-type 'n su = Su of 'n
-
-type 'n is_nat =
-  | Zero : ze is_nat
-  | Succ : 'n is_nat -> 'n su is_nat
-
-type nat = Nat : 'n is_nat -> nat [@ocaml.unboxed]
-
-let rec nat_of_int = function
-  | 0 ->
-     Nat Zero
-  | i when i > 0 ->
-     let Nat n = nat_of_int (i-1) in
-     Nat (Succ n)
-  | _ ->
-     invalid_arg "nat_of_int"
-
-let rec int_of_nat : type n. n is_nat -> int =
-  function
-    | Zero   -> 0
-    | Succ n -> 1 + int_of_nat n
-
-type ('a,'n) vec =
-  | Nil  : ('a,ze) vec
-  | Cons : 'a * ('a,'n) vec -> ('a,'n su) vec
-
-let rec list_of_vec : type a n. (a, n) vec -> a list =
-  function
-    | Nil -> []
-    | Cons (a, v) -> a :: list_of_vec v
-
-let rec vec_of_list : type a n. n is_nat -> a list -> (a, n) vec =
-  fun n xs -> match n, xs with
-    | Zero,   []    -> Nil
-    | Succ n, x::xs -> Cons (x, vec_of_list n xs)
-    | _ ->
-       invalid_arg "vec_of_list"
-
-let rec init_vec : type a n. n is_nat -> a -> (a, n) vec =
-  fun n x -> match n with
-    | Zero   -> Nil
-    | Succ n -> Cons (x, init_vec n x)
-
-module type BLOCK_LIST = sig
-  module IA : Idealised_algol.Syntax.S
-
-  type 'n handle
-
-  val arity : 'n handle -> 'n is_nat
-
-  val declare : name:string -> arity:'n is_nat -> ('n handle -> IA.comm) -> IA.comm
-
-  (* FIXME: these ought to have the same arity, but this is easier for
-     now *)
-  val move : src:'n handle -> tgt:'n2 handle -> IA.comm
-
-  val insert : 'n handle -> (int IA.exp, 'n) vec -> IA.comm
-
-  val iterate : 'n handle -> ((int IA.exp, 'n) vec -> IA.comm) -> IA.comm
-
-  val is_empty : 'n handle -> bool IA.exp
-
-  val print_out : string -> 'n handle -> IA.comm
-end
-
-module type B_TREE = sig
-  module S : Idealised_algol.Syntax.S
-
-  type 'n handle
-
-  val declare : 'n is_nat -> ('n handle -> S.comm) -> S.comm
-
-  val insert : 'n handle -> (int S.exp, 'n) vec -> S.comm
-
-  val iterate_range :
-    'n handle ->
-    start:(int S.exp, 'n) vec ->
-    stop:(int S.exp, 'n) vec ->
-    ((int S.exp, 'n) vec -> S.comm) ->
-    S.comm
+  let lt x y =
+    let rec loop i =
+      if i = W.width - 1 then
+        let open! S in
+        x#.val_fields.(i) < y#.val_fields.(i)
+      else
+        let e = loop (i+1) in
+        let open! S in
+        x#.val_fields.(i) < y#.val_fields.(i)
+        || (x#.val_fields.(i) == y#.val_fields.(i) && e)
+    in
+    loop 0
 end
 
 module type INDEXED_TABLE = sig
-  module IA : Idealised_algol.Syntax.S
+  module S : Idealised_algol.Syntax.S
 
-  type 'n handle
+  type handle
 
-  (* implement this as a collection of BTrees, one for each index
-     pattern.
+  val arity : int
 
-     'iterate' is given a pattern: find the index that has all the
-     fixed parts of this pattern as a prefix. 'ifmember' does the
-     same.
+  val declare : name:string -> (handle -> S.comm) -> S.comm
 
-     'insert' updates all the indexes.  *)
-
-  val arity : 'n handle -> 'n is_nat
-
-  (** The [indexes] argument ought to be a list of permutations of the
-      allowed slots. There will be one B-tree for each index. *)
-  val declare :
-    name:string ->
-    arity:'n is_nat ->
-    indexes:int array list -> (* ('n fin,'n) vec list *)
-    ('n handle -> IA.comm) ->
-    IA.comm
-
-  (** Given a pattern:
-      - find the index suitable for this query: it will contain all the fixed parts of the pattern as a prefix.
-      - reverse the index to correctly extract the attributes in the right order
-  *)
   val iterate :
-    'n handle ->
-    pat:([`Wild | `Fixed of int IA.exp], 'n) vec ->
-    ((int IA.exp, 'n) vec -> IA.comm) ->
-    IA.comm
+    handle ->
+    pat:[`Wild | `Fixed of int S.exp] array ->
+    (int S.exp array -> S.comm) ->
+    S.comm
 
-  (** Translate to insertion commands for each of the underlying
-      B-trees. *)
-  val insert :
-    'n handle ->
-    (int IA.exp, 'n) vec ->
-    IA.comm
+  val insert : handle -> int S.exp array -> S.comm
+
+  val ifmember_pat :
+    handle ->
+    pat:[`Wild | `Fixed of int S.exp] array ->
+    then_:S.comm ->
+    else_:S.comm ->
+    S.comm
 
   val ifmember :
-    'n handle ->
-    pat:([`Wild | `Fixed of int IA.exp], 'n) vec ->
-    IA.comm ->
-    IA.comm
-
-  (** All of the B-trees ought to be the same size, so we just check
-     if the first one is empty. *)
-  val is_empty : 'n handle -> bool IA.exp
+    handle ->
+    pat:int S.exp array ->
+    then_:S.comm ->
+    else_:S.comm ->
+    S.comm
 end
 
-module BL_Make (IA : Idealised_algol.Syntax.S) () : BLOCK_LIST with module IA = IA =
+module Make_Indexed_Table
+    (S : Idealised_algol.Syntax.S)
+    (A : sig
+       val arity : int
+       val indexes : int array array
+     end)
+    () : INDEXED_TABLE with module S = S =
 struct
-  module IA = IA
 
-  open IA
+  module S = S
 
-  let block_size = 16l
+  let _ =
+    assert (A.arity > 0);
+    assert (Array.length A.indexes > 0);
+    assert (Array.for_all (fun a -> Array.length a = A.arity) A.indexes)
 
-  type node
-  let node : node structure typ = structure "list_node"
-  let occupied = field node "occupied" int
-  let next     = field node "next" (ptr node)
-  let values   = field node "values" (array int 1l)
-  let ()       = seal node
+  let arity =
+    A.arity
 
-  type 'n handle =
-    { arity : 'n is_nat
-    ; var   : node structure ptr var
-    }
+  module Key =
+    IntTupleKey (S)
+      (struct let width = A.arity end)
+      ()
 
-  let arity handle =
-    handle.arity
+  module BT =
+    Idealised_algol.Btree.Make (S)
+      (struct let min_children = 16l end)
+      (Key)
+      ()
 
-  let is_empty { var } =
-    var =*= null
+  type handle = BT.tree_var array
 
-  let rec write : type n. int array var -> int exp -> (int exp, n) vec -> comm =
-    fun arr offset vals -> match vals with
-      | Nil ->
-         empty
-      | Cons (v, vs) ->
-         (arr#@(offset) := v) ^^ write arr (offset + const 1l) vs
+  let declare ~name k =
+    let rec loop i l =
+      if i = Array.length A.indexes then
+        k (Array.of_list (List.rev l))
+      else
+        BT.with_tree (fun v -> loop (i+1) (v::l))
+    in
+    loop 0 []
 
-  let move ~src:{var=src} ~tgt:{var=tgt} =
-    begin%monoid
-      tgt := src;
-      src := null
-    end
+  let conv_pattern pat =
+    Array.fold_left
+      (fun (i, l) p ->
+         (i+1,
+          match p with
+            | `Fixed _ -> i::l
+            | `Wild    -> l))
+      (0,[])
+      pat
+    |> snd
+    |> List.rev
+    |> Array.of_list
 
-  let new_block v ~arity ~vals ~next:nxt =
-    begin%monoid
-      let length = Int32.mul (Int32.of_int (int_of_nat arity)) block_size in
-      malloc_ext v node (const length) int;
-      v#->occupied := const 1l;
-      v#->next := nxt;
-      write (v#->values) (const 0l) vals
-    end
+  let is_prefix ar1 ar2 =
+    if Array.length ar1 > Array.length ar2 then false
+    else
+      let rec loop i =
+        if i = Array.length ar1 then true
+        else if ar1.(i) <> ar2.(i) then false
+        else loop (i+1)
+      in
+      loop 0
 
-  let insert { var; arity } vals =
-    if_ (var =*= null)
-      ~then_:begin%monoid
-        new_block var ~arity ~vals ~next:null
-      end
-      ~else_:begin%monoid
-        if_ (var#->occupied == const block_size)
-          ~then_:begin%monoid
-            declare ~name:"new_head" (ptr node) @@ fun new_head ->
-            begin%monoid
-              new_block new_head ~arity ~vals ~next:var;
-              var := new_head
-            end
-          end
-          ~else_:begin%monoid
-            write (var#->values)
-              (var#->occupied * const (Int32.of_int (int_of_nat arity))) vals;
-            var#->occupied := var#->occupied + const 1l
-          end
-      end
+  let find_handle prefix handles =
+    let rec loop i =
+      if i = Array.length handles then
+        failwith "Invalid search pattern"
+      else if is_prefix prefix A.indexes.(i) then
+        handles.(i), A.indexes.(i)
+      else
+        loop (i+1)
+    in
+    loop 0
 
-  let rec read : type n. int array var -> int exp -> n is_nat -> (int exp, n) vec =
-    fun arr idx n -> match n with
-      | Zero   -> Nil
-      | Succ n -> Cons (arr#@idx, read arr (idx + const 1l) n)
+  let invert perm =
+    let inv = Array.make (Array.length perm) 0 in
+    Array.iteri (fun i j -> inv.(j) <- i) perm;
+    inv
 
-  let iterate { var; arity } body =
-    declare ~name:"block_iterator" (ptr node) @@ fun node ->
-    begin%monoid
-      node := var;
+  let get_fixed = function
+    | `Fixed e -> e
+    | `Wild    -> assert false
 
-      while_ (node =!*= null) ~do_:begin%monoid
-        declare ~name:"i" int @@ fun i -> begin%monoid
-          i := const 0l;
+  let for_pattern h pat k =
+    let prefix_pat   = conv_pattern pat in
+    let handle, perm = find_handle prefix_pat h in
+    let perm_inv     = invert perm in
+    let minimum =
+      Key.create
+        (Array.init A.arity
+           (fun i ->
+              if i < Array.length prefix_pat then
+                get_fixed (pat.(prefix_pat.(i)))
+              else
+                S.const 0l))
+    in
+    let maximum =
+      Key.create
+        (Array.init A.arity
+           (fun i ->
+              if i < Array.length prefix_pat then
+                get_fixed (pat.(prefix_pat.(i)))
+              else
+                S.int_max))
+    in
+    k handle minimum maximum perm_inv
 
-          while_ (i < node#->occupied) ~do_:begin%monoid
-            body (read
-                    (node#->values)
-                    (i * const (Int32.of_int (int_of_nat arity)))
-                    arity);
-
-            i := i + const 1l;
-          end;
-
-          node := node#->next
+  let iterate h ~pat k =
+    for_pattern h pat begin fun tree minimum maximum perm_inv ->
+      BT.iterate_range
+        minimum maximum tree
+        begin fun key ->
+          k (Array.init A.arity (fun i -> Key.get key perm_inv.(i)))
         end
-      end
     end
 
-  let print_out nm hndl =
-    begin%monoid
-      print_str nm;
-      print_newline;
-      iterate hndl @@ fun attrs -> begin%monoid
-        print_str "   ";
-        attrs |> list_of_vec |> List.map (fun i -> begin%monoid
-              print_int i; print_str " "
-            end) |> List.fold_left (^^) empty;
-        print_newline
-      end
+  let ifmember_pat h ~pat ~then_ ~else_ =
+    for_pattern h pat begin fun tree minimum maximum _ ->
+      BT.ifmember_range
+        minimum maximum tree
+        then_
+        else_
     end
 
-  let declare ~name ~arity k =
-    declare ~name (ptr node) @@ fun var ->
-    begin%monoid
-      var := null;
-      k { arity; var };
-      declare ~name:"ahead" (ptr node) @@ fun ahead ->
-      while_ (var =!*= null) ~do_:begin%monoid
-        ahead := var#->next;
-        free var;
-        var := ahead
-      end
-    end
+  let ifmember h ~pat ~then_ ~else_ =
+    let perm = A.indexes.(0) in
+    let handle = h.(0) in
+    let key = Key.create (Array.init A.arity (fun i -> pat.(perm.(i)))) in
+    BT.ifmember key handle then_ else_
+
+  let insert h exps =
+    h
+    |> Array.mapi (fun i ->
+        BT.insert (Key.create (Array.map (fun j -> exps.(j)) A.indexes.(i))))
+    |> let open! S in Array.fold_left (^^) empty
 
 end
 
 module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
-  module BL = BL_Make (IA) ()
+  module BL = Idealised_algol.Block_list.Make (IA) ()
 
-  open Syntax
+  module type INDEXED_TABLE = INDEXED_TABLE with module S = IA
 
-  module Env = struct
-    include Map.Make
-        (struct
-          type t = Syntax.relvar
-          let compare = Pervasives.compare
-        end)
+  type value =
+    | Plain   : BL.handle -> value
+    | Indexed : (module INDEXED_TABLE with type handle = 'h) * 'h -> value
 
-    type value =
-      | Plain   : 'n BL.handle -> value
-      (* | Indexed : 'n Indx.handle -> value *)
-
-    let add nm handle env =
-      add nm (Plain handle) env
-  end
+  module Env =
+    Map.Make
+      (struct
+        type t = Syntax.relvar
+        let compare = Pervasives.compare
+      end)
 
   module LEnv = Map.Make (String)
 
   let rec and_list = function
-    | [] -> IA.true_
-    | [e] -> e
+    | []    -> IA.true_
+    | [e]   -> e
     | e::es -> IA.(&&) e (and_list es)
 
   let condition lenv exps = let open! IA in function
-    | (i, Syntax.Attr nm) -> List.nth exps i == LEnv.find nm lenv
-    | (i, Syntax.Lit j)   -> List.nth exps i == const j
+    | (i, Syntax.Attr nm) -> exps.(i) == LEnv.find nm lenv
+    | (i, Syntax.Lit j)   -> exps.(i) == const j
+
+  let exp_of_scalar lenv = function
+    | Syntax.Attr nm -> LEnv.find nm lenv
+    | Syntax.Lit j   -> IA.const j
+
+  let pattern_of_conditions arity lenv conditions =
+    let pat = Array.make arity `Wild in
+    List.iter
+      (fun (i, scalar) -> pat.(i) <- `Fixed (exp_of_scalar lenv scalar))
+      conditions;
+    pat
+
+  let print_exps exps =
+    let open! IA in
+    begin%monoid
+      IA.print_str "   ";
+      (exps
+       |> Array.map (fun e -> print_int e ^^ print_str " ")
+       |> Array.fold_left (^^) empty);
+      IA.print_newline
+    end
+
+  let projections_to_lenv projections attrs lenv =
+    List.fold_right
+      (fun (i, nm) -> LEnv.add nm attrs.(i))
+      projections
+      lenv
 
   let rec translate_expr expr env lenv k = match expr with
-    | Return { guard_relation; values } ->
-       let vals =
-         List.map (function Lit i   -> IA.const i
-                          | Attr nm -> LEnv.find nm lenv)
-           values
-       in
-       (* FIXME: check to see whether vals is in 'guard_relation' *)
+    | Syntax.Return { guard_relation=None; values } ->
+       let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
        k vals
 
-    | Select { relation; conditions=[]; projections; cont } ->
-       (match Env.find relation env with
-         | Env.Plain handle ->
-            BL.iterate handle @@ fun attrs ->
-            let attrs = list_of_vec attrs in
-            let lenv =
-              List.fold_right
-                (fun (i, nm) -> LEnv.add nm (List.nth attrs i))
-                projections
-                lenv
-            in
-            translate_expr cont env lenv k
-         (*| Env.Indexed handle ->
-            let pat = init_vec (Indx.arity handle) `Wild in
-            Indx.iterate handle ~pat @@ fun attrs ->
-            let attrs = list_of_vec attrs in
-            let lenv =
-              List.fold_right
-                (fun (i, nm) -> LEnv.add nm (List.nth attrs i))
-                projections
-                lenv
-            in
-            translate_expr cont env lenv k*))
+    | Syntax.Return { guard_relation=Some guard; values } ->
+       (let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
+        match Env.find guard env with
+          | Plain _ ->
+             failwith "plain relation used as a guard"
+          | Indexed (m, handle) ->
+             let module IT = (val m) in
+             IT.ifmember handle
+               ~pat:vals
+               ~then_:begin%monoid.IA
+                 (* IA.print_str "Not inserting:"; print_exps vals *)
+               end
+               ~else_:(k vals))
 
-    | Select { relation; conditions; projections; cont } ->
+    | Syntax.Select { relation; conditions; projections; cont } ->
        (match Env.find relation env with
-         | Env.Plain handle ->
+         | Plain handle ->
             BL.iterate handle @@ fun attrs ->
-            let attrs = list_of_vec attrs in
+            (* FIXME: optimise out the empty conditions case *)
             IA.ifthen (and_list (List.map (condition lenv attrs) conditions))
               ~then_:begin
-                let lenv =
-                  List.fold_right
-                    (fun (i, nm) -> LEnv.add nm (List.nth attrs i))
-                    projections
-                    lenv
-                in
-                translate_expr cont env lenv k
+                let lenv = projections_to_lenv projections attrs lenv in
+                begin%monoid.IA
+                  (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
+                  translate_expr cont env lenv k
+                end
               end
-         (*| Env.Indexed handle ->
-            let pat = assert false in
-            Indx.iterate handle ~pat @@ fun attrs ->
-            let attrs = list_of_vec attrs in
-            let lenv =
-              List.fold_right
-                (fun (i, nm) -> LEnv.add nm (List.nth attrs i))
-                projections
-                lenv
-            in
-            translate_expr cont env lenv k*) )
+         | Indexed (m, handle) ->
+            (let module IT = (val m) in
+             let pat = pattern_of_conditions IT.arity lenv conditions in
+             match projections with
+               | [] ->
+                  IT.ifmember_pat handle ~pat
+                    ~then_:(translate_expr cont env lenv k)
+                    ~else_:IA.empty
+               | projections ->
+                  IT.iterate handle ~pat @@ fun attrs -> begin%monoid.IA
+                    (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
+                    let lenv = projections_to_lenv projections attrs lenv in
+                    translate_expr cont env lenv k
+                  end))
+
+  let print_strln s =
+    let open! IA in
+    begin%monoid
+      print_str s;
+      print_newline
+    end
 
   let rec translate_comm comm env =
     match comm with
-      | WhileNotEmpty (vars, body) ->
+      | Syntax.WhileNotEmpty (vars, body) ->
          let check_empty nm =
            match Env.find nm env with
-             | Env.Plain handle -> BL.is_empty handle
-             (*| Env.Indexed handle -> Indx.is_empty handle*)
+             | Plain handle -> BL.is_empty handle
+             | Indexed _    -> failwith "emptiness test on an indexed table"
          in
-         IA.while_ (IA.not (and_list (List.map check_empty vars)))
-           ~do_:(translate_comms body env)
+         IA.while_
+           (IA.not (and_list (List.map check_empty vars)))
+           ~do_:begin%monoid.IA
+             (*print_strln "looping"; *)
+             translate_comms body env
+           end
 
       | Insert (relvar, expr) ->
-         (match Env.find relvar env with
-           | Env.Plain handle ->
-              translate_expr expr env LEnv.empty @@ fun vals ->
-              BL.insert handle (vec_of_list (BL.arity handle) vals)
-              (*| Env.Indexed handle ->
-                 translate_expr expr env LEnv.empty @@ fun vals ->
-                 Indx.insert handle (vec_of_list (Indx.arity handle) vals)*))
+         begin%monoid.IA
+           (*IA.print_str ("Inserting into: " ^ relvar.Syntax.ident);
+             IA.print_newline;*)
+           translate_expr expr env LEnv.empty @@ fun vals -> begin%monoid.IA
+             (* print_exps vals; *)
+             match Env.find relvar env with
+               | Plain handle ->
+                  BL.insert handle vals
+               | Indexed (m, handle) ->
+                  let module IT = (val m) in
+                  IT.insert handle vals
+           end
+         end
 
       | Declare (vars, body) ->
          List.fold_right
            (fun varnm k env ->
-              let Nat n = nat_of_int varnm.Syntax.arity in
               BL.declare
                 ~name:varnm.Syntax.ident
-                ~arity:n
-                (fun handle -> k (Env.add varnm handle env)))
+                ~arity:varnm.Syntax.arity
+                (fun handle -> k (Env.add varnm (Plain handle) env)))
            vars
            (translate_comms body)
            env
 
       | Move { src; tgt } ->
          (match Env.find src env, Env.find tgt env with
-           | Env.Plain src, Env.Plain tgt ->
+           | Plain src, Plain tgt ->
               BL.move ~src ~tgt
-              (*| _ ->
-                 failwith "Attempted move between indexed relations" *))
+           | _ ->
+              failwith "Attempted move between indexed relations")
 
   and translate_comms comms env =
     let open! IA in
     List.fold_left
       (fun code comm -> code ^^ translate_comm comm env)
-      IA.empty
+      empty
       comms
 
-  let translate_prog { idb_relvars; commands } =
+  let translate_prog (Syntax.{ idb_relvars; commands } as code) =
+    let indexes = Indexes.indexes code in
     List.fold_right
       (fun relvar k env ->
-         let Nat arity = nat_of_int relvar.Syntax.arity in
-         BL.declare
+         let module P = struct
+           let arity = relvar.Syntax.arity
+           let indexes =
+             try Array.of_list (List.assoc relvar indexes)
+             with Not_found -> [|Array.init arity (fun i -> i)|]
+         end in
+         let module IT = Make_Indexed_Table (IA) (P) () in
+         IT.declare
            ~name:relvar.Syntax.ident
-           ~arity
-         @@ fun handle -> begin%monoid.IA
-           k (Env.add relvar handle env);
-           BL.print_out relvar.Syntax.ident handle
-         end)
+           (fun handle ->
+              let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
+              let value = Indexed (m, handle) in
+              begin%monoid.IA
+                k (Env.add relvar value env);
+                IA.print_str relvar.Syntax.ident;
+                IA.print_newline;
+                IT.iterate handle ~pat:(Array.make IT.arity `Wild) print_exps
+              end))
       idb_relvars
       (translate_comms commands)
       Env.empty
@@ -458,7 +428,22 @@ module C          = Idealised_algol.C.C ()
 module Translator = Gen (C) ()
 
 let translate program =
-  let stmts = C.gen (Translator.translate_prog program) in
+  let comm    = Translator.translate_prog program in
+  let stmts   = C.gen comm in
+  let structs = C.struct_decls () in
   Format.set_margin 300;
   Format.set_max_indent 280;
-  Idealised_algol.C.PP.pp_stmts Format.std_formatter stmts
+  Format.open_vbox 0;
+  Format.printf "#include <stdlib.h>@,";
+  Format.printf "#include <stdio.h>@,";
+  Format.printf "#include <stdbool.h>@,";
+  Format.printf "#include <limits.h>@,@,";
+  structs |> List.iter begin fun struct_decl ->
+    Idealised_algol.C.PP.pp_struct_decl Format.std_formatter struct_decl;
+    Format.print_cut ()
+  end;
+  Format.print_cut ();
+  Format.printf "@[<v 4>int main(int argc, char **argv) {@ ";
+  Idealised_algol.C.PP.pp_stmts Format.std_formatter stmts;
+  Format.printf "@]@,}@,";
+  Format.close_box ()

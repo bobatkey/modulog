@@ -39,11 +39,11 @@ module type S = sig
 
   (** {3 Boolean expressions} *)
 
-  val true_  : (bool, [`exp]) expr
-  val false_ : (bool, [`exp]) expr
-  val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> (bool, [`exp]) expr
-  val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> (bool, [`exp]) expr
-  val not    : (bool, [>`exp]) expr -> (bool, [>`exp]) expr
+  val true_  : bool exp
+  val false_ : bool exp
+  val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+  val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+  val not    : (bool, [>`exp]) expr -> bool exp
 
   (** {3 Integer expressions} *)
 
@@ -57,6 +57,17 @@ module type S = sig
   val ( + ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
   val ( * ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
   val ( - ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
+  val int_max : int exp
+
+  (** {3 Structs} *)
+
+  (** Structure field access. *)
+  val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+
+  type exp_box = Exp : 'a exp -> exp_box
+
+  (** Structure literals. *)
+  val struct_const : 's structure typ -> exp_box list -> 's structure exp
 
   (** {3 Pointer expressions *)
 
@@ -74,9 +85,6 @@ module type S = sig
 
   (** Array indexing. *)
   val (#@) : ('a array, [>`exp]) expr -> (int, [>`exp]) expr -> ('a,[<`exp|`var]) expr
-
-  (** Structure field access. *)
-  val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
 
   (** Combined pointer dereference and structure field access. *)
   val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr

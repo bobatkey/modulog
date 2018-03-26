@@ -21,7 +21,17 @@ type 'a typ =
   | Struct  : string -> 'a structure typ
 
 type c_type =
-  | A_type : 'a typ -> c_type
+  | Some_type : 'a typ -> c_type
+
+type structure_field =
+  | StructField : { fld_name : string; fld_type : 'a typ } -> structure_field
+
+type structure_desc =
+  { name   : string
+  ; fields : structure_field list
+  }
+
+
 
 type binop =
   | Plus
@@ -70,7 +80,9 @@ type c_exp =
 
   | BoolLit of bool
   | IntLit of int32
+  | IntMax
   | StrLit of string
+  | StructLit of string * c_exp list
 
   | Binop of c_exp * binop * c_exp
   | Unop  of unop * c_exp
@@ -128,6 +140,20 @@ module PP = struct
     pp_typ (fun l fmt -> Format.pp_print_string fmt ident) fmt typ;
     Format.pp_print_string fmt ";"
 
+  let pp_struct_decl fmt { name; fields } =
+    Format.fprintf fmt "@[<v>@[<v 4>struct %s {@ " name;
+    let rec loop = function
+      | [] -> ()
+      | [StructField { fld_name; fld_type }] ->
+         pp_decl fmt (fld_type, fld_name)
+      | StructField { fld_name; fld_type } :: fields ->
+         pp_decl fmt (fld_type, fld_name);
+         Format.pp_print_cut fmt ();
+         loop fields
+    in
+    loop fields;
+    Format.fprintf fmt "@]@,};@]"
+
   let pp_typename fmt typ =
     pp_typ (fun l fmt -> ()) fmt typ
 
@@ -142,8 +168,15 @@ module PP = struct
          (pp_expr level) e2
     | IntLit i ->
        Format.fprintf fmt "%ld" i
+    | IntMax ->
+       Format.pp_print_string fmt "INT_MAX"
     | BoolLit b ->
        Format.fprintf fmt "%b" b
+    | StructLit (name, exps) ->
+       Format.fprintf fmt
+         "(struct %s){ @[<hv>%a@] }"
+         name
+         Fmt.(list ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
     | Var vnm ->
        Format.pp_print_string fmt vnm
     | Field (Deref expr, fnm) ->
@@ -278,13 +311,13 @@ module PP = struct
          Fmt.(list ~sep:(Fmt.always ",@ ") pp_expr) exps
 
   let pp_arg_decls =
-    let pp_arg_decl fmt (A_type ty, ident) =
+    let pp_arg_decl fmt (Some_type ty, ident) =
       pp_decl fmt (ty, ident)
     in
     Fmt.(list ~sep:(Fmt.always ", ") pp_arg_decl)
 
   let pp_fundecl fmt { return_type; name; arg_decls; body } =
-    let A_type return_type = return_type in
+    let Some_type return_type = return_type in
     Format.fprintf fmt
       "@[<v 0>]%a %s(%a)@,@[<v 5>{@,%a@]@,}@]"
       pp_typename return_type
@@ -294,7 +327,9 @@ module PP = struct
 end
 
 module C () : sig
-  include Syntax.S with type ('a,'b) expr = c_exp
+  include Syntax.S (* with type ('a,'b) expr = c_exp *)
+
+  val struct_decls : unit -> structure_desc list
 
   val gen : comm -> block_stmt list
 end = struct
@@ -320,17 +355,18 @@ end = struct
 
   type ('s,'a) field = string
 
-  (* FIXME: keep a record of each structure type, and generate the
-     appropriate decls when asked to. *)
-  type structure_field =
-    | StructField : { fld_name : string; fld_type : 'a typ } -> structure_field
-
   let structures : (string, structure_field list) Hashtbl.t =
     Hashtbl.create 12
+  let structures_ordered =
+    ref []
+
+  let struct_decls () =
+    List.rev_map (fun name -> { name; fields = Hashtbl.find structures name }) !structures_ordered
 
   let structure name =
     let name = Name_freshener.fresh_for (Hashtbl.mem structures) name in
     Hashtbl.add structures name [];
+    structures_ordered := name :: !structures_ordered;
     Struct name
 
   let field (Struct name) fname typ =
@@ -349,16 +385,6 @@ end = struct
   let seal (Struct name) =
     (* FIXME: do something here -- mark this structure as finished. *)
     ()
-
-(*
-  type (_,_) arg_spec =
-    | Arg : 'a typ * ('r,'s) arg_spec -> ('a exp -> 'r,'a var -> 's) arg_spec
-    | End : (comm, comm) arg_spec
-*)
-
-  (* type 'a arg_spec = *)
-  (*   | Return : comm arg_spec *)
-  (*   | Arg    : 'a typ * 'b arg_spec -> ('a var -> 'b) arg_spec *)
 
   let true_ = BoolLit true
   let false_ = BoolLit false
@@ -428,6 +454,11 @@ end = struct
   let (#.) struct_exp field =
     Field (struct_exp, field)
 
+  type exp_box = Exp : 'a exp -> exp_box
+
+  let struct_const (Struct name) exps =
+    StructLit (name, List.map (fun (Exp e) -> (e : c_exp)) exps)
+
   let (#->) struct_ptr_exp field =
     Field (Deref struct_ptr_exp, field)
 
@@ -441,6 +472,7 @@ end = struct
   let ( +  ) e1 e2 = Binop (e1, Plus, e2)
   let ( *  ) e1 e2 = Binop (e1, Mult, e2)
   let ( -  ) e1 e2 = Binop (e1, Sub, e2)
+  let int_max = IntMax
 
   let ( =*= ) e1 e2 = Binop (e1, Eq, e2)
   let ( =!*= ) e1 e2 = Binop (e1, Ne, e2)
@@ -453,5 +485,5 @@ end = struct
     `Open [Statement (Call ("printf", [StrLit "\n"]))]
 
   let print_str str ng =
-    `Open [Statement (Call ("printf", [StrLit "%s"; StrLit str]))]
+    `Open [Statement (Call ("fputs", [StrLit str; Var "stdout"]))]
 end
