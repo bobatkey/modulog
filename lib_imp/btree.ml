@@ -176,7 +176,7 @@ module Make
 
         body x#->keys#@i;
 
-        if_ (i == x#->nkeys)
+        if_ (i == x#->nkeys - const 1l)
           ~then_:pop
           ~else_:(incr (snd top));
 
@@ -184,7 +184,7 @@ module Make
 
         while_ (not x#->leaf)
           ~do_:begin%monoid
-            pop;
+            push x (const 0l);
             x := x#-> children#@(const 0l)
           end;
 
