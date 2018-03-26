@@ -1,13 +1,9 @@
-module Make (S : Syntax.S) () : sig
+module type S = sig
+  module S : Syntax.S
+
   type handle
 
-  (*   val arity : handle -> int *)
-
-  val declare :
-    name:string ->
-    arity:int ->
-    (handle -> S.comm) ->
-    S.comm
+  val declare : name:string -> arity:int -> (handle -> S.comm) -> S.comm
 
   (** the two handles ought to have the same arity *)
   val move : src:handle -> tgt:handle -> S.comm
@@ -18,9 +14,11 @@ module Make (S : Syntax.S) () : sig
   val is_empty : handle -> bool S.exp
 
   val iterate : handle -> (int S.exp array -> S.comm) -> S.comm
+end
 
-  val print_out : string -> handle -> S.comm
-end = struct
+module Make (S : Syntax.S) () : S with module S = S = struct
+  module S = S
+
   open! S
 
   let block_size = 16l
@@ -109,19 +107,6 @@ end = struct
         end;
 
         node := node#->next
-      end
-    end
-
-  let print_out nm hndl =
-    begin%monoid
-      print_str nm;
-      print_newline;
-      iterate hndl @@ fun attrs -> begin%monoid
-        print_str "   ";
-        attrs |> Array.map (fun i -> begin%monoid
-              print_int i; print_str " "
-            end) |> Array.fold_left (^^) empty;
-        print_newline
       end
     end
 
