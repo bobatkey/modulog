@@ -77,6 +77,11 @@ module type INDEXED_TABLE = sig
     (int S.exp array -> S.comm) ->
     S.comm
 
+  val iterate_all :
+    handle ->
+    (int S.exp array -> S.comm) ->
+    S.comm
+
   val insert : handle -> int S.exp array -> S.comm
 
   val ifmember_pat :
@@ -124,7 +129,7 @@ struct
       (Key)
       ()
 
-  type handle = BT.tree_var array
+  type handle = BT.handle array
 
   let declare ~name k =
     let rec loop i l =
@@ -225,6 +230,11 @@ struct
     let key = Key.create (Array.init A.arity (fun i -> pat.(perm.(i)))) in
     BT.ifmember key handle then_ else_
 
+  let iterate_all h k =
+    let perm_inv = invert A.indexes.(0) in
+    let handle = h.(0) in
+    BT.iterate_all handle (fun key -> k (Array.init A.arity (fun i -> Key.get key perm_inv.(i))))
+
   let insert h exps =
     h
     |> Array.mapi (fun i ->
@@ -310,16 +320,18 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Syntax.Select { relation; conditions; projections; cont } ->
        (match Env.find relation env with
          | Plain handle ->
-            BL.iterate handle @@ fun attrs ->
-            (* FIXME: optimise out the empty conditions case *)
-            IA.ifthen (and_list (List.map (condition lenv attrs) conditions))
-              ~then_:begin
-                let lenv = projections_to_lenv projections attrs lenv in
-                begin%monoid.IA
-                  (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
-                  translate_expr cont env lenv k
-                end
-              end
+            (BL.iterate handle @@ fun attrs ->
+             let body = begin%monoid.IA
+               let lenv = projections_to_lenv projections attrs lenv in
+               (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
+               translate_expr cont env lenv k
+               end
+             in
+             match conditions with
+               | [] -> body
+               | _  ->
+                  IA.ifthen (and_list (List.map (condition lenv attrs) conditions))
+                    ~then_:body)
          | Indexed (m, handle) ->
             (let module IT = (val m) in
              let pat = pattern_of_conditions IT.arity lenv conditions in
@@ -417,7 +429,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
                 k (Env.add relvar value env);
                 IA.print_str relvar.Syntax.ident;
                 IA.print_newline;
-                IT.iterate handle ~pat:(Array.make IT.arity `Wild) print_exps
+                IT.iterate_all handle print_exps
               end))
       idb_relvars
       (translate_comms commands)
