@@ -1,5 +1,5 @@
 %{
-open Syntax.Core
+open! Syntax.Core
 open Syntax.Mod
 %}
 
