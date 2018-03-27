@@ -13,7 +13,7 @@ module RelvarSet  = struct
 end
 
 module AttrSet =
-  (Set.Make (String) : Set.S with type elt = attr)
+  (Set.Make (Attr) : Set.S with type elt = attr)
 
 
 let scalar_of_expr = function

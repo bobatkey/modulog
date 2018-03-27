@@ -10,6 +10,11 @@ end
 
 type attr = string
 
+module Attr : sig
+  type t = attr
+  val compare : t -> t -> int
+end
+
 type scalar =
   | Attr of attr
   | Lit  of int32

@@ -10,6 +10,11 @@ end
 
 type attr = string
 
+module Attr = struct
+  type t = attr
+  let compare = Pervasives.compare
+end
+
 type scalar =
   | Attr of attr
   | Lit  of int32
