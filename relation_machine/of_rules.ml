@@ -3,11 +3,7 @@ module Ruleset = Datalog.Ruleset
 open Syntax
 
 module RelvarSet  = struct
-  module Relvar = struct
-    type t = relvar
-    let compare = compare
-  end
-  include (Set.Make (Relvar) : Set.S with type elt = relvar)
+  include (Set.Make (RelVar) : Set.S with type elt = relvar)
 
   let map_to_list f set =
     fold (fun x -> List.cons (f x)) set []
