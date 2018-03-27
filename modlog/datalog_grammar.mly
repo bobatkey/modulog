@@ -7,7 +7,7 @@ open Syntax.Mod
 %token COLON_DASH
 %token COLON
 %token STAR DOT ARROW EQUALS BAR UNDERSCORE
-%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEFINE CONSTANT WITH
+%token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEFINE CONSTANT WITH EXTERNAL
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
 %token<string> IDENT ENUM_IDENT MV_IDENT
@@ -95,6 +95,11 @@ str_value:
                   ; const_type = ty
                   ; const_expr = e
                   } }
+| EXTERNAL; name=IDENT; COLON; types=predicate_type
+    { External { external_loc = Location.mk $startpos $endpos
+               ; external_name = name
+               ; external_type = types
+               } }
 
 /* types */
 

@@ -122,12 +122,54 @@ let rec eval_comm rel_env = function
 and eval_comms rel_env comms =
   List.iter (eval_comm rel_env) comms
 
+let read_line arity line =
+  let attrs = Array.make arity 0l in
+  let rec read field_idx acc i =
+    if field_idx >= arity then
+      failwith "Too many fields";
+    if i = String.length line then
+      (attrs.(field_idx) <- acc;
+       attrs)
+    else match line.[i] with
+      | ',' ->
+         attrs.(field_idx) <- acc;
+         read (field_idx+1) 0l (i+1)
+      | '0' .. '9' as c ->
+         let d = Int32.of_int (Char.code c - Char.code '0') in
+         read field_idx Int32.(add (mul acc 10l) d) (i+1)
+      | c ->
+         failwith "Unrecognised character"
+  in
+  read 0 0l 0
+
+let load_csv_file filename arity =
+  let ch  = open_in filename in
+  let rel = Relation.create 128 in
+  let rec loop () =
+    match input_line ch with
+      | exception End_of_file -> ()
+      | line ->
+         let tuple = read_line arity line in
+         Relation.add rel tuple;
+         loop ()
+  in
+  try loop (); close_in ch; rel
+  with e -> close_in ch; raise e
 
 let eval {edb_relvars; idb_relvars; commands} =
+  let rel_env = Env.empty in
+  let rel_env =
+    List.fold_left
+      (fun rel_env nm ->
+         let rel = load_csv_file (nm.ident ^ ".csv") nm.arity in
+         Env.add nm rel rel_env)
+      rel_env
+      edb_relvars
+  in
   let rel_env =
     List.fold_left
       (fun rel_env nm -> Env.add nm (Relation.create 128) rel_env)
-      Env.empty
+      rel_env
       idb_relvars
   in
   eval_comms rel_env commands;

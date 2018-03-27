@@ -13,6 +13,7 @@ rule token = parse
 | "."        { DOT }
 | "->"       { ARROW }
 | "="        { EQUALS }
+| "external" { EXTERNAL }
 | "module"   { MODULE }
 | "type"     { TYPE }
 | "struct"   { STRUCT }

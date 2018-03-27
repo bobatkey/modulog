@@ -121,9 +121,9 @@ and pp_comms fmt = function
 
 let pp_program fmt {edb_relvars; idb_relvars; commands} =
   let pp_relvar_decl typ fmt nm =
-    Format.fprintf fmt "%s %a" typ pp_relvar nm
+    Format.fprintf fmt "%s %a@," typ pp_relvar nm
   in
-  Format.fprintf fmt "@[<v>%a%a@,@,%a@]"
-    Fmt.(list (pp_relvar_decl "ext")) edb_relvars
-    Fmt.(list (pp_relvar_decl "int")) idb_relvars
-    pp_comms                          commands
+  Format.fprintf fmt "@[<v>%a%a@,%a@]"
+    Fmt.(list ~sep:(always "") (pp_relvar_decl "ext")) edb_relvars
+    Fmt.(list ~sep:(always "") (pp_relvar_decl "int")) idb_relvars
+    pp_comms                                           commands

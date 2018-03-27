@@ -368,6 +368,15 @@ module Core_typing = struct
             , List.map (fun (id, ty) -> (id, Core.Predicate ty)) idents
             )
 
+      | Src.(External { external_loc; external_name; external_type }) ->
+         check_predtype env external_type >>= fun external_type ->
+         let external_name = Modules.Ident.create external_name in
+         Ok ( Core.(External { external_loc
+                             ; external_name
+                             ; external_type })
+            , [ external_name, Core.Predicate external_type ]
+            )
+
       | Src.(ConstantDef { const_loc; const_name; const_type; const_expr }) ->
          check_deftype env () const_type >>= fun typ ->
          type_expr env LocalEnv.empty typ const_expr >>= fun (expr, _) ->
@@ -377,6 +386,7 @@ module Core_typing = struct
                                 ; const_type = typ
                                 ; const_expr = expr
                                 })
+            (* FIXME: should this be 'name'? *)
             , [ Modules.Ident.create const_name, Core.Value typ ]
             )
 

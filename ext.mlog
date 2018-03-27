@@ -1,0 +1,8 @@
+type vertex = int
+
+external edge : vertex * vertex
+
+define
+  path : vertex * vertex
+  path(?X,?Y) :- edge(?X,?Y)
+  path(?X,?Z) :- path(?X,?Y), edge(?Y, ?Z)

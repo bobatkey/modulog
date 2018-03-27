@@ -101,7 +101,14 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     ; const_expr : expr
     }
 
+  type external_decl =
+    { external_loc  : Location.t
+    ; external_name : Names.ident
+    ; external_type : predicate_type
+    }
+
   type term =
+    | External      of external_decl
     | PredicateDefs of declaration list
     | ConstantDef   of constant_def
 
@@ -187,7 +194,13 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       pp_domaintype  const_type
       pp_expr        const_expr
 
+  let pp_ext_decl fmt { external_name; external_type } =
+    Format.fprintf fmt "external %a : @[<h>%a@]@,"
+      Names.pp_ident external_name
+      pp_domaintypes external_type.predty_data
+
   let pp_term fmt = function
+    | External ext_decl  -> pp_ext_decl fmt ext_decl
     | PredicateDefs defs -> pp_pred_defs fmt defs
     | ConstantDef c      -> pp_constant_def fmt c
 

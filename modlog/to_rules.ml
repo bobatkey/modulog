@@ -157,10 +157,20 @@ module Eval = struct
       in
       bindings, rules
 
+    let eval_external env { external_name; external_type } rules =
+      let ident     = Modules.Ident.name external_name in
+      let decl_type = List.map (eval_type env ()) external_type.predty_data in
+      let arity     = arity_of_decl_type decl_type in
+      let name      = RS.Builder.freshen_name RS.{ident;arity} rules in
+      [ (external_name, Val_predicate (name, decl_type)) ],
+      ignore_builder_error (RS.Builder.add_edb_predicate name rules)
+
     let eval_term env term rules =
       match term with
         | PredicateDefs defs ->
            eval_predicate env defs rules
+        | External ext ->
+           eval_external env ext rules
         | ConstantDef {const_name;const_expr} ->
            [ (const_name, Val_const const_expr) ],
            rules
