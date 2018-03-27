@@ -201,42 +201,44 @@ module Make
   let iterate_all tree body =
     with_nodeptr tree @@ fun x ->
     Stk.with_stack max_stack_depth (ptr node) int @@
-    fun Stk.{push;pop;top;is_empty} ->
-    with_int @@ fun i ->
-    begin%monoid
+    fun Stk.{push;pop;top;is_empty} -> begin%monoid
       while_ (not x#->leaf)
         ~do_:begin%monoid
           push x (const 0l);
           x := x#->children#@(const 0l)
         end;
-      loop begin%monoid
-        while_ (i < x#->nkeys)
-          ~do_:begin%monoid
-            body x#->keys#@i;
-            incr i
-          end;
-
-        ifthen is_empty
-          ~then_:break;
-
-        x := fst top;
-        i := snd top;
-
-        body x#->keys#@i;
-
-        if_ (i == x#->nkeys - const 1l)
-          ~then_:pop
-          ~else_:(incr (snd top));
-
-        x := x#->children#@(i + const 1l);
-
-        while_ (not x#->leaf)
-          ~do_:begin%monoid
-            push x (const 0l);
-            x := x#->children#@(const 0l)
-          end;
-
+      with_int @@ fun i -> begin%monoid
         i := const 0l;
+
+        loop begin%monoid
+          while_ (i < x#->nkeys)
+            ~do_:begin%monoid
+              body x#->keys#@i;
+              incr i
+            end;
+
+          ifthen is_empty
+            ~then_:break;
+
+          x := fst top;
+          i := snd top;
+
+          body x#->keys#@i;
+
+          if_ (i == x#->nkeys - const 1l)
+            ~then_:pop
+            ~else_:(incr (snd top));
+
+          x := x#->children#@(i + const 1l);
+
+          while_ (not x#->leaf)
+            ~do_:begin%monoid
+              push x (const 0l);
+              x := x#->children#@(const 0l)
+            end;
+
+          i := const 0l;
+        end
       end
     end
 
