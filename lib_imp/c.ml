@@ -559,3 +559,31 @@ end = struct
   let print_str str ng =
     `Open [Statement (Call ("fputs", [StrLit str; Var "stdout"]))]
 end
+
+let output f x fmt =
+  let module C = C () in
+  let main_comm = f.Syntax.generate (module C) x in
+  let stmts   = C.gen main_comm in
+  let structs = C.struct_decls () in
+  let funcs   = C.fun_decls () in
+  Format.pp_set_margin fmt 300;
+  Format.pp_set_max_indent fmt 280;
+  Format.pp_open_vbox fmt 0;
+  Format.fprintf fmt "#include <stdlib.h>@,";
+  Format.fprintf fmt "#include <stdio.h>@,";
+  Format.fprintf fmt "#include <stdbool.h>@,";
+  Format.fprintf fmt "#include <limits.h>@,@,";
+  structs |> List.iter begin fun struct_decl ->
+    PP.pp_struct_decl fmt struct_decl;
+    Format.pp_print_cut fmt ()
+  end;
+  Format.pp_print_cut fmt ();
+  funcs |> List.iter begin fun fun_decl ->
+    PP.pp_fundecl fmt fun_decl;
+    Format.pp_print_cut fmt ();
+    Format.pp_print_cut fmt ();
+  end;
+  Format.fprintf fmt "@[<v 4>int main(int argc, char **argv) {@ ";
+  PP.pp_stmts fmt stmts;
+  Format.fprintf fmt "@]@,}@,";
+  Format.pp_close_box fmt ()

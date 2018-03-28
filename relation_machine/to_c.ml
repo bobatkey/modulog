@@ -431,33 +431,12 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       Env.empty
 end
 
-module C          = Idealised_algol.C.C ()
-module Translator = Gen (C) ()
-
+let generator (type comm)
+    (module IA : Idealised_algol.Syntax.S with type comm = comm)
+    program =
+  let module T = Gen (IA) () in
+  T.translate_prog program
 
 let translate program =
-  let comm    = Translator.translate_prog program in
-  let stmts   = C.gen comm in
-  let structs = C.struct_decls () in
-  let funcs   = C.fun_decls () in
-  Format.set_margin 300;
-  Format.set_max_indent 280;
-  Format.open_vbox 0;
-  Format.printf "#include <stdlib.h>@,";
-  Format.printf "#include <stdio.h>@,";
-  Format.printf "#include <stdbool.h>@,";
-  Format.printf "#include <limits.h>@,@,";
-  structs |> List.iter begin fun struct_decl ->
-    Idealised_algol.C.PP.pp_struct_decl Format.std_formatter struct_decl;
-    Format.print_cut ()
-  end;
-  Format.print_cut ();
-  funcs |> List.iter begin fun fun_decl ->
-    Idealised_algol.C.PP.pp_fundecl Format.std_formatter fun_decl;
-    Format.print_cut ();
-    Format.print_cut ();
-  end;
-  Format.printf "@[<v 4>int main(int argc, char **argv) {@ ";
-  Idealised_algol.C.PP.pp_stmts Format.std_formatter stmts;
-  Format.printf "@]@,}@,";
-  Format.close_box ()
+  let open! Idealised_algol in
+  C.output { Syntax.generate = generator } program Format.std_formatter

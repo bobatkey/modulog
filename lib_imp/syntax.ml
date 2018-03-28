@@ -104,7 +104,7 @@ module type S = sig
   val (^^) : comm -> comm -> comm
 
   (** Assignment *)
-  val (:=) : ('a,[`exp|`var]) expr -> ('a,[>`exp]) expr -> comm
+  val (:=) : 'a var -> ('a,[>`exp]) expr -> comm
 
   (** While loops. *)
   val while_ : bool exp -> do_:comm -> comm
@@ -119,14 +119,14 @@ module type S = sig
   val ifthen : (bool, [>`exp]) expr -> then_:comm -> comm
 
   (** Declare a new variable. Takes an optional name hint. *)
-  val declare : ?name:string -> 'a typ -> (('a,[`exp|`var]) expr -> comm) -> comm
+  val declare : ?name:string -> 'a typ -> ('a var -> comm) -> comm
 
   (** Heap allocate some memory to hold values of a given type. *)
-  val malloc : ('a ptr, [`exp|`var]) expr -> 'a typ -> comm
+  val malloc : 'a ptr var -> 'a typ -> comm
 
   (** Heap allocate some memory to holds values of a given type, and
       dynamically some extra memory. *)
-  val malloc_ext : ('a ptr, [`exp|`var]) expr -> 'a typ -> (int,[>`exp]) expr -> _ typ -> comm
+  val malloc_ext : 'a ptr var -> 'a typ -> (int,[>`exp]) expr -> _ typ -> comm
   (* TODO: distinguish arbitrary length from fixed length structures somehow. *)
 
   (** Free heap allocated memory. *)
@@ -146,8 +146,13 @@ module type S = sig
   type 'a arg_spec
 
   val return_void : comm arg_spec
+
   val (@->) : string * 'a typ -> 'b arg_spec -> ('a exp -> 'b) arg_spec
+
   val (@&->) : string * 'a typ -> 'b arg_spec -> ('a var -> 'b) arg_spec
 
   val declare_func : name:string -> typ:'t arg_spec -> body:'t -> 't
 end
+
+type 'a program =
+  { generate : 'comm. (module S with type comm = 'comm) -> 'a -> 'comm }
