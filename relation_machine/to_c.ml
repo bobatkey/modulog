@@ -432,10 +432,12 @@ end
 module C          = Idealised_algol.C.C ()
 module Translator = Gen (C) ()
 
+
 let translate program =
   let comm    = Translator.translate_prog program in
   let stmts   = C.gen comm in
   let structs = C.struct_decls () in
+  let funcs   = C.fun_decls () in
   Format.set_margin 300;
   Format.set_max_indent 280;
   Format.open_vbox 0;
@@ -448,6 +450,11 @@ let translate program =
     Format.print_cut ()
   end;
   Format.print_cut ();
+  funcs |> List.iter begin fun fun_decl ->
+    Idealised_algol.C.PP.pp_fundecl Format.std_formatter fun_decl;
+    Format.print_cut ();
+    Format.print_cut ();
+  end;
   Format.printf "@[<v 4>int main(int argc, char **argv) {@ ";
   Idealised_algol.C.PP.pp_stmts Format.std_formatter stmts;
   Format.printf "@]@,}@,";

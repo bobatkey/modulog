@@ -1,13 +1,6 @@
 (* TODO
    - Improve name generation
-   - Generation of struct decalarations
-   - Generation of complete function declarations (and calls?)
-
-   To be able to generate code for the Btrees:
-   - a thing to turn a command into a function
-   - to be able to use that function in later code (i.e., we get a new 'primitive')
 *)
-
 
 type _ ptr = Ptr
 type _ array = Array
@@ -90,6 +83,7 @@ type c_exp =
   | Deref of c_exp
   | Field of c_exp * string
   | Idx   of c_exp * c_exp
+  | AddrOf of c_exp
 
 type stmt =
   | Assign  of c_exp * c_exp
@@ -107,8 +101,8 @@ and block_stmt =
   | Statement   : stmt            -> block_stmt
 
 type fundecl =
-  { return_type : c_type
-  ; name        : string
+  { (*return_type : c_type
+      ; *)name        : string
   ; arg_decls   : (c_type * string) list
   ; body        : block_stmt list
   }
@@ -137,17 +131,18 @@ module PP = struct
            typ
 
   let pp_decl fmt (typ, ident) =
-    pp_typ (fun l fmt -> Format.pp_print_string fmt ident) fmt typ;
-    Format.pp_print_string fmt ";"
+    pp_typ (fun l fmt -> Format.pp_print_string fmt ident) fmt typ
 
   let pp_struct_decl fmt { name; fields } =
     Format.fprintf fmt "@[<v>@[<v 4>struct %s {@ " name;
     let rec loop = function
       | [] -> ()
       | [StructField { fld_name; fld_type }] ->
-         pp_decl fmt (fld_type, fld_name)
+         pp_decl fmt (fld_type, fld_name);
+         Format.pp_print_string fmt ";"
       | StructField { fld_name; fld_type } :: fields ->
          pp_decl fmt (fld_type, fld_name);
+         Format.pp_print_string fmt ";";
          Format.pp_print_cut fmt ();
          loop fields
     in
@@ -158,6 +153,14 @@ module PP = struct
     pp_typ (fun l fmt -> ()) fmt typ
 
   let rec pp_expr prec fmt = function
+    | Binop (e1, (LAnd | LOr as op), e2) ->
+       (* Special case these because GCC complains about parens in mixed &&, || expressions *)
+       let level = prec_of_binop op in
+       Format.fprintf fmt
+         "(%a@ %s %a)"
+         (pp_expr (level-1)) e1
+         (str_of_binop op)
+         (pp_expr level) e2
     | Binop (e1, op, e2) ->
        let level = prec_of_binop op in
        let s     = str_of_binop op in
@@ -190,6 +193,9 @@ module PP = struct
          Format.fprintf fmt "(*%a)" (pp_expr 2) expr
        else
          Format.fprintf fmt "*%a" (pp_expr 2) expr
+    | AddrOf expr ->
+       (* FIXME: look up the precedence *)
+       Format.fprintf fmt "(&%a)" (pp_expr 2) expr
     | Unop (Neg, expr) ->
        if prec < 3 then
          Format.fprintf fmt "(-%a)" (pp_expr 2) expr
@@ -227,14 +233,17 @@ module PP = struct
         | Declaration (typ, ident) :: stmts ->
            (match previous with
              | `Start ->
-                pp_decl fmt (typ, ident)
+                pp_decl fmt (typ, ident);
+                Format.pp_print_string fmt ";"
              | `Decl ->
                 Format.pp_print_cut fmt ();
-                pp_decl fmt (typ, ident)
+                pp_decl fmt (typ, ident);
+                Format.pp_print_string fmt ";"
              | `Stmt ->
                 Format.pp_print_cut fmt ();
                 Format.pp_print_cut fmt ();
-                pp_decl fmt (typ, ident));
+                pp_decl fmt (typ, ident);
+                Format.pp_print_string fmt ";");
            loop `Decl stmts
         | [] ->
            ()
@@ -264,22 +273,26 @@ module PP = struct
          pp_expr expr
          pp_stmt then_stmt
     | If (expr, Block then_stmt, Some (Block else_stmt)) ->
-       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+       Format.fprintf fmt
+         "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
          pp_expr expr
          pp_stmts then_stmt
          pp_stmts else_stmt
     | If (expr, Block then_stmt, Some else_stmt) ->
-       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+       Format.fprintf fmt
+         "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
          pp_expr expr
          pp_stmts then_stmt
          pp_stmt else_stmt
     | If (expr, then_stmt, Some (Block else_stmt)) ->
-       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+       Format.fprintf fmt
+         "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
          pp_expr expr
          pp_stmt then_stmt
          pp_stmts else_stmt
     | If (expr, then_stmt, Some else_stmt) ->
-       Format.fprintf fmt "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
+       Format.fprintf fmt
+         "@[<v 4>if (@[<hv>%a@]) {@ %a@]@,@[<v 4>} else {@ %a@]@,}"
          pp_expr expr
          pp_stmt then_stmt
          pp_stmt else_stmt
@@ -287,7 +300,7 @@ module PP = struct
        Format.fprintf fmt "@[<v4>{@,%a@]@,}"
          pp_stmts block_stmts
     | Break ->
-       Format.fprintf fmt "break;@,"
+       Format.fprintf fmt "break;"
     | Malloc (l_value, typ, None) ->
        (* FIXME: abort if allocation fails *)
        Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a))@];"
@@ -295,7 +308,8 @@ module PP = struct
          pp_typename typ
     | Malloc (l_value, typ, Some (num, typ')) ->
        (* FIXME: abort if allocation fails *)
-       Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a) + %a * sizeof(%a))@];"
+       Format.fprintf fmt
+         "@[<hv>%a =@ malloc (sizeof (%a) + %a * sizeof(%a))@];"
          pp_expr     l_value
          pp_typename typ
          pp_expr     num
@@ -316,18 +330,20 @@ module PP = struct
     in
     Fmt.(list ~sep:(Fmt.always ", ") pp_arg_decl)
 
-  let pp_fundecl fmt { return_type; name; arg_decls; body } =
-    let Some_type return_type = return_type in
+  let pp_fundecl fmt { (*return_type; *)name; arg_decls; body } =
+    (* let Some_type return_type = return_type in *)
     Format.fprintf fmt
-      "@[<v 0>]%a %s(%a)@,@[<v 5>{@,%a@]@,}@]"
-      pp_typename return_type
+      "@[<v 0>void %s(%a)@,@[<v 5>{@,%a@]@,}@]"
+      (* pp_typename return_type *)
       name
       pp_arg_decls arg_decls
       pp_stmts body
 end
 
 module C () : sig
-  include Syntax.S (* with type ('a,'b) expr = c_exp *)
+  include Syntax.S
+
+  val fun_decls : unit -> fundecl list
 
   val struct_decls : unit -> structure_desc list
 
@@ -337,11 +353,15 @@ end = struct
 
   let gen comm = match comm 0 with `Open stmts | `Closed stmts -> stmts
 
-  type (_,_) expr = c_exp
-  type 'a exp = c_exp
-  type 'a var = c_exp
+  type (_,_) expr = Expr of c_exp
+  type 'a exp = ('a, [`exp]) expr
+  type 'a var = ('a, [`exp|`var]) expr
   type comm   =
     namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
+
+  let un_expr (Expr e) = e
+
+  let to_exp (Expr e) = Expr e
 
   type nonrec 'a typ = 'a typ
   type nonrec 'a ptr = 'a ptr
@@ -353,6 +373,7 @@ end = struct
   let ptr x = Pointer x
   let array x n = Array (x,n)
 
+  (**********************************************************************)
   type ('s,'a) field = string
 
   let structures : (string, structure_field list) Hashtbl.t =
@@ -361,7 +382,9 @@ end = struct
     ref []
 
   let struct_decls () =
-    List.rev_map (fun name -> { name; fields = Hashtbl.find structures name }) !structures_ordered
+    List.rev_map
+      (fun name -> { name; fields = Hashtbl.find structures name })
+      !structures_ordered
 
   let structure name =
     let name = Name_freshener.fresh_for (Hashtbl.mem structures) name in
@@ -386,11 +409,56 @@ end = struct
     (* FIXME: do something here -- mark this structure as finished. *)
     ()
 
-  let true_ = BoolLit true
-  let false_ = BoolLit false
-  let (&&) e1 e2 = Binop (e1, LAnd, e2)
-  let (||) e1 e2 = Binop (e1, LOr, e2)
-  let not e = Unop (LNot, e)
+  (**********************************************************************)
+  type _ arg_spec =
+    | End : comm arg_spec
+    | Arg : string * 'a typ * 'b arg_spec -> (('a, [`exp]) expr -> 'b) arg_spec
+    | Ref : string * 'a typ * 'b arg_spec -> (('a, [`exp|`var]) expr -> 'b) arg_spec
+
+  let return_void = End
+  let (@->) (nm, t) s = Arg (nm, t, s)
+  let (@&->) (nm, t) s = Ref (nm, t, s)
+
+  let decld_functions = Hashtbl.create 20
+  let decld_functions_order = ref []
+
+  let fun_decls () =
+    List.rev_map (Hashtbl.find decld_functions) !decld_functions_order
+
+  let rec get_args : type a. a arg_spec -> (c_type * string) list = function
+    | End -> []
+    | Arg (nm, typ, a) -> (Some_type typ, nm) :: get_args a
+    | Ref (nm, typ, a) -> (Some_type (Pointer typ), nm) :: get_args a
+
+  let rec apply : type a. a arg_spec -> a -> block_stmt list = function
+    | End            -> fun c -> gen c
+    | Arg (nm, _, a) -> fun b -> apply a (b (Expr (Var nm)))
+    | Ref (nm, _, a) -> fun b -> apply a (b (Expr (Deref (Var nm))))
+
+  let declare_func ~name ~typ ~body =
+    let name = Name_freshener.fresh_for (Hashtbl.mem decld_functions) name in
+    decld_functions_order := name :: !decld_functions_order;
+    let decl =
+      { name; arg_decls = get_args typ; body = apply typ body }
+    in
+    Hashtbl.add decld_functions name decl;
+    let rec gen_call : type a. a arg_spec -> c_exp list -> a = function
+      | End ->
+         fun l ng -> `Open [Statement (Call (name, List.rev l))]
+      | Arg (_, _, a) ->
+         fun l (Expr e) -> gen_call a (e::l)
+      | Ref (_, _, a) ->
+         fun l (Expr e) -> gen_call a (AddrOf e::l)
+    in
+    gen_call typ []
+
+  (**********************************************************************)
+
+  let true_ = Expr (BoolLit true)
+  let false_ = Expr (BoolLit false)
+  let (&&) e1 e2 = Expr (Binop (un_expr e1, LAnd, un_expr e2))
+  let (||) e1 e2 = Expr (Binop (un_expr e1, LOr, un_expr e2))
+  let not e = Expr (Unop (LNot, un_expr e))
 
   let empty ng =
     `Open []
@@ -415,71 +483,75 @@ end = struct
     | `Closed stmts                     -> Block stmts
 
   let (:=) v e ng =
-    `Open [Statement (Assign (v, e))]
+    `Open [Statement (Assign (un_expr v, un_expr e))]
 
   let while_ cond ~do_:body ng =
-    `Open [Statement (While (cond, block (body ng)))]
+    `Open [Statement (While (un_expr cond, block (body ng)))]
 
   let break ng =
     `Open [Statement Break]
 
   let ifthen cond ~then_:body ng =
-    `Open [Statement (If (cond, block (body ng), None))]
+    `Open [Statement (If (un_expr cond,
+                          block (body ng),
+                          None))]
 
   let if_ cond ~then_ ~else_ ng =
-    `Open [Statement (If (cond, block (then_ ng), Some (block (else_ ng))))]
+    `Open [Statement (If (un_expr cond,
+                          block (then_ ng),
+                          Some (block (else_ ng))))]
 
   let declare ?(name="x") typ body ng =
     let name = String.map (function ':' -> '_' | x -> x) name in
     let nm = Printf.sprintf "%s%d" name ng and ng = ng+1 in
     let decl = Declaration (typ, nm) in
-    match body (Var nm) ng with
+    match body (Expr (Var nm)) ng with
       | `Closed stmts | `Open stmts ->
          `Closed (decl :: stmts)
 
   let malloc v typ ng =
-    `Open [Statement (Malloc (v, typ, None))]
+    `Open [Statement (Malloc (un_expr v, typ, None))]
 
   let malloc_ext v typ n typ' ng =
-    `Open [Statement (Malloc (v, typ, Some (n, typ')))]
+    `Open [Statement (Malloc (un_expr v, typ, Some (un_expr n, typ')))]
 
-  let free expr ng =
-    `Open [Statement (Free expr)]
+  let free e ng =
+    `Open [Statement (Free (un_expr e))]
 
-  let deref e = Deref e
+  let deref e = Expr (Deref (un_expr e))
 
   let (#@) array_exp idx_exp =
-    Idx (array_exp, idx_exp)
+    Expr (Idx (un_expr array_exp, un_expr idx_exp))
 
   let (#.) struct_exp field =
-    Field (struct_exp, field)
+    Expr (Field (un_expr struct_exp, field))
 
   type exp_box = Exp : 'a exp -> exp_box
 
   let struct_const (Struct name) exps =
-    StructLit (name, List.map (fun (Exp e) -> (e : c_exp)) exps)
+    Expr (StructLit (name, List.map (fun (Exp e) -> un_expr e) exps))
 
   let (#->) struct_ptr_exp field =
-    Field (Deref struct_ptr_exp, field)
+    Expr (Field (un_expr (deref struct_ptr_exp), field))
 
-  let const i = IntLit i
-  let ( <  ) e1 e2 = Binop (e1, Lt, e2)
-  let ( >  ) e1 e2 = Binop (e1, Gt, e2)
-  let ( >= ) e1 e2 = Binop (e1, Ge, e2)
-  let ( <= ) e1 e2 = Binop (e1, Le, e2)
-  let ( == ) e1 e2 = Binop (e1, Eq, e2)
-  let ( != ) e1 e2 = Binop (e1, Ne, e2)
-  let ( +  ) e1 e2 = Binop (e1, Plus, e2)
-  let ( *  ) e1 e2 = Binop (e1, Mult, e2)
-  let ( -  ) e1 e2 = Binop (e1, Sub, e2)
-  let int_max = IntMax
+  let const i = Expr (IntLit i)
+  let ( <  ) e1 e2 = Expr (Binop (un_expr e1, Lt, un_expr e2))
+  let ( >  ) e1 e2 = Expr (Binop (un_expr e1, Gt, un_expr e2))
+  let ( >= ) e1 e2 = Expr (Binop (un_expr e1, Ge, un_expr e2))
+  let ( <= ) e1 e2 = Expr (Binop (un_expr e1, Le, un_expr e2))
+  let ( == ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
+  let ( != ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
+  let ( +  ) e1 e2 = Expr (Binop (un_expr e1, Plus, un_expr e2))
+  let ( *  ) e1 e2 = Expr (Binop (un_expr e1, Mult, un_expr e2))
+  let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
+  let int_max = Expr IntMax
 
-  let ( =*= ) e1 e2 = Binop (e1, Eq, e2)
-  let ( =!*= ) e1 e2 = Binop (e1, Ne, e2)
-  let null = Null
+  let ( =*= ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
+  let ( =!*= ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
+  let null = Expr Null
 
   let print_int e ng =
-    `Open [Statement (Call ("printf", [StrLit "%d"; e]))]
+    `Open [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
 
   let print_newline ng =
     `Open [Statement (Call ("printf", [StrLit "\n"]))]

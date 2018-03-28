@@ -37,6 +37,8 @@ module type S = sig
   type 'a exp = ('a,[`exp]) expr
   type 'a var = ('a,[`var|`exp]) expr
 
+  val to_exp : 'a var -> 'a exp
+
   (** {3 Boolean expressions} *)
 
   val true_  : bool exp
@@ -138,4 +140,14 @@ module type S = sig
 
   (** Print a (static) string to standard out. *)
   val print_str : string -> comm
+
+  (** {3 Function declarations} *)
+
+  type 'a arg_spec
+
+  val return_void : comm arg_spec
+  val (@->) : string * 'a typ -> 'b arg_spec -> ('a exp -> 'b) arg_spec
+  val (@&->) : string * 'a typ -> 'b arg_spec -> ('a var -> 'b) arg_spec
+
+  val declare_func : name:string -> typ:'t arg_spec -> body:'t -> 't
 end
