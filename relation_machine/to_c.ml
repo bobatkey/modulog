@@ -1,10 +1,15 @@
-module IntTupleKey (S : Idealised_algol.Syntax.S) (W : sig val width : int end) ()
+
+
+module IntTupleKey
+    (S : Idealised_algol.Syntax.S)
+    (W : sig val width : int end)
+    ()
   : sig
     include Idealised_algol.Btree.KEY with module S = S
 
     val create : int S.exp array -> t S.exp
 
-    val get    : t S.exp -> int -> int S.exp
+    val get : t S.exp -> int -> int S.exp
   end =
 struct
   module S = S
@@ -93,7 +98,7 @@ module type INDEXED_TABLE = sig
 
   val ifmember :
     handle ->
-    pat:int S.exp array ->
+    int S.exp array ->
     then_:S.comm ->
     else_:S.comm ->
     S.comm
@@ -224,10 +229,10 @@ struct
         else_
     end
 
-  let ifmember h ~pat ~then_ ~else_ =
-    let perm = A.indexes.(0) in
+  let ifmember h key ~then_ ~else_ =
+    let perm   = A.indexes.(0) in
     let handle = h.(0) in
-    let key = Key.create (Array.init A.arity (fun i -> pat.(perm.(i)))) in
+    let key    = Key.create (Array.init A.arity (fun i -> key.(perm.(i)))) in
     BT.ifmember key handle then_ else_
 
   let iterate_all h k =
@@ -277,6 +282,12 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       conditions;
     pat
 
+  let print_strln s =
+    begin%monoid.IA
+      IA.print_str s;
+      IA.print_newline
+    end
+
   let print_exps exps =
     let open! IA in
     begin%monoid
@@ -293,107 +304,97 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       projections
       lenv
 
+  let if_conj conditions then_ =
+    match conditions with
+      | []         -> then_
+      | conditions -> IA.ifthen (and_list conditions) ~then_
+
   let rec translate_expr expr env lenv k = match expr with
     | Syntax.Return { guard_relation=None; values } ->
        let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
        k vals
 
     | Syntax.Return { guard_relation=Some guard; values } ->
-       (let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
-        match Env.find guard env with
-          | Plain _ ->
-             failwith "plain relation used as a guard"
-          | Indexed (m, handle) ->
-             let module IT = (val m) in
-             IT.ifmember handle
-               ~pat:vals
-               ~then_:begin%monoid.IA
-                 (* IA.print_str "Not inserting:"; print_exps vals *)
-               end
-               ~else_:(k vals))
+       begin match Env.find guard env with
+         | Plain _ ->
+            failwith "plain relation used as a guard"
+         | Indexed (m, handle) ->
+            let module IT = (val m) in
+            let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
+            IT.ifmember handle vals ~then_:IA.empty ~else_:(k vals)
+       end
 
     | Syntax.Select { relation; conditions; projections; cont } ->
-       (match Env.find relation env with
+       begin match Env.find relation env with
          | Plain handle ->
-            (BL.iterate handle @@ fun attrs ->
-             let body = begin%monoid.IA
-               let lenv = projections_to_lenv projections attrs lenv in
-               (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
-               translate_expr cont env lenv k
-               end
-             in
-             match conditions with
-               | [] -> body
-               | _  ->
-                  IA.ifthen (and_list (List.map (condition lenv attrs) conditions))
-                    ~then_:body)
+            (* FIXME: emit a warning if conditions contains anything,
+               or if projections is empty. *)
+            BL.iterate handle @@ fun attrs ->
+            if_conj (List.map (condition lenv attrs) conditions)
+              begin%monoid.IA
+                let lenv = projections_to_lenv projections attrs lenv in
+                translate_expr cont env lenv k
+              end
          | Indexed (m, handle) ->
-            (let module IT = (val m) in
-             let pat = pattern_of_conditions IT.arity lenv conditions in
-             match projections with
-               | [] ->
-                  IT.ifmember_pat handle ~pat
-                    ~then_:(translate_expr cont env lenv k)
-                    ~else_:IA.empty
-               | projections ->
-                  IT.iterate handle ~pat @@ fun attrs -> begin%monoid.IA
-                    (* IA.print_str (relation.Syntax.ident ^ ":"); print_exps attrs; *)
-                    let lenv = projections_to_lenv projections attrs lenv in
-                    translate_expr cont env lenv k
-                  end))
+            begin
+              let module IT = (val m) in
+              match conditions, projections with
+                | conditions, [] ->
+                   let pat = pattern_of_conditions IT.arity lenv conditions in
+                   IT.ifmember_pat handle ~pat
+                     ~then_:(translate_expr cont env lenv k)
+                     ~else_:IA.empty
+                | [], projections ->
+                   IT.iterate_all handle @@ fun attrs -> begin%monoid.IA
+                     let lenv = projections_to_lenv projections attrs lenv in
+                     translate_expr cont env lenv k
+                   end
+                | conditions, projections ->
+                   let pat = pattern_of_conditions IT.arity lenv conditions in
+                   IT.iterate handle ~pat @@ fun attrs -> begin%monoid.IA
+                     let lenv = projections_to_lenv projections attrs lenv in
+                     translate_expr cont env lenv k
+                   end
+            end
+       end
 
-  let print_strln s =
-    let open! IA in
-    begin%monoid
-      print_str s;
-      print_newline
-    end
-
-  let rec translate_comm comm env =
-    match comm with
-      | Syntax.WhileNotEmpty (vars, body) ->
-         let check_empty nm =
-           match Env.find nm env with
-             | Plain handle -> BL.is_empty handle
-             | Indexed _    -> failwith "emptiness test on an indexed table"
-         in
-         IA.while_
-           (IA.not (and_list (List.map check_empty vars)))
-           ~do_:begin%monoid.IA
-             (*print_strln "looping"; *)
-             translate_comms body env
-           end
-
-      | Insert (relvar, expr) ->
-         begin%monoid.IA
-           (*IA.print_str ("Inserting into: " ^ relvar.Syntax.ident);
-             IA.print_newline;*)
-           translate_expr expr env LEnv.empty @@ fun vals -> begin%monoid.IA
-             (* print_exps vals; *)
-             match Env.find relvar env with
-               | Plain handle ->
-                  BL.insert handle vals
-               | Indexed (m, handle) ->
-                  let module IT = (val m) in
-                  IT.insert handle vals
-           end
+  let rec translate_comm comm env = match comm with
+    | Syntax.WhileNotEmpty (vars, body) ->
+       let check_empty nm =
+         match Env.find nm env with
+           | Plain handle -> BL.is_empty handle
+           | Indexed _    -> failwith "emptiness test on an indexed table"
+       in
+       IA.while_
+         (IA.not (and_list (List.map check_empty vars)))
+         ~do_:begin%monoid.IA
+           translate_comms body env
          end
 
-      | Declare (vars, body) ->
-         List.fold_right
-           (fun (Syntax.{ident;arity} as varnm) k env ->
-              BL.declare ~name:ident ~arity
-                (fun handle -> k (Env.add varnm (Plain handle) env)))
-           vars
-           (translate_comms body)
-           env
+    | Insert (relvar, expr) ->
+       translate_expr expr env LEnv.empty @@ fun vals -> begin%monoid.IA
+         match Env.find relvar env with
+           | Plain handle ->
+              BL.insert handle vals
+           | Indexed (m, handle) ->
+              let module IT = (val m) in IT.insert handle vals
+       end
 
-      | Move { src; tgt } ->
-         (match Env.find src env, Env.find tgt env with
-           | Plain src, Plain tgt ->
-              BL.move ~src ~tgt
-           | _ ->
-              failwith "Attempted move between indexed relations")
+    | Declare (vars, body) ->
+       List.fold_right
+         (fun (Syntax.{ident;arity} as varnm) k env ->
+            BL.declare ~name:ident ~arity
+              (fun handle -> k (Env.add varnm (Plain handle) env)))
+         vars
+         (translate_comms body)
+         env
+
+    | Move { src; tgt } ->
+       (match Env.find src env, Env.find tgt env with
+         | Plain src, Plain tgt ->
+            BL.move ~src ~tgt
+         | _ ->
+            failwith "Attempted move between indexed relations")
 
   and translate_comms comms env =
     let open! IA in
@@ -415,15 +416,16 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
          let module IT = Make_Indexed_Table (IA) (P) () in
          IT.declare
            ~name:relvar.Syntax.ident
-           (fun handle ->
-              let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
-              let value = Indexed (m, handle) in
-              begin%monoid.IA
-                k (Env.add relvar value env);
-                IA.print_str relvar.Syntax.ident;
-                IA.print_newline;
-                IT.iterate_all handle print_exps
-              end))
+           begin fun handle ->
+             let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
+             let value = Indexed (m, handle) in
+             begin%monoid.IA
+               k (Env.add relvar value env);
+               IA.print_str relvar.Syntax.ident;
+               IA.print_newline;
+               IT.iterate_all handle print_exps
+             end
+           end)
       idb_relvars
       (translate_comms commands)
       Env.empty
