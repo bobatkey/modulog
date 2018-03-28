@@ -45,25 +45,38 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     if a1 <> a2 then
       invalid_arg "Block_list.Make.move: mismatched arities";
     begin%monoid
+      (declare (ptr list_node) @@ fun ptr1 ->
+       begin%monoid
+         ptr1 := tgt;
+         while_ (ptr1 =!*= null)
+           ~do_:begin%monoid
+             declare (ptr list_node) @@ fun ptr2 ->
+             begin%monoid
+               ptr2 := ptr1#->next;
+               free ptr1;
+               ptr1 := ptr2
+             end
+           end
+       end);
       tgt := src;
       src := null;
     end
 
   let write val_array offset vals =
-    vals
-    |> Array.mapi begin fun i v ->
+    vals |>
+    Array.mapi begin fun i v ->
       let i = Int32.of_int i in
       val_array#@(offset + const i) := v
-    end
-    |> Array.fold_left (^^) empty
+    end |>
+    Array.fold_left (^^) empty
 
   let read val_array offset arity =
     Array.init arity
       (fun i -> val_array#@(offset + const (Int32.of_int i)))
 
   let new_block v ~arity ~vals ~next:nxt =
+    let length = Int32.mul (Int32.of_int arity) block_size in
     begin%monoid
-      let length = Int32.mul (Int32.of_int arity) block_size in
       malloc_ext v list_node (const length) int;
       v#->occupied := const 1l;
       v#->next := nxt;
@@ -77,11 +90,10 @@ module Make (S : Syntax.S) () : S with module S = S = struct
       ~then_:begin%monoid
         new_block head ~arity ~vals ~next:null
       end
-      ~else_:begin
+      ~else_:begin%monoid
         if_ (head#->occupied == const block_size)
           ~then_:begin%monoid
-            declare (ptr list_node) @@ fun new_head ->
-            begin%monoid
+            declare (ptr list_node) @@ fun new_head -> begin%monoid
               new_block new_head ~arity ~vals ~next:head;
               head := new_head
             end
@@ -94,32 +106,36 @@ module Make (S : Syntax.S) () : S with module S = S = struct
       end
 
   let iterate {var=head; arity} body =
-    declare (ptr list_node) @@ fun node ->
-    declare int @@ fun i ->
-    begin%monoid
+    declare (ptr list_node) @@ fun node -> begin%monoid
       node := head;
 
-      while_ (node =!*= null) ~do_:begin%monoid
-        i := const 0l;
-        while_ (i < (node#->occupied * const (Int32.of_int arity))) ~do_:begin%monoid
-          body (read (node#->values) i arity);
-          i := i + const (Int32.of_int arity)
-        end;
+      while_ (node =!*= null)
+        ~do_:begin%monoid
+          declare int @@ fun i -> begin%monoid
+            i := const 0l;
 
-        node := node#->next
-      end
+            while_ (i < (node#->occupied * const (Int32.of_int arity)))
+              ~do_:begin%monoid
+                body (read (node#->values) i arity);
+                i := i + const (Int32.of_int arity)
+              end;
+
+            node := node#->next
+          end
+        end
     end
 
   let declare ~name ~arity k =
-    declare ~name (ptr list_node) @@ fun var ->
-    begin%monoid
+    declare ~name (ptr list_node) @@ fun var -> begin%monoid
       var := null;
       k { arity; var };
-      declare ~name:"ahead" (ptr list_node) @@ fun ahead ->
-      while_ (var =!*= null) ~do_:begin%monoid
-        ahead := var#->next;
-        free var;
-        var := ahead
-      end
+      while_ (var =!*= null)
+        ~do_:begin%monoid
+          declare ~name:"ahead" (ptr list_node) @@ fun ahead -> begin%monoid
+            ahead := var#->next;
+            free var;
+            var := ahead
+          end
+        end
     end
 end

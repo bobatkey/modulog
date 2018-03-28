@@ -23,21 +23,21 @@ module type S = sig
 
   val declare : (handle -> S.comm) -> S.comm
 
-  val insert : (key,[>`exp]) S.expr -> handle -> S.comm
+  val insert : key S.exp -> handle -> S.comm
 
-  val ifmember : (key,[>`exp]) S.expr -> handle -> S.comm -> S.comm -> S.comm
+  val ifmember : key S.exp -> handle -> S.comm -> S.comm -> S.comm
 
   val ifmember_range :
-    (key,[>`exp]) S.expr ->
-    (key,[>`exp]) S.expr ->
+    key S.exp ->
+    key S.exp ->
     handle ->
     S.comm ->
     S.comm ->
     S.comm
 
   val iterate_range :
-    (key,[>`exp]) S.expr ->
-    (key,[>`exp]) S.expr ->
+    key S.exp ->
+    key S.exp ->
     handle ->
     (key S.exp -> S.comm) ->
     S.comm
@@ -82,22 +82,26 @@ module Make
   let decr (i : _ var) =
     i := i - const 1l
 
-  let find_key i x key =
-    begin%monoid
-      i := const 0l;
-      while_ (i < x#->nkeys && K.lt x#->keys#@i key)
-        (incr i)
-    end
+  let find_key =
+    declare_func
+      ~name:"find_key"
+      ~typ:(("i", int) @&-> ("x",ptr node) @-> ("key",K.t) @-> return_void)
+      ~body:begin fun i x key ->
+        begin%monoid
+          i := const 0l;
+          while_ (i < x#->nkeys && K.lt x#->keys#@i key)
+            ~do_:(incr i)
+        end
+      end
 
   let with_nodeptr init body =
-    declare ~name:"node" (ptr node) @@ fun x ->
-    begin%monoid
-      x := init; body x
+    declare ~name:"node" (ptr node) @@ fun x -> begin%monoid
+      x := init;
+      body x
     end
 
   let alloc_node body =
-    declare ~name:"node" (ptr node) @@ fun x ->
-    begin%monoid
+    declare ~name:"node" (ptr node) @@ fun x -> begin%monoid
       malloc x node;
       body x
     end
@@ -106,12 +110,11 @@ module Make
     declare ~name:"i" int body
 
   let loop body =
-    while_ true_ body
+    while_ true_ ~do_:body
 
 
   let declare body =
-    alloc_node @@ fun x ->
-    begin%monoid
+    alloc_node @@ fun x -> begin%monoid
       x#->leaf := true_;
       x#->nkeys := const 0l;
       body x
@@ -123,7 +126,7 @@ module Make
     with_nodeptr t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
-      find_key i x key;
+      find_key i (to_exp x) key;
       ifthen (i < x#->nkeys && K.eq x#->keys#@i key)
         ~then_:begin%monoid yes; break end;
       ifthen x#->leaf
@@ -136,7 +139,7 @@ module Make
     with_nodeptr t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
-      find_key i x from;
+      find_key i (to_exp x) from;
       ifthen (i < x#->nkeys && K.le x#->keys#@i upto)
         begin%monoid yes; break end;
       ifthen x#->leaf ~then_:begin%monoid no; break end;
@@ -158,7 +161,7 @@ module Make
     begin%monoid
       (* recurse down the tree *)
       loop begin%monoid
-        find_key i x from;
+        find_key i (to_exp x) from;
         ifthen x#->leaf ~then_:break;
         ifthen (i < x#->nkeys) ~then_:(push x i);
         x := x#->children#@i
@@ -264,86 +267,102 @@ module Make
       end
     end
 
-  let split_child x i =
-    with_nodeptr x#->children#@i @@ fun y ->
-    alloc_node @@ fun z ->
-    begin%monoid
-      z#->leaf := y#->leaf;
-      z#->nkeys := const min_keys;
-
-      (* copy the keys over *)
-      copy
-        ~n:(const min_keys)
-        ~src:(fun j -> y#->keys#@(j + const P.min_children))
-        ~dst:(fun j -> z#->keys#@j);
-
-      (* copy the children over (if not a leaf node) *)
-      ifthen (not y#->leaf) begin
-        copy ~n:(const P.min_children)
-          ~src:(fun j -> y#->children#@(j + const P.min_children))
-          ~dst:(fun j -> z#->children#@j)
-      end;
-
-      (* truncate y *)
-      y #-> nkeys := const min_keys;
-
-      (* shunt x's children up *)
-      begin
-        with_int @@ fun j ->
+  let split_child =
+    declare_func
+      ~name:"split_child"
+      ~typ:(("x", ptr node) @-> ("i", int) @-> return_void)
+      ~body:begin fun x i ->
+        with_nodeptr x#->children#@i @@ fun y ->
+        alloc_node @@ fun z ->
         begin%monoid
-          j := x#->nkeys;
-          while_ (j > i) ~do_:begin%monoid
-            x#->children#@(j + const 1l) := x#->children#@j;
-            decr j
-          end
+          z#->leaf := y#->leaf;
+          z#->nkeys := const min_keys;
+
+          (* copy the keys over *)
+          copy
+            ~n:(const min_keys)
+            ~src:(fun j -> y#->keys#@(j + const P.min_children))
+            ~dst:(fun j -> z#->keys#@j);
+
+          (* copy the children over (if not a leaf node) *)
+          ifthen (not y#->leaf) begin
+            copy ~n:(const P.min_children)
+              ~src:(fun j -> y#->children#@(j + const P.min_children))
+              ~dst:(fun j -> z#->children#@j)
+          end;
+
+          (* truncate y *)
+          y #-> nkeys := const min_keys;
+
+          (* shunt x's children up *)
+          begin
+            with_int @@ fun j ->
+            begin%monoid
+              j := x#->nkeys;
+              while_ (j > i) ~do_:begin%monoid
+                x#->children#@(j + const 1l) := x#->children#@j;
+                decr j
+              end
+            end
+          end;
+
+          move_keys_up x i;
+
+          x#->children#@(i + const 1l) := z;
+          x#->keys#@i := y#->keys#@(const min_keys);
+          incr (x #-> nkeys)
         end
-      end;
-
-      move_keys_up x i;
-
-      x#->children#@(i + const 1l) := z;
-      x#->keys#@i := y#->keys#@(const min_keys);
-      incr (x #-> nkeys)
-    end
+      end
 
   let node_is_full x =
     x#->nkeys == const max_keys
 
-  let insert_nonfull x key =
-    with_int @@ fun i ->
-    begin%monoid
-      while_ (not x#->leaf) begin%monoid
-        find_key i x key;
-        ifthen (node_is_full x#->children#@i)
-          ~then_:begin%monoid
-            split_child x i;
-            ifthen (K.lt x#->keys#@i key)
-              ~then_:(incr i)
+  let insert_nonfull =
+    declare_func ~name:"insert_nonfull"
+      ~typ:(("x", ptr node) @-> ("key", K.t) @-> return_void)
+      ~body:begin fun x' key ->
+        with_nodeptr x' @@ fun x ->
+        with_int @@ fun i ->
+        begin%monoid
+          while_ (not x#->leaf) begin%monoid
+            find_key i (to_exp x) key;
+            ifthen (node_is_full x#->children#@i)
+              ~then_:begin%monoid
+                split_child (to_exp x) (to_exp i);
+                ifthen (K.lt x#->keys#@i key)
+                  ~then_:(incr i)
+              end;
+            x:= x#->children#@i
           end;
-        x:= x#->children#@i
-      end;
 
-      find_key i x key;
-      move_keys_up x i;
-      x#->keys#@i := key;
-      incr (x #-> nkeys)
-    end
-
-  let insert key root = begin%monoid
-    (* if the root is full, then split it by making a new root node
-       with a single child, and using split_child *)
-    ifthen (node_is_full root) begin
-      alloc_node @@ fun s ->
-      begin%monoid
-        s #-> leaf := false_;
-        s #-> nkeys := const 0l;
-        s#->children#@(const 0l) := root;
-        split_child s (const 0l);
-        root := s
+          find_key i (to_exp x) key;
+          move_keys_up x i;
+          x#->keys#@i := key;
+          incr (x #-> nkeys)
+        end
       end
-    end;
-    (* Once the root is not full, insert the key into it. *)
-    with_nodeptr root @@ fun x ->
-    insert_nonfull x key
-  end
+
+  let insert =
+    declare_func
+      ~name:"insert"
+      ~typ:(("key", K.t) @-> ("root", ptr node) @&-> return_void)
+      ~body:begin fun key root ->
+        begin%monoid
+          (* if the root is full, then split it by making a new root node
+                   with a single child, and using split_child *)
+          ifthen (node_is_full root) begin
+            alloc_node @@ fun s ->
+            begin%monoid
+              s #-> leaf := false_;
+              s #-> nkeys := const 0l;
+              s#->children#@(const 0l) := root;
+              split_child (to_exp s) (const 0l);
+              root := s
+            end
+          end;
+          (* Once the root is not full, insert the key into it. *)
+          (* with_nodeptr root @@ fun x -> *)
+          insert_nonfull (to_exp root) key
+        end
+      end
 end
