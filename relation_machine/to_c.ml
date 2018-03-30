@@ -421,7 +421,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       | indexes ->
          let module P = struct
            let arity = relvar.Syntax.arity
-           let indexes = Array.of_list indexes
+           let indexes = indexes
          end in
          let module IT = Make_Indexed_Table (IA) (P) () in
          let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in

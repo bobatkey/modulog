@@ -1,5 +1,3 @@
-open Syntax
-
 (* Indexes:
      - work out which indexes are needed:
        - for each select, we know the inputs and the outputs required.
@@ -58,17 +56,15 @@ module PredicatePats : sig
 
   val empty : t
 
-  val pats : relvar -> t -> PatternSet.t
+  val pats : Syntax.relvar -> t -> PatternSet.t
 
-  val add : relvar -> PatternSet.pattern -> t -> t
+  val add : Syntax.relvar -> PatternSet.pattern -> t -> t
 
-  val fold : (relvar -> PatternSet.t -> 'a -> 'a) -> t -> 'a -> 'a
-
-  val map_to_list : (relvar -> PatternSet.t -> 'a) -> t -> 'a list
+  val map_to_list : (Syntax.relvar -> PatternSet.t -> 'a) -> t -> 'a list
 
   val pp : Format.formatter -> t -> unit
 end = struct
-  module VarMap = Map.Make (struct type t = relvar let compare = compare end)
+  module VarMap = Map.Make (Syntax.RelVar)
 
   type t = PatternSet.t VarMap.t
 
@@ -85,8 +81,8 @@ end = struct
       let set = pats pred t in
       VarMap.add pred (PatternSet.add pat set) t
 
-  let fold = VarMap.fold
-  let map_to_list f t = VarMap.fold (fun p pats -> List.cons (f p pats)) t []
+  let map_to_list f t =
+    VarMap.fold (fun p pats -> List.cons (f p pats)) t []
 
   let pp =
     Fmt.iter_bindings VarMap.iter
@@ -96,7 +92,7 @@ end = struct
 end
 
 let rec search_patterns_of_expr pats = function
-  | Select { relation; conditions; projections; cont } ->
+  | Syntax.Select { relation; conditions; projections; cont } ->
      let pat  = PatternSet.Pattern.of_list (List.map fst conditions) in
      let pats = PredicatePats.add relation pat pats in
      search_patterns_of_expr pats cont
@@ -107,7 +103,7 @@ let rec search_patterns_of_expr pats = function
      PredicatePats.add relation pat pats
 
 let rec search_patterns_of_command pats = function
-  | WhileNotEmpty (_, comms) | Declare (_, comms) ->
+  | Syntax.WhileNotEmpty (_, comms) | Declare (_, comms) ->
      search_patterns_of_commands pats comms
   | Insert (_, expr) ->
      search_patterns_of_expr pats expr
@@ -117,7 +113,7 @@ let rec search_patterns_of_command pats = function
 and search_patterns_of_commands pats commands =
   List.fold_left search_patterns_of_command pats commands
 
-let search_patterns {commands} =
+let search_patterns {Syntax.commands} =
   search_patterns_of_commands PredicatePats.empty commands
 
 let ordering_of_pattern_path arity pats =
@@ -138,23 +134,19 @@ let ordering_of_pattern_path arity pats =
   ordering
 
 let orderings_of_patterns pred pats =
-  let arity = pred.arity in
+  let arity = pred.Syntax.arity in
   let pattern_paths =
     MPC.minimal_path_cover pats
     |> List.map List.rev
     |> List.map (ordering_of_pattern_path arity)
+    |> Array.of_list
   in
   (pred, pattern_paths)
 
-let indexes program : (relvar * int array list) list =
+let indexes program : (Syntax.relvar * int array array) list =
   PredicatePats.map_to_list
     orderings_of_patterns
     (search_patterns program)
-
-(* Now:
-   - generate a variable ordering for each index
-   - and a back mapping to the search patterns, in some form
-*)
 
 let pp_indexes =
   Fmt.(brackets
@@ -166,18 +158,22 @@ let pp_indexes =
 let pp_all_indexes =
   Fmt.(braces
          (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ") Syntax.pp_relvar pp_indexes)))
+            (pair ~sep:(always " =>@ ")
+               Syntax.pp_relvar
+               pp_indexes)))
 
 let pp_orderings =
   Fmt.(brackets
-         (list ~sep:(always ";@ ")
+         (array ~sep:(always ";@ ")
             (brackets
               (array ~sep:(always ";@ ") int))))
 
 let pp_all_orderings =
   Fmt.(braces
          (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ") Syntax.pp_relvar pp_orderings)))
+            (pair ~sep:(always " =>@ ")
+               Syntax.pp_relvar
+               pp_orderings)))
 
 (* Now to work out the indexes required for each relation:
    - run "search_patterns program"
