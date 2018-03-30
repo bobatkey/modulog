@@ -8,6 +8,7 @@
   http://link.springer.com/chapter/10.1007/978-3-319-41540-6_23
   https://github.com/oracle/souffle
 
+- https://blog.acolyer.org/2018/03/27/anna-a-kvs-for-any-scale/
 
 ## Code generation
 
