@@ -133,7 +133,7 @@ module Builder = struct
         { ident = candidate; arity = base.arity }
         predicates_so_far
     in
-    { ident = Name_freshener.fresh_for used base.ident
+    { ident = Display_names.Fresh.choose used base.ident
     ; arity = base.arity
     }
 

@@ -3,4 +3,4 @@
 (library
  ((name datalog)
   (public_name datalog)
-  (libraries (ocamlgraph fmt))))
+  (libraries (ocamlgraph fmt display_names))))

@@ -13,7 +13,7 @@ let get_number_suffix str =
     (String.sub str 0 i,
      Some (int_of_string (String.sub str i (l - i))))
 
-let fresh_for used base =
+let choose used base =
   if not (used base) then
     base
   else

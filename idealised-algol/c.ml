@@ -411,7 +411,7 @@ end = struct
       !structures_ordered
 
   let structure name =
-    let name = Name_freshener.fresh_for (Hashtbl.mem structures) name in
+    let name = Display_names.Fresh.choose (Hashtbl.mem structures) name in
     Hashtbl.add structures name [];
     structures_ordered := name :: !structures_ordered;
     Struct name
@@ -464,7 +464,7 @@ end = struct
     | Ref (nm, _, a) -> fun b -> apply a (b (Expr (Deref (Var nm))))
 
   let declare_func ~name ~typ ~body =
-    let name = Name_freshener.fresh_for (Hashtbl.mem decld_functions) name in
+    let name = Display_names.Fresh.choose (Hashtbl.mem decld_functions) name in
     decld_functions_order := name :: !decld_functions_order;
     let return_type, arg_decls = get_args typ [] in
     let decl =
