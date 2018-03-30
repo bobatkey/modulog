@@ -9,11 +9,11 @@ module type S = sig
   val move : src:handle -> tgt:handle -> S.comm
 
   (** the length of the list and arity must match *)
-  val insert : handle -> int S.exp array -> S.comm
+  val insert : handle -> int32 S.exp array -> S.comm
 
   val is_empty : handle -> bool S.exp
 
-  val iterate : handle -> (int S.exp array -> S.comm) -> S.comm
+  val iterate : handle -> (int32 S.exp array -> S.comm) -> S.comm
 end
 
 module Make (S : Syntax.S) () : S with module S = S = struct
@@ -25,13 +25,14 @@ module Make (S : Syntax.S) () : S with module S = S = struct
 
   type list_node
   let list_node : list_node structure typ = structure "list_node"
-  let occupied = field list_node "occupied" int
+  let occupied = field list_node "occupied" int32
   let next     = field list_node "next" (ptr list_node)
-  let values   = field list_node "values" (array int 1l)
+  let values   = field list_node "values" (array int32 1l)
   let ()       = seal list_node
 
   type handle =
     { arity : int
+    ; name  : string
     ; var   : list_node structure ptr var
     }
 
@@ -41,23 +42,20 @@ module Make (S : Syntax.S) () : S with module S = S = struct
   let is_empty {var} =
     var =*= null
 
+  let free_list p =
+    while_ (p =!*= null) ~do_:begin%monoid
+      declare_init ~name:"ahead" (ptr list_node) p#->next @@ fun ahead ->
+      begin%monoid
+        free p;
+        p := ahead
+      end
+    end
+
   let move ~src:{var=src;arity=a1} ~tgt:{var=tgt;arity=a2} =
     if a1 <> a2 then
       invalid_arg "Block_list.Make.move: mismatched arities";
     begin%monoid
-      (declare (ptr list_node) @@ fun ptr1 ->
-       begin%monoid
-         ptr1 := tgt;
-         while_ (ptr1 =!*= null)
-           ~do_:begin%monoid
-             declare (ptr list_node) @@ fun ptr2 ->
-             begin%monoid
-               ptr2 := ptr1#->next;
-               free ptr1;
-               ptr1 := ptr2
-             end
-           end
-       end);
+      declare_init ~name:"cursor" (ptr list_node) tgt free_list;
       tgt := src;
       src := null;
     end
@@ -77,7 +75,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
   let new_block v ~arity ~vals ~next:nxt =
     let length = Int32.mul (Int32.of_int arity) block_size in
     begin%monoid
-      malloc_ext v list_node (const length) int;
+      malloc_ext v list_node (const length) int32;
       v#->occupied := const 1l;
       v#->next := nxt;
       write (v#->values) (const 0l) vals
@@ -106,14 +104,10 @@ module Make (S : Syntax.S) () : S with module S = S = struct
       end
 
   let iterate {var=head; arity} body =
-    declare (ptr list_node) @@ fun node -> begin%monoid
-      node := head;
-
+    declare_init ~name:"cursor" (ptr list_node) head @@ fun node -> begin%monoid
       while_ (node =!*= null)
         ~do_:begin%monoid
-          declare int @@ fun i -> begin%monoid
-            i := const 0l;
-
+          declare_init ~name:"i" int32 (const 0l) @@ fun i -> begin%monoid
             while_ (i < (node#->occupied * const (Int32.of_int arity)))
               ~do_:begin%monoid
                 body (read (node#->values) i arity);
@@ -126,16 +120,9 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     end
 
   let declare ~name ~arity k =
-    declare ~name (ptr list_node) @@ fun var -> begin%monoid
-      var := null;
-      k { arity; var };
-      while_ (var =!*= null)
-        ~do_:begin%monoid
-          declare ~name:"ahead" (ptr list_node) @@ fun ahead -> begin%monoid
-            ahead := var#->next;
-            free var;
-            var := ahead
-          end
-        end
+    declare_init ~name (ptr list_node) null @@ fun var ->
+    begin%monoid
+      k { arity; name; var };
+      free_list var
     end
 end

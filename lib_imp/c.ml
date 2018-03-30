@@ -1,5 +1,6 @@
 (* TODO
    - Improve name generation
+   - Wider range of integer types
 *)
 
 type _ ptr = Ptr
@@ -7,7 +8,8 @@ type _ array = Array
 type _ structure = Structure
 
 type 'a typ =
-  | Int     : int typ
+  | Void    : unit typ
+  | Int32   : int32 typ
   | Bool    : bool typ
   | Pointer : 'a typ -> 'a ptr typ
   | Array   : 'a typ * int32 -> 'a array typ
@@ -67,28 +69,25 @@ type unop =
   | LNot
 
 type c_exp =
-  | Var of string
-
+  | Var       of string
   | Null
-
-  | BoolLit of bool
-  | IntLit of int32
-  | IntMax
-  | StrLit of string
+  | BoolLit   of bool
+  | IntLit    of int32
+  | Int32Max
+  | StrLit    of string
   | StructLit of string * c_exp list
-
-  | Binop of c_exp * binop * c_exp
-  | Unop  of unop * c_exp
-
-  | Deref of c_exp
-  | Field of c_exp * string
-  | Idx   of c_exp * c_exp
-  | AddrOf of c_exp
+  | Binop     of c_exp * binop * c_exp
+  | Unop      of unop * c_exp
+  | Deref     of c_exp
+  | Field     of c_exp * string
+  | Idx       of c_exp * c_exp
+  | AddrOf    of c_exp
+  | ECall     of string * c_exp list
 
 type stmt =
   | Assign  of c_exp * c_exp
   | Malloc  : c_exp * 'a typ * (c_exp * 'b typ) option -> stmt
-  | Free    : c_exp -> stmt
+  | Free    of c_exp
   | If      of c_exp * stmt * stmt option
   | While   of c_exp * stmt
   | Break
@@ -97,22 +96,24 @@ type stmt =
   | Call    of string * c_exp list
 
 and block_stmt =
-  | Declaration : 'a typ * string -> block_stmt
-  | Statement   : stmt            -> block_stmt
+  | Declaration : 'a typ * string * c_exp option -> block_stmt
+  | Statement   : stmt                           -> block_stmt
 
 type fundecl =
-  { (*return_type : c_type
-      ; *)name        : string
+  { return_type : c_type
+  ; name        : string
   ; arg_decls   : (c_type * string) list
   ; body        : block_stmt list
   }
 
 module PP = struct
-  let rec pp_typ : type a. (bool -> Format.formatter -> unit) ->
-    Format.formatter -> a typ -> unit =
+  let rec pp_typ :
+    type a. (bool -> Format.formatter -> unit) -> Format.formatter -> a typ -> unit =
     fun f fmt -> function
-      | Int ->
-         Format.fprintf fmt "int %t" (f true)
+      | Void ->
+         Format.fprintf fmt "void %t" (f true)
+      | Int32 ->
+         Format.fprintf fmt "int32_t %t" (f true)
       | Bool ->
          Format.fprintf fmt "bool %t" (f true)
       | Struct nm ->
@@ -136,7 +137,8 @@ module PP = struct
   let pp_struct_decl fmt { name; fields } =
     Format.fprintf fmt "@[<v>@[<v 4>struct %s {@ " name;
     let rec loop = function
-      | [] -> ()
+      | [] ->
+         ()
       | [StructField { fld_name; fld_type }] ->
          pp_decl fmt (fld_type, fld_name);
          Format.pp_print_string fmt ";"
@@ -154,7 +156,8 @@ module PP = struct
 
   let rec pp_expr prec fmt = function
     | Binop (e1, (LAnd | LOr as op), e2) ->
-       (* Special case these because GCC complains about parens in mixed &&, || expressions *)
+       (* Special case these because GCC complains about parens in
+          mixed &&, || expressions *)
        let level = prec_of_binop op in
        Format.fprintf fmt
          "(%a@ %s %a)"
@@ -171,8 +174,8 @@ module PP = struct
          (pp_expr level) e2
     | IntLit i ->
        Format.fprintf fmt "%ld" i
-    | IntMax ->
-       Format.pp_print_string fmt "INT_MAX"
+    | Int32Max ->
+       Format.pp_print_string fmt "INT32_MAX"
     | BoolLit b ->
        Format.fprintf fmt "%b" b
     | StructLit (name, exps) ->
@@ -194,8 +197,10 @@ module PP = struct
        else
          Format.fprintf fmt "*%a" (pp_expr 2) expr
     | AddrOf expr ->
-       (* FIXME: look up the precedence *)
-       Format.fprintf fmt "(&%a)" (pp_expr 2) expr
+       if prec < 3 then
+         Format.fprintf fmt "(&%a)" (pp_expr 2) expr
+       else
+         Format.fprintf fmt "&%a" (pp_expr 2) expr
     | Unop (Neg, expr) ->
        if prec < 3 then
          Format.fprintf fmt "(-%a)" (pp_expr 2) expr
@@ -210,6 +215,10 @@ module PP = struct
        Format.pp_print_string fmt "NULL"
     | StrLit s ->
        Format.fprintf fmt "%S" s
+    | ECall (nm, exps) ->
+       Format.fprintf fmt "@[<hov>%s@,(@[<hv>%a)@]@]"
+         nm
+         Fmt.(list ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
 
   let pp_expr fmt e =
     Format.fprintf fmt "@[<hv>%a@]" (pp_expr 20) e
@@ -230,7 +239,7 @@ module PP = struct
                 Format.pp_print_cut fmt ();
                 pp_stmt fmt stmt);
            loop `Stmt stmts
-        | Declaration (typ, ident) :: stmts ->
+        | Declaration (typ, ident, None) :: stmts ->
            (match previous with
              | `Start ->
                 pp_decl fmt (typ, ident);
@@ -245,6 +254,21 @@ module PP = struct
                 pp_decl fmt (typ, ident);
                 Format.pp_print_string fmt ";");
            loop `Decl stmts
+        | Declaration (typ, ident, Some init) :: stmts ->
+           (match previous with
+             | `Start ->
+                Format.fprintf fmt "%a = %a;"
+                  pp_decl (typ, ident)
+                  pp_expr init
+             | `Decl ->
+                Format.fprintf fmt "@,%a = %a;"
+                  pp_decl (typ, ident)
+                  pp_expr init
+             | `Stmt ->
+                Format.fprintf fmt "@,@,%a = %a;"
+                  pp_decl (typ, ident)
+                  pp_expr init);
+           loop `Decl stmts
         | [] ->
            ()
     in
@@ -253,7 +277,7 @@ module PP = struct
 
   and pp_stmt fmt = function
     | Assign (l_value, expr) ->
-       Format.fprintf fmt "@[<hv>%a =@ %a@];"
+       Format.fprintf fmt "@[<hv 2>%a =@ %a@];"
          pp_expr l_value
          pp_expr expr
     | While (expr, Block stmts) ->
@@ -320,7 +344,7 @@ module PP = struct
     | Return expr ->
        Format.fprintf fmt "return %a;" pp_expr expr
     | Call (nm, exps) ->
-       Format.fprintf fmt "@[<hov>%s@,(@[<hv>%a)@]@];"
+       Format.fprintf fmt "@[<hov 2>%s@,(@[<hv>%a)@]@];"
          nm
          Fmt.(list ~sep:(Fmt.always ",@ ") pp_expr) exps
 
@@ -330,11 +354,11 @@ module PP = struct
     in
     Fmt.(list ~sep:(Fmt.always ", ") pp_arg_decl)
 
-  let pp_fundecl fmt { (*return_type; *)name; arg_decls; body } =
-    (* let Some_type return_type = return_type in *)
+  let pp_fundecl fmt { return_type; name; arg_decls; body } =
+    let Some_type return_type = return_type in
     Format.fprintf fmt
-      "@[<v 0>void %s(%a)@,@[<v 5>{@,%a@]@,}@]"
-      (* pp_typename return_type *)
+      "@[<v 0>%a %s(%a)@,@[<v 5>{@,%a@]@,}@]"
+      pp_typename return_type
       name
       pp_arg_decls arg_decls
       pp_stmts body
@@ -351,13 +375,13 @@ module C () : sig
 end = struct
   type namegen = int
 
-  let gen comm = match comm 0 with `Open stmts | `Closed stmts -> stmts
+  let gen comm =
+    snd (comm 0)
 
   type (_,_) expr = Expr of c_exp
   type 'a exp = ('a, [`exp]) expr
   type 'a var = ('a, [`exp|`var]) expr
-  type comm   =
-    namegen -> [ `Closed of block_stmt list | `Open of block_stmt list ]
+  type comm = namegen -> namegen * block_stmt list
 
   let un_expr (Expr e) = e
 
@@ -368,7 +392,7 @@ end = struct
   type nonrec 'a array = 'a array
   type nonrec 'a structure = 'a structure
 
-  let int = Int
+  let int32 = Int32
   let bool = Bool
   let ptr x = Pointer x
   let array x n = Array (x,n)
@@ -411,11 +435,13 @@ end = struct
 
   (**********************************************************************)
   type _ arg_spec =
-    | End : comm arg_spec
+    | RetVoid : comm arg_spec
+    | RetVal  : 'a typ -> ('a,[`exp]) expr arg_spec
     | Arg : string * 'a typ * 'b arg_spec -> (('a, [`exp]) expr -> 'b) arg_spec
     | Ref : string * 'a typ * 'b arg_spec -> (('a, [`exp|`var]) expr -> 'b) arg_spec
 
-  let return_void = End
+  let return_void = RetVoid
+  let return t = RetVal t
   let (@->) (nm, t) s = Arg (nm, t, s)
   let (@&->) (nm, t) s = Ref (nm, t, s)
 
@@ -425,26 +451,31 @@ end = struct
   let fun_decls () =
     List.rev_map (Hashtbl.find decld_functions) !decld_functions_order
 
-  let rec get_args : type a. a arg_spec -> (c_type * string) list = function
-    | End -> []
-    | Arg (nm, typ, a) -> (Some_type typ, nm) :: get_args a
-    | Ref (nm, typ, a) -> (Some_type (Pointer typ), nm) :: get_args a
+  let rec get_args : type a. a arg_spec -> (c_type * string) list -> c_type * (c_type * string) list = function
+    | RetVoid          -> fun acc -> (Some_type Void, List.rev acc)
+    | RetVal typ       -> fun acc -> (Some_type typ, List.rev acc)
+    | Arg (nm, typ, a) -> fun acc -> get_args a ((Some_type typ, nm) :: acc)
+    | Ref (nm, typ, a) -> fun acc -> get_args a ((Some_type (Pointer typ), nm) :: acc)
 
   let rec apply : type a. a arg_spec -> a -> block_stmt list = function
-    | End            -> fun c -> gen c
+    | RetVoid        -> fun c -> gen c
+    | RetVal t       -> fun e -> [Statement (Return (un_expr e))]
     | Arg (nm, _, a) -> fun b -> apply a (b (Expr (Var nm)))
     | Ref (nm, _, a) -> fun b -> apply a (b (Expr (Deref (Var nm))))
 
   let declare_func ~name ~typ ~body =
     let name = Name_freshener.fresh_for (Hashtbl.mem decld_functions) name in
     decld_functions_order := name :: !decld_functions_order;
+    let return_type, arg_decls = get_args typ [] in
     let decl =
-      { name; arg_decls = get_args typ; body = apply typ body }
+      { name; return_type; arg_decls; body = apply typ body }
     in
     Hashtbl.add decld_functions name decl;
     let rec gen_call : type a. a arg_spec -> c_exp list -> a = function
-      | End ->
-         fun l ng -> `Open [Statement (Call (name, List.rev l))]
+      | RetVoid ->
+         fun l ng -> ng, [Statement (Call (name, List.rev l))]
+      | RetVal _ ->
+         fun l -> Expr (ECall (name, List.rev l))
       | Arg (_, _, a) ->
          fun l (Expr e) -> gen_call a (e::l)
       | Ref (_, _, a) ->
@@ -461,62 +492,63 @@ end = struct
   let not e = Expr (Unop (LNot, un_expr e))
 
   let empty ng =
-    `Open []
+    ng, []
 
   let (^^) c1 c2 ng =
-    match c1 ng, c2 ng with
-      | `Open stmts1,   `Open stmts2   ->
-         `Open (stmts1 @ stmts2)
-      | `Open stmts1,   `Closed stmts2 ->
-         `Closed (stmts1 @ stmts2)
-      | `Closed stmts1, `Open stmts2   ->
-         `Open (Statement (Block stmts1) :: stmts2)
-      | `Closed stmts1, `Closed stmts2 ->
-         `Closed (Statement (Block stmts1) :: stmts2)
+    let ng, s1 = c1 ng in
+    let ng, s2 = c2 ng in
+    ng, s1 @ s2
 
   let rec block = function
-    | `Open [Statement (Block stmts)]
-    | `Closed [Statement (Block stmts)] -> block (`Open stmts)
-    | `Open [Statement stmt]
-    | `Closed [Statement stmt]          -> stmt
-    | `Open stmts
-    | `Closed stmts                     -> Block stmts
+    | [Statement (Block stmts)] -> block stmts
+    | [Statement stmt]          -> stmt
+    | stmts                     -> Block stmts
 
   let (:=) v e ng =
-    `Open [Statement (Assign (un_expr v, un_expr e))]
+    ng, [Statement (Assign (un_expr v, un_expr e))]
 
   let while_ cond ~do_:body ng =
-    `Open [Statement (While (un_expr cond, block (body ng)))]
+    let ng, body = body ng in
+    ng, [Statement (While (un_expr cond, block body))]
 
   let break ng =
-    `Open [Statement Break]
+    ng, [Statement Break]
 
   let ifthen cond ~then_:body ng =
-    `Open [Statement (If (un_expr cond,
-                          block (body ng),
-                          None))]
+    let ng, body = body ng in
+    ng, [Statement (If (un_expr cond,
+                    block body,
+                    None))]
 
   let if_ cond ~then_ ~else_ ng =
-    `Open [Statement (If (un_expr cond,
-                          block (then_ ng),
-                          Some (block (else_ ng))))]
+    let ng, then_ = then_ ng in
+    let ng, else_ = else_ ng in
+    ng, [Statement (If (un_expr cond,
+                    block then_,
+                    Some (block else_)))]
 
   let declare ?(name="x") typ body ng =
     let name = String.map (function ':' -> '_' | x -> x) name in
-    let nm = Printf.sprintf "%s%d" name ng and ng = ng+1 in
-    let decl = Declaration (typ, nm) in
-    match body (Expr (Var nm)) ng with
-      | `Closed stmts | `Open stmts ->
-         `Closed (decl :: stmts)
+    let nm   = Printf.sprintf "%s%d" name ng and ng = ng+1 in
+    let decl = Declaration (typ, nm, None) in
+    let ng, body = body (Expr (Var nm)) ng in
+    ng, decl :: body
+
+  let declare_init ?(name="x") typ init body ng =
+    let name = String.map (function ':' -> '_' | x -> x) name in
+    let nm   = Printf.sprintf "%s%d" name ng and ng = ng+1 in
+    let decl = Declaration (typ, nm, Some (un_expr init)) in
+    let ng, body = body (Expr (Var nm)) ng in
+    ng, decl :: body
 
   let malloc v typ ng =
-    `Open [Statement (Malloc (un_expr v, typ, None))]
+    ng, [Statement (Malloc (un_expr v, typ, None))]
 
   let malloc_ext v typ n typ' ng =
-    `Open [Statement (Malloc (un_expr v, typ, Some (un_expr n, typ')))]
+    ng, [Statement (Malloc (un_expr v, typ, Some (un_expr n, typ')))]
 
   let free e ng =
-    `Open [Statement (Free (un_expr e))]
+    ng, [Statement (Free (un_expr e))]
 
   let deref e = Expr (Deref (un_expr e))
 
@@ -544,20 +576,20 @@ end = struct
   let ( +  ) e1 e2 = Expr (Binop (un_expr e1, Plus, un_expr e2))
   let ( *  ) e1 e2 = Expr (Binop (un_expr e1, Mult, un_expr e2))
   let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
-  let int_max = Expr IntMax
+  let int32_max = Expr Int32Max
 
   let ( =*= ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
   let ( =!*= ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
   let null = Expr Null
 
   let print_int e ng =
-    `Open [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
+    ng, [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
 
   let print_newline ng =
-    `Open [Statement (Call ("printf", [StrLit "\n"]))]
+    ng, [Statement (Call ("printf", [StrLit "\n"]))]
 
   let print_str str ng =
-    `Open [Statement (Call ("fputs", [StrLit str; Var "stdout"]))]
+    ng, [Statement (Call ("fputs", [StrLit str; Var "stdout"]))]
 end
 
 let output f x fmt =
@@ -566,13 +598,13 @@ let output f x fmt =
   let stmts   = C.gen main_comm in
   let structs = C.struct_decls () in
   let funcs   = C.fun_decls () in
-  Format.pp_set_margin fmt 300;
-  Format.pp_set_max_indent fmt 280;
+  Format.pp_set_margin fmt 90;
+  Format.pp_set_max_indent fmt 80;
   Format.pp_open_vbox fmt 0;
   Format.fprintf fmt "#include <stdlib.h>@,";
   Format.fprintf fmt "#include <stdio.h>@,";
   Format.fprintf fmt "#include <stdbool.h>@,";
-  Format.fprintf fmt "#include <limits.h>@,@,";
+  Format.fprintf fmt "#include <stdint.h>@,@,";
   structs |> List.iter begin fun struct_decl ->
     PP.pp_struct_decl fmt struct_decl;
     Format.pp_print_cut fmt ()

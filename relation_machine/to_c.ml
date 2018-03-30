@@ -2,14 +2,14 @@
 
 module IntTupleKey
     (S : Idealised_algol.Syntax.S)
-    (W : sig val width : int end)
+    (A : sig val arity : int end)
     ()
   : sig
     include Idealised_algol.Btree.KEY with module S = S
 
-    val create : int S.exp array -> t S.exp
+    val create : int32 S.exp array -> t S.exp
 
-    val get : t S.exp -> int -> int S.exp
+    val get : t S.exp -> int -> int32 S.exp
   end =
 struct
   module S = S
@@ -18,7 +18,7 @@ struct
   type t = key S.structure
   let t : t S.typ = S.structure "key"
   let val_fields =
-    Array.init W.width (fun i -> S.field t (Printf.sprintf "x%d" i) S.int)
+    Array.init A.arity (fun i -> S.field t (Printf.sprintf "x%d" i) S.int32)
   let () = S.seal t
 
   let create exps =
@@ -28,43 +28,58 @@ struct
     let open! S in
     x#.val_fields.(i)
 
-  let eq x y =
-    let rec loop i acc =
-      if i = W.width then
-        acc
-      else
-        loop (i+1)
-          (let open! S in
-           acc && x#.val_fields.(i) == y#.val_fields.(i))
-    in
-    loop 1
-      (let open! S in x#.val_fields.(0) == y#.val_fields.(0))
+  let eq =
+    S.declare_func
+      ~name:"eq"
+      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~body:begin fun x y ->
+        let rec loop i acc =
+          if i = A.arity then
+            acc
+          else
+            loop (i+1)
+              (let open! S in
+               acc && x#.val_fields.(i) == y#.val_fields.(i))
+        in
+        loop 1
+          (let open! S in x#.val_fields.(0) == y#.val_fields.(0))
+      end
 
-  let le x y =
-    let rec loop i =
-      if i = W.width - 1 then
-        let open! S in
-        x#.val_fields.(i) <= y#.val_fields.(i)
-      else
-        let e = loop (i+1) in
-        let open! S in
-        x#.val_fields.(i) < y#.val_fields.(i)
-        || (x#.val_fields.(i) == y#.val_fields.(i) && e)
-    in
-    loop 0
+  let le =
+    S.declare_func
+      ~name:"le"
+      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~body:begin fun x y ->
+        let rec loop i =
+          if i = A.arity - 1 then
+            let open! S in
+            x#.val_fields.(i) <= y#.val_fields.(i)
+          else
+            let e = loop (i+1) in
+            let open! S in
+            x#.val_fields.(i) < y#.val_fields.(i)
+            || (x#.val_fields.(i) == y#.val_fields.(i) && e)
+        in
+        loop 0
+      end
 
-  let lt x y =
-    let rec loop i =
-      if i = W.width - 1 then
-        let open! S in
-        x#.val_fields.(i) < y#.val_fields.(i)
-      else
-        let e = loop (i+1) in
-        let open! S in
-        x#.val_fields.(i) < y#.val_fields.(i)
-        || (x#.val_fields.(i) == y#.val_fields.(i) && e)
-    in
-    loop 0
+  let lt =
+    S.declare_func
+      ~name:"lt"
+      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~body:begin fun x y ->
+        let rec loop i =
+          if i = A.arity - 1 then
+            let open! S in
+            x#.val_fields.(i) < y#.val_fields.(i)
+          else
+            let e = loop (i+1) in
+            let open! S in
+            x#.val_fields.(i) < y#.val_fields.(i)
+            || (x#.val_fields.(i) == y#.val_fields.(i) && e)
+        in
+        loop 0
+      end
 end
 
 module type INDEXED_TABLE = sig
@@ -78,27 +93,27 @@ module type INDEXED_TABLE = sig
 
   val iterate :
     handle ->
-    pat:[`Wild | `Fixed of int S.exp] array ->
-    (int S.exp array -> S.comm) ->
+    pat:[`Wild | `Fixed of int32 S.exp] array ->
+    (int32 S.exp array -> S.comm) ->
     S.comm
 
   val iterate_all :
     handle ->
-    (int S.exp array -> S.comm) ->
+    (int32 S.exp array -> S.comm) ->
     S.comm
 
-  val insert : handle -> int S.exp array -> S.comm
+  val insert : handle -> int32 S.exp array -> S.comm
 
   val ifmember_pat :
     handle ->
-    pat:[`Wild | `Fixed of int S.exp] array ->
+    pat:[`Wild | `Fixed of int32 S.exp] array ->
     then_:S.comm ->
     else_:S.comm ->
     S.comm
 
   val ifmember :
     handle ->
-    int S.exp array ->
+    int32 S.exp array ->
     then_:S.comm ->
     else_:S.comm ->
     S.comm
@@ -116,17 +131,14 @@ struct
   module S = S
 
   let _ =
+    (* FIXME: raise invalid_arg? *)
     assert (A.arity > 0);
     assert (Array.length A.indexes > 0);
     assert (Array.for_all (fun a -> Array.length a = A.arity) A.indexes)
 
-  let arity =
-    A.arity
+  let arity = A.arity
 
-  module Key =
-    IntTupleKey (S)
-      (struct let width = A.arity end)
-      ()
+  module Key = IntTupleKey (S) (A) ()
 
   module BT =
     Idealised_algol.Btree.Make (S)
@@ -146,14 +158,10 @@ struct
     loop 0 []
 
   let conv_pattern pat =
-    Array.fold_left
-      (fun (i, l) p ->
-         (i+1,
-          match p with
-            | `Fixed _ -> i::l
-            | `Wild    -> l))
+    pat
+    |> Array.fold_left
+      (fun (i, l) p -> (i+1, match p with `Fixed _ -> i::l | `Wild    -> l))
       (0,[])
-      pat
     |> snd
     |> List.rev
     |> Array.of_list
@@ -208,7 +216,7 @@ struct
               if i < Array.length prefix_pat then
                 get_fixed (pat.(prefix_pat.(i)))
               else
-                S.int_max))
+                S.int32_max))
     in
     k handle minimum maximum perm_inv
 
@@ -250,6 +258,9 @@ end
 
 module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
+  let map_seq f =
+    List.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
+
   module BL = Idealised_algol.Block_list.Make (IA) ()
 
   module type INDEXED_TABLE = INDEXED_TABLE with module S = IA
@@ -258,9 +269,9 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Plain   : BL.handle -> value
     | Indexed : (module INDEXED_TABLE with type handle = 'h) * 'h -> value
 
-  module Env = Map.Make (Syntax.RelVar)
+  module RelEnv = Map.Make (Syntax.RelVar)
 
-  module LEnv = Map.Make (String)
+  module AttrEnv = Map.Make (Syntax.Attr)
 
   let rec and_list = function
     | []    -> IA.true_
@@ -268,11 +279,11 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | e::es -> IA.(&&) e (and_list es)
 
   let condition lenv exps = let open! IA in function
-    | (i, Syntax.Attr nm) -> exps.(i) == LEnv.find nm lenv
+    | (i, Syntax.Attr nm) -> exps.(i) == AttrEnv.find nm lenv
     | (i, Syntax.Lit j)   -> exps.(i) == const j
 
   let exp_of_scalar lenv = function
-    | Syntax.Attr nm -> LEnv.find nm lenv
+    | Syntax.Attr nm -> AttrEnv.find nm lenv
     | Syntax.Lit j   -> IA.const j
 
   let pattern_of_conditions arity lenv conditions =
@@ -300,7 +311,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
   let projections_to_lenv projections attrs lenv =
     List.fold_right
-      (fun (i, nm) -> LEnv.add nm attrs.(i))
+      (fun (i, nm) -> AttrEnv.add nm attrs.(i))
       projections
       lenv
 
@@ -315,26 +326,27 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
        k vals
 
     | Syntax.Return { guard_relation=Some guard; values } ->
-       begin match Env.find guard env with
-         | Plain _ ->
-            failwith "plain relation used as a guard"
-         | Indexed (m, handle) ->
-            let module IT = (val m) in
-            let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
-            IT.ifmember handle vals ~then_:IA.empty ~else_:(k vals)
+       begin
+         match RelEnv.find guard env with
+           | Plain _ ->
+              failwith "plain relation used as a guard"
+           | Indexed (m, handle) ->
+              let module IT = (val m) in
+              let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
+              IT.ifmember handle vals ~then_:IA.empty ~else_:(k vals)
        end
 
     | Syntax.Select { relation; conditions; projections; cont } ->
-       begin match Env.find relation env with
+       begin match RelEnv.find relation env with
          | Plain handle ->
-            (* FIXME: emit a warning if conditions contains anything,
-               or if projections is empty. *)
-            BL.iterate handle @@ fun attrs ->
-            if_conj (List.map (condition lenv attrs) conditions)
-              begin%monoid.IA
-                let lenv = projections_to_lenv projections attrs lenv in
-                translate_expr cont env lenv k
-              end
+            begin
+              (* FIXME: emit a warning if conditions contains anything,
+                 or if projections is empty. *)
+              BL.iterate handle @@ fun attrs ->
+              if_conj (List.map (condition lenv attrs) conditions)
+                (let lenv = projections_to_lenv projections attrs lenv in
+                 translate_expr cont env lenv k)
+            end
          | Indexed (m, handle) ->
             begin
               let module IT = (val m) in
@@ -345,90 +357,96 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
                      ~then_:(translate_expr cont env lenv k)
                      ~else_:IA.empty
                 | [], projections ->
-                   IT.iterate_all handle @@ fun attrs -> begin%monoid.IA
-                     let lenv = projections_to_lenv projections attrs lenv in
-                     translate_expr cont env lenv k
-                   end
+                   (IT.iterate_all handle @@ fun attrs ->
+                    let lenv = projections_to_lenv projections attrs lenv in
+                    translate_expr cont env lenv k)
                 | conditions, projections ->
-                   let pat = pattern_of_conditions IT.arity lenv conditions in
-                   IT.iterate handle ~pat @@ fun attrs -> begin%monoid.IA
-                     let lenv = projections_to_lenv projections attrs lenv in
-                     translate_expr cont env lenv k
-                   end
+                   (let pat = pattern_of_conditions IT.arity lenv conditions in
+                    IT.iterate handle ~pat @@ fun attrs ->
+                    let lenv = projections_to_lenv projections attrs lenv in
+                    translate_expr cont env lenv k)
             end
        end
 
-  let rec translate_comm comm env = match comm with
+  let rec translate_comm env = function
     | Syntax.WhileNotEmpty (vars, body) ->
        let check_empty nm =
-         match Env.find nm env with
+         match RelEnv.find nm env with
            | Plain handle -> BL.is_empty handle
            | Indexed _    -> failwith "emptiness test on an indexed table"
        in
-       IA.while_
-         (IA.not (and_list (List.map check_empty vars)))
-         ~do_:begin%monoid.IA
-           translate_comms body env
-         end
+       IA.while_ (IA.not (and_list (List.map check_empty vars)))
+         ~do_:(translate_comms env body)
 
     | Insert (relvar, expr) ->
-       translate_expr expr env LEnv.empty @@ fun vals -> begin%monoid.IA
-         match Env.find relvar env with
-           | Plain handle ->
-              BL.insert handle vals
-           | Indexed (m, handle) ->
-              let module IT = (val m) in IT.insert handle vals
-       end
+       (translate_expr expr env AttrEnv.empty @@ fun vals ->
+        match RelEnv.find relvar env with
+          | Plain handle ->
+             BL.insert handle vals
+          | Indexed (m, handle) ->
+             let module IT = (val m) in IT.insert handle vals)
 
     | Declare (vars, body) ->
        List.fold_right
          (fun (Syntax.{ident;arity} as varnm) k env ->
             BL.declare ~name:ident ~arity
-              (fun handle -> k (Env.add varnm (Plain handle) env)))
+              (fun handle -> k (RelEnv.add varnm (Plain handle) env)))
          vars
-         (translate_comms body)
+         (fun env -> translate_comms env body)
          env
 
     | Move { src; tgt } ->
-       (match Env.find src env, Env.find tgt env with
+       (match RelEnv.find src env, RelEnv.find tgt env with
          | Plain src, Plain tgt ->
             BL.move ~src ~tgt
          | _ ->
             failwith "Attempted move between indexed relations")
 
-  and translate_comms comms env =
-    let open! IA in
-    List.fold_left
-      (fun code comm -> code ^^ translate_comm comm env)
-      empty
-      comms
+  and translate_comms env comms =
+    map_seq (translate_comm env) comms
 
-  let translate_prog (Syntax.{ idb_relvars; commands } as code) =
-    let indexes = Indexes.indexes code in
-    List.fold_right
-      (fun relvar k env ->
+  let translate_idb_predicate indexes relvar k env =
+    match List.assoc relvar indexes with
+      | exception Not_found ->
+         BL.declare
+           ~name:relvar.Syntax.ident
+           ~arity:relvar.Syntax.arity
+           begin fun handle ->
+             begin%monoid.IA
+               k (RelEnv.add relvar (Plain handle) env);
+               print_strln relvar.Syntax.ident;
+               BL.iterate handle print_exps
+             end
+           end
+      | indexes ->
          let module P = struct
            let arity = relvar.Syntax.arity
-           let indexes =
-             try Array.of_list (List.assoc relvar indexes)
-             with Not_found -> [|Array.init arity (fun i -> i)|]
+           let indexes = Array.of_list indexes
          end in
          let module IT = Make_Indexed_Table (IA) (P) () in
+         let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
          IT.declare
            ~name:relvar.Syntax.ident
            begin fun handle ->
-             let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
-             let value = Indexed (m, handle) in
              begin%monoid.IA
-               k (Env.add relvar value env);
-               IA.print_str relvar.Syntax.ident;
-               IA.print_newline;
+               k (RelEnv.add relvar (Indexed (m, handle)) env);
+               print_strln relvar.Syntax.ident;
                IT.iterate_all handle print_exps
              end
-           end)
-      idb_relvars
-      (translate_comms commands)
-      Env.empty
+           end
+
+  (* FIXME: do this properly, adding code to load the data from CSV files *)
+  let translate_edb_predicate =
+    translate_idb_predicate
+
+  let translate_prog (Syntax.{ idb_relvars; edb_relvars; commands } as code) =
+    let indexes = Indexes.indexes code in
+    let prog =
+      (fun env -> translate_comms env commands)
+      |> List.fold_right (translate_idb_predicate indexes) idb_relvars
+      |> List.fold_right (translate_edb_predicate indexes) edb_relvars
+    in
+    prog RelEnv.empty
 end
 
 let generator (type comm)

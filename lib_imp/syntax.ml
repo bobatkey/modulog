@@ -10,7 +10,7 @@ module type S = sig
   (**{3 Representations of basic types}*)
 
   (** Representation of the type of machine integers. *)
-  val int : int typ
+  val int32 : int32 typ
 
   (** Representation of the type of booleans. *)
   val bool : bool typ
@@ -49,17 +49,17 @@ module type S = sig
 
   (** {3 Integer expressions} *)
 
-  val const : int32 -> int exp
-  val ( < ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( > ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( >= ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( <= ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( == ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( != ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> bool exp
-  val ( + ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
-  val ( * ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
-  val ( - ) : (int, [>`exp]) expr -> (int, [>`exp]) expr -> int exp
-  val int_max : int exp
+  val const : int32 -> int32 exp
+  val ( < ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( > ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( >= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( <= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( == ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( != ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+  val ( + ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+  val ( * ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+  val ( - ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+  val int32_max : int32 exp
 
   (** {3 Structs} *)
 
@@ -86,7 +86,7 @@ module type S = sig
   val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
 
   (** Array indexing. *)
-  val (#@) : ('a array, [>`exp]) expr -> (int, [>`exp]) expr -> ('a,[<`exp|`var]) expr
+  val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
   (** Combined pointer dereference and structure field access. *)
   val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
@@ -121,19 +121,23 @@ module type S = sig
   (** Declare a new variable. Takes an optional name hint. *)
   val declare : ?name:string -> 'a typ -> ('a var -> comm) -> comm
 
+  (** Declare a new variable with an expression for the initial
+      value. Takes an optional name hint. *)
+  val declare_init : ?name:string -> 'a typ -> ('a,[>`exp]) expr -> ('a var -> comm) -> comm
+
   (** Heap allocate some memory to hold values of a given type. *)
   val malloc : 'a ptr var -> 'a typ -> comm
 
   (** Heap allocate some memory to holds values of a given type, and
       dynamically some extra memory. *)
-  val malloc_ext : 'a ptr var -> 'a typ -> (int,[>`exp]) expr -> _ typ -> comm
+  val malloc_ext : 'a ptr var -> 'a typ -> (int32,[>`exp]) expr -> _ typ -> comm
   (* TODO: distinguish arbitrary length from fixed length structures somehow. *)
 
-  (** Free heap allocated memory. *)
+  (** Free heap allocated memory that came from malloc. *)
   val free : ('a ptr, [>`exp]) expr -> comm
 
   (** Print an integer to standard out. *)
-  val print_int : (int, [>`exp]) expr -> comm
+  val print_int : (int32, [>`exp]) expr -> comm
 
   (** Print a newline to standard out. *)
   val print_newline : comm
@@ -146,6 +150,8 @@ module type S = sig
   type 'a arg_spec
 
   val return_void : comm arg_spec
+
+  val return : 'a typ -> 'a exp arg_spec
 
   val (@->) : string * 'a typ -> 'b arg_spec -> ('a exp -> 'b) arg_spec
 

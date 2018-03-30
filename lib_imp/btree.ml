@@ -9,9 +9,9 @@ module type KEY = sig
 
   val t : t S.typ
 
-  val lt : (t,[>`exp]) S.expr -> (t,[>`exp]) S.expr -> bool S.exp
-  val le : (t,[>`exp]) S.expr -> (t,[>`exp]) S.expr -> bool S.exp
-  val eq : (t,[>`exp]) S.expr -> (t,[>`exp]) S.expr -> bool S.exp
+  val lt : t S.exp -> t S.exp -> bool S.exp
+  val le : t S.exp -> t S.exp -> bool S.exp
+  val eq : t S.exp -> t S.exp -> bool S.exp
 end
 
 module type S = sig
@@ -67,7 +67,7 @@ module Make
   type node
   let node : node structure typ = structure "node"
   let leaf     = field node "leaf" bool
-  let nkeys    = field node "nkeys" int
+  let nkeys    = field node "nkeys" int32
   let keys     = field node "keys" (array K.t max_keys)
   let children = field node "children" (array (ptr node) child_slots)
   let ()       = seal node
@@ -85,7 +85,7 @@ module Make
   let find_key =
     declare_func
       ~name:"find_key"
-      ~typ:(("i", int) @&-> ("x",ptr node) @-> ("key",K.t) @-> return_void)
+      ~typ:(("i", int32) @&-> ("x",ptr node) @-> ("key",K.t) @-> return_void)
       ~body:begin fun i x key ->
         begin%monoid
           i := const 0l;
@@ -94,11 +94,8 @@ module Make
         end
       end
 
-  let with_nodeptr init body =
-    declare ~name:"node" (ptr node) @@ fun x -> begin%monoid
-      x := init;
-      body x
-    end
+  let with_nodeptr ~name init body =
+    declare_init ~name (ptr node) init body
 
   let alloc_node body =
     declare ~name:"node" (ptr node) @@ fun x -> begin%monoid
@@ -107,7 +104,7 @@ module Make
     end
 
   let with_int body =
-    declare ~name:"i" int body
+    declare ~name:"i" int32 body
 
   let loop body =
     while_ true_ ~do_:body
@@ -123,7 +120,7 @@ module Make
 
   (************************************************************)
   let ifmember key t yes no =
-    with_nodeptr t @@ fun x ->
+    with_nodeptr ~name:"cursor" t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
       find_key i (to_exp x) key;
@@ -136,7 +133,7 @@ module Make
 
   (************************************************************)
   let ifmember_range from upto t yes no =
-    with_nodeptr t @@ fun x ->
+    with_nodeptr ~name:"cursor" t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
       find_key i (to_exp x) from;
@@ -154,8 +151,8 @@ module Make
   let max_stack_depth = 40l
 
   let iterate_range from upto (tree : handle) body =
-    with_nodeptr tree @@ fun x ->
-    Stk.with_stack max_stack_depth (ptr node) int @@
+    with_nodeptr ~name:"cursor" tree @@ fun x ->
+    Stk.with_stack max_stack_depth (ptr node) int32 @@
     fun Stk.{push;pop;top;is_empty} ->
     with_int @@ fun i ->
     begin%monoid
@@ -202,18 +199,16 @@ module Make
 
   (************************************************************)
   let iterate_all tree body =
-    with_nodeptr tree @@ fun x ->
-    Stk.with_stack max_stack_depth (ptr node) int @@
+    with_nodeptr ~name:"cursor" tree @@ fun x ->
+    Stk.with_stack max_stack_depth (ptr node) int32 @@
     fun Stk.{push;pop;top;is_empty} -> begin%monoid
       while_ (not x#->leaf)
         ~do_:begin%monoid
           push x (const 0l);
           x := x#->children#@(const 0l)
         end;
-      with_int @@ fun i -> begin%monoid
-        i := const 0l;
-
-        loop begin%monoid
+      loop begin%monoid
+        declare_init ~name:"i" int32 (const 0l) @@ fun i -> begin%monoid
           while_ (i < x#->nkeys)
             ~do_:begin%monoid
               body x#->keys#@i;
@@ -239,8 +234,6 @@ module Make
               push x (const 0l);
               x := x#->children#@(const 0l)
             end;
-
-          i := const 0l;
         end
       end
     end
@@ -248,31 +241,25 @@ module Make
   (************************************************************)
   (* Insertion *)
   let move_keys_up x i =
-    with_int @@ fun j ->
-    begin%monoid
-      j := x#->nkeys - const 1l;
-      while_ (j >= i) ~do_:begin%monoid
-        x#->keys#@(j + const 1l) := x#->keys#@j;
-        decr j
-      end
+    declare_init ~name:"j" int32 (x#->nkeys - const 1l) @@ fun j ->
+    while_ (j >= i) ~do_:begin%monoid
+      x#->keys#@(j + const 1l) := x#->keys#@j;
+      decr j
     end
 
   let copy ~n ~src ~dst =
-    with_int @@ fun j ->
-    begin%monoid
-      j := const 0l;
-      while_ (j < n) begin%monoid
-        dst j := src j;
-        incr j
-      end
+    declare_init ~name:"j" int32 (const 0l) @@ fun j ->
+    while_ (j < n) ~do_:begin%monoid
+      dst j := src j;
+      incr j
     end
 
   let split_child =
     declare_func
       ~name:"split_child"
-      ~typ:(("x", ptr node) @-> ("i", int) @-> return_void)
+      ~typ:(("x", ptr node) @-> ("i", int32) @-> return_void)
       ~body:begin fun x i ->
-        with_nodeptr x#->children#@i @@ fun y ->
+        with_nodeptr ~name:"child" x#->children#@i @@ fun y ->
         alloc_node @@ fun z ->
         begin%monoid
           z#->leaf := y#->leaf;
@@ -296,9 +283,8 @@ module Make
 
           (* shunt x's children up *)
           begin
-            with_int @@ fun j ->
+            declare_init ~name:"i" int32 (x#->nkeys) @@ fun j ->
             begin%monoid
-              j := x#->nkeys;
               while_ (j > i) ~do_:begin%monoid
                 x#->children#@(j + const 1l) := x#->children#@j;
                 decr j
@@ -321,7 +307,7 @@ module Make
     declare_func ~name:"insert_nonfull"
       ~typ:(("x", ptr node) @-> ("key", K.t) @-> return_void)
       ~body:begin fun x' key ->
-        with_nodeptr x' @@ fun x ->
+        with_nodeptr ~name:"insert_cursor" x' @@ fun x ->
         with_int @@ fun i ->
         begin%monoid
           while_ (not x#->leaf) begin%monoid
@@ -361,7 +347,6 @@ module Make
             end
           end;
           (* Once the root is not full, insert the key into it. *)
-          (* with_nodeptr root @@ fun x -> *)
           insert_nonfull (to_exp root) key
         end
       end
