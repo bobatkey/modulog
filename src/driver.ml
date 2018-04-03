@@ -6,7 +6,7 @@ let typecheck filename =
     | Ok (str, sg) ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.Mod.pp_signature sg
+         Modlog.Checked_syntax.Mod.pp_signature sg
 
     | Error err ->
        Format.printf

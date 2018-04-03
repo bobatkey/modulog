@@ -45,16 +45,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
          (Fmt.list ~sep:(Fmt.always " |@ ") pp_enum_sym) syms
 
   and pp_domaintypes pp tys =
-    let rec lp = function
-      | [] ->
-         ()
-      | [ty] ->
-         pp_domaintype pp ty
-      | ty::tys ->
-         Format.fprintf pp "%a *@ " pp_domaintype ty;
-         lp tys
-    in
-    lp tys
+    Fmt.(list ~sep:(always " *@ ") pp_domaintype) pp tys
 
   type predicate_type =
     { predty_loc  : Location.t
@@ -117,12 +108,12 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 
   let pp_def_decl fmt = function
     | (id, (), Some domty) ->
-      Format.fprintf fmt "type %a = %a"
-        Names.pp_ident id
-        pp_domaintype domty
+       Format.fprintf fmt "type %a = %a"
+         Names.pp_ident id
+         pp_domaintype domty
     | (id, (), None) ->
-      Format.fprintf fmt "type %a"
-        Names.pp_ident id
+       Format.fprintf fmt "type %a"
+         Names.pp_ident id
 
   let pp_val_decl fmt = function
     | (id, Predicate {predty_data=tys}) ->
@@ -142,17 +133,14 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | {expr_data = Expr_enum sym}   -> pp_enum_sym fmt sym
     | {expr_data = Expr_lid lid}    -> Names.pp_longident fmt lid
 
-  and pp_exprs pp = function
-    | [] -> ()
-    | expr::exprs ->
-       pp_expr pp expr;
-       List.iter (Format.fprintf pp ", %a" pp_expr) exprs
+  and pp_exprs pp =
+    Fmt.(list ~sep:(always ", ") pp_expr) pp
 
   let pp_atom pp = function
     | {atom_data = Atom_predicate {pred; args}} ->
        Format.fprintf pp "%a(%a)"
          Names.pp_longident pred
-         pp_exprs args
+         pp_exprs           args
 
   let pp_rule pp {rule_pred; rule_args; rule_rhs} =
     Format.pp_open_hovbox pp 4;
@@ -161,23 +149,16 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       pp_exprs rule_args;
     (match rule_rhs with
       | [] -> ()
-      | atom::atoms ->
-         Format.fprintf pp " :- %a" pp_atom atom;
-         List.iter (Format.fprintf pp ",@ %a" pp_atom) atoms);
+      | atoms ->
+         Format.fprintf pp " :- %a"
+           Fmt.(list ~sep:(always ",@ ") pp_atom) atoms);
     Format.pp_close_box pp ()
 
   let pp_decl pp {decl_name; decl_type; decl_rules} =
-    Format.pp_open_vbox pp 0;
-    Format.fprintf pp "%a : @[<h>%a@]@,"
-      Names.pp_ident decl_name
-      pp_domaintypes decl_type.predty_data;
-    let rec pp_rules = function
-      | []          -> ()
-      | [rule]      -> pp_rule pp rule
-      | rule::rules -> pp_rule pp rule; Format.pp_print_space pp (); pp_rules rules
-    in
-    pp_rules decl_rules;
-    Format.pp_close_box pp ()
+    Format.fprintf pp "@[<v 0>%a : @[<h>%a@]@,%a@]"
+      Names.pp_ident                        decl_name
+      pp_domaintypes                        decl_type.predty_data
+      Fmt.(list ~sep:(always "@ ") pp_rule) decl_rules
 
   let pp_pred_defs pp = function
     | [] -> ()

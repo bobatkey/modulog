@@ -1,1 +1,1 @@
-val from_structure : Checker.Mod.structure -> Datalog.Ruleset.ruleset
+val from_structure : Checked_syntax.Mod.structure -> Datalog.Ruleset.ruleset

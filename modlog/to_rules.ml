@@ -1,7 +1,7 @@
 module RS = Datalog.Ruleset
 
 module Eval = struct
-  module Core = Checker.Core
+  module Core = Checked_syntax.Core
 
   open Core
 
@@ -179,7 +179,7 @@ module Eval = struct
 end
 
 module Evaluator =
-  Modules.Evaluator.Make (Checker.Mod) (Eval)
+  Modules.Evaluator.Make (Checked_syntax.Mod) (Eval)
 
 let from_structure structure =
   Eval.run (Evaluator.eval_structure structure)
