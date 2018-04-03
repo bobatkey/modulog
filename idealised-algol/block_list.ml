@@ -31,20 +31,17 @@ module Make (S : Syntax.S) () : S with module S = S = struct
   let ()       = seal list_node
 
   type handle =
-    { arity : int
+    { arity : int32
     ; name  : string
     ; var   : list_node structure ptr var
     }
-
-  let arity handle =
-    handle.arity
 
   let is_empty {var} =
     var =*= null
 
   let free_list p =
     while_ (p =!*= null) ~do_:begin%monoid
-      declare_init ~name:"ahead" (ptr list_node) p#->next @@ fun ahead ->
+      declare ~name:"ahead" (ptr list_node) ~init:p#->next @@ fun ahead ->
       begin%monoid
         free p;
         p := ahead
@@ -55,7 +52,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     if a1 <> a2 then
       invalid_arg "Block_list.Make.move: mismatched arities";
     begin%monoid
-      declare_init ~name:"cursor" (ptr list_node) tgt free_list;
+      declare ~name:"cursor" (ptr list_node) ~init:tgt free_list;
       tgt := src;
       src := null;
     end
@@ -69,11 +66,11 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     Array.fold_left (^^) empty
 
   let read val_array offset arity =
-    Array.init arity
+    Array.init (Int32.to_int arity)
       (fun i -> val_array#@(offset + const (Int32.of_int i)))
 
   let new_block v ~arity ~vals ~next:nxt =
-    let length = Int32.mul (Int32.of_int arity) block_size in
+    let length = Int32.mul arity block_size in
     begin%monoid
       malloc_ext v list_node (const length) int32;
       v#->occupied := const 1l;
@@ -82,7 +79,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     end
 
   let insert {var=head; arity} vals =
-    if Array.length vals <> arity then
+    if Array.length vals <> Int32.to_int arity then
       invalid_arg "Block_list.Make.insert: arity mismatch";
     if_ (head =*= null)
       ~then_:begin%monoid
@@ -97,30 +94,31 @@ module Make (S : Syntax.S) () : S with module S = S = struct
             end
           end
           ~else_:begin%monoid
-            write (head#->values)
-              (head#->occupied * const (Int32.of_int arity)) vals;
+            write head#->values (head#->occupied * const arity) vals;
             head#->occupied := head#->occupied + const 1l
           end
       end
 
   let iterate {var=head; arity} body =
-    declare_init ~name:"cursor" (ptr list_node) head @@ fun node -> begin%monoid
+    declare ~name:"cursor" (ptr list_node) ~init:head @@ fun node ->
+    begin%monoid
       while_ (node =!*= null)
         ~do_:begin%monoid
-          declare_init ~name:"i" int32 (const 0l) @@ fun i -> begin%monoid
-            while_ (i < (node#->occupied * const (Int32.of_int arity)))
+          declare ~name:"i" int32 ~init:(const 0l) @@ fun i ->
+          begin%monoid
+            while_ (i < (node#->occupied * const arity))
               ~do_:begin%monoid
-                body (read (node#->values) i arity);
-                i := i + const (Int32.of_int arity)
+                body (read node#->values i arity);
+                i := i + const arity
               end;
-
             node := node#->next
           end
         end
     end
 
   let declare ~name ~arity k =
-    declare_init ~name (ptr list_node) null @@ fun var ->
+    let arity = Int32.of_int arity in
+    declare ~name (ptr list_node) ~init:null @@ fun var ->
     begin%monoid
       k { arity; name; var };
       free_list var

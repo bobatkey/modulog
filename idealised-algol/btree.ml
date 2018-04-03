@@ -96,7 +96,7 @@ module Make
       end
 
   let with_nodeptr ~name init body =
-    declare_init ~name (ptr node) init body
+    S.declare ~name (ptr node) ~init body
 
   let alloc_node body =
     declare ~name:"node" (ptr node) @@ fun x -> begin%monoid
@@ -105,7 +105,7 @@ module Make
     end
 
   let with_int body =
-    declare ~name:"i" int32 body
+    declare ~name:"i" int32 ~init:(const 0l) body
 
   let loop body =
     while_ Bool.true_ ~do_:body
@@ -212,7 +212,7 @@ module Make
           x := x#->children#@(const 0l)
         end;
       loop begin%monoid
-        declare_init ~name:"i" int32 (const 0l) @@ fun i -> begin%monoid
+        S.declare ~name:"i" int32 ~init:(const 0l) @@ fun i -> begin%monoid
           while_ (i < x#->nkeys)
             ~do_:begin%monoid
               body x#->keys#@i;
@@ -244,15 +244,16 @@ module Make
 
   (************************************************************)
   (* Insertion *)
+
   let move_keys_up x i =
-    declare_init ~name:"j" int32 (x#->nkeys - const 1l) @@ fun j ->
+    S.declare ~name:"j" int32 ~init:(x#->nkeys - const 1l) @@ fun j ->
     while_ (j >= i) ~do_:begin%monoid
       x#->keys#@(j + const 1l) := x#->keys#@j;
       decr j
     end
 
   let copy ~n ~src ~dst =
-    declare_init ~name:"j" int32 (const 0l) @@ fun j ->
+    S.declare ~name:"j" int32 ~init:(const 0l) @@ fun j ->
     while_ (j < n) ~do_:begin%monoid
       dst j := src j;
       incr j
@@ -283,11 +284,11 @@ module Make
           end;
 
           (* truncate y *)
-          y #-> nkeys := const min_keys;
+          y#->nkeys := const min_keys;
 
           (* shunt x's children up *)
           begin
-            declare_init ~name:"i" int32 (x#->nkeys) @@ fun j ->
+            S.declare ~name:"i" int32 ~init:(x#->nkeys) @@ fun j ->
             begin%monoid
               while_ (j > i) ~do_:begin%monoid
                 x#->children#@(j + const 1l) := x#->children#@j;
@@ -338,13 +339,13 @@ module Make
       ~typ:(("key", K.t) @-> ("root", ptr node) @&-> return_void)
       ~body:begin fun key root ->
         begin%monoid
-          (* if the root is full, then split it by making a new root node
-                   with a single child, and using split_child *)
+          (* if the root is full, then split it by making a new root
+             node with a single child, and using split_child *)
           ifthen (node_is_full root) begin
             alloc_node @@ fun s ->
             begin%monoid
-              s #-> leaf := Bool.false_;
-              s #-> nkeys := const 0l;
+              s#->leaf := Bool.false_;
+              s#->nkeys := const 0l;
               s#->children#@(const 0l) := root;
               split_child (to_exp s) (const 0l);
               root := s

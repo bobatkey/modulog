@@ -29,7 +29,7 @@ end = struct
   let with_stack max_depth typ1 typ2 body =
     declare ~name:"stack1_" (array typ1 max_depth) @@ fun stack1 ->
     declare ~name:"stack2_" (array typ2 max_depth) @@ fun stack2 ->
-    declare_init ~name:"stackptr" int32 (const 0l) @@ fun stackptr ->
+    declare ~name:"stackptr" int32 ~init:(const 0l) @@ fun stackptr ->
     let push x1 x2 =
       begin%monoid
         stack1 #@ stackptr := x1;

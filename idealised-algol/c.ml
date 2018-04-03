@@ -532,17 +532,11 @@ end = struct
                     block then_,
                     Some (block else_)))]
 
-  let declare ?(name="x") typ body ng =
+  let declare ?(name="x") typ ?init body ng =
     let name = String.map (function ':' -> '_' | x -> x) name in
     let nm   = Printf.sprintf "%s%d" name ng and ng = ng+1 in
-    let decl = Declaration (typ, nm, None) in
-    let ng, body = body (Expr (Var nm)) ng in
-    ng, decl :: body
-
-  let declare_init ?(name="x") typ init body ng =
-    let name = String.map (function ':' -> '_' | x -> x) name in
-    let nm   = Printf.sprintf "%s%d" name ng and ng = ng+1 in
-    let decl = Declaration (typ, nm, Some (un_expr init)) in
+    let init = match init with None -> None | Some e -> Some (un_expr e) in
+    let decl = Declaration (typ, nm, init) in
     let ng, body = body (Expr (Var nm)) ng in
     ng, decl :: body
 

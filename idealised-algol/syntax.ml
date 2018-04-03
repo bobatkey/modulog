@@ -87,11 +87,13 @@ module type S = sig
   (** Pointer disequality *)
   val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
 
-  (** Array indexing. *)
-  val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
-
   (** Combined pointer dereference and structure field access. *)
   val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+
+  (** {3 Array indexing} *)
+
+  (** Array indexing. *)
+  val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
   (** {2 Commands} *)
 
@@ -120,12 +122,9 @@ module type S = sig
   (** If then. *)
   val ifthen : (bool, [>`exp]) expr -> then_:comm -> comm
 
-  (** Declare a new variable. Takes an optional name hint. *)
-  val declare : ?name:string -> 'a typ -> ('a var -> comm) -> comm
-
-  (** Declare a new variable with an expression for the initial
-      value. Takes an optional name hint. *)
-  val declare_init : ?name:string -> 'a typ -> ('a,[>`exp]) expr -> ('a var -> comm) -> comm
+  (** Declare a new variable. Takes an optional name hint and initial
+      value. *)
+  val declare : ?name:string -> 'a typ -> ?init:('a,[>`exp]) expr -> ('a var -> comm) -> comm
 
   (** Heap allocate some memory to hold values of a given type. *)
   val malloc : 'a ptr var -> 'a typ -> comm
