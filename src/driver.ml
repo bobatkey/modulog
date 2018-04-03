@@ -40,7 +40,7 @@ let gen_c filename =
     | Ok (str, sg) ->
        let rules    = Modlog.To_rules.from_structure str in
        let code     = Relation_machine.Of_rules.translate rules in
-       Relation_machine.To_c.translate code
+       Relation_machine.Codegen.translate code
 
     | Error err ->
        Format.printf
