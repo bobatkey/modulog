@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name modlog)
-  (public_name modlog)
+ ((name modulog)
+  (public_name modulog)
   (libraries (modules datalog fmt rresult))
   (flags (:standard -w -49+44 -safe-string))))
 ; (menhir
@@ -12,7 +12,7 @@
 (rule
  ((targets (parser.ml parser.mli))
   (deps    (datalog_grammar.mly))
-  (action  (chdir ${ROOT} (run ${bin:menhir} --base modlog/parser ${<} ${lib:modules:modules_grammar.mly})))))
+  (action  (chdir ${ROOT} (run ${bin:menhir} --base modulog/parser ${<} ${lib:modules:modules_grammar.mly})))))
 
 (ocamllex
  (lexer))

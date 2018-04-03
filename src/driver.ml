@@ -1,23 +1,23 @@
-open Modlog.Std
+open Modulog.Std
 
 let typecheck filename =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checked_syntax.Mod.pp_signature sg
+         Modulog.Checked_syntax.Mod.pp_signature sg
 
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 let relmachine filename with_indexes =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Modlog.To_rules.from_structure str in
+       let rules    = Modulog.To_rules.from_structure str in
        let code     = Relation_machine.Of_rules.translate rules in
        Format.printf
          "@[<v>%a@]\n%!"
@@ -32,27 +32,27 @@ let relmachine filename with_indexes =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 let gen_c filename =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Modlog.To_rules.from_structure str in
+       let rules    = Modulog.To_rules.from_structure str in
        let code     = Relation_machine.Of_rules.translate rules in
        Relation_machine.Codegen.translate code
 
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 
 let rules filename =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules = Modlog.To_rules.from_structure str in
+       let rules = Modulog.To_rules.from_structure str in
        Format.printf
          "@[<v>%a@]\n"
          Datalog.Ruleset.pp rules
@@ -60,13 +60,13 @@ let rules filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 let rules_graph filename =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules = Modlog.To_rules.from_structure str in
+       let rules = Modulog.To_rules.from_structure str in
        Format.printf
          "@[<v>%a@]\n"
          Datalog.Graphviz.dot_of_ruleset rules
@@ -74,13 +74,13 @@ let rules_graph filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 let exec filename =
   let structure = read_structure_from_file filename in
-  match Modlog.Checker.type_structure structure with
+  match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
-       let rules    = Modlog.To_rules.from_structure str in
+       let rules    = Modulog.To_rules.from_structure str in
        let code     = Relation_machine.Of_rules.translate rules in
        let env      = Relation_machine.Interpreter.eval code in
        Format.printf
@@ -90,7 +90,7 @@ let exec filename =
     | Error err ->
        Format.printf
          "@[<v>%a@]\n"
-         Modlog.Checker.pp_error err
+         Modulog.Checker.pp_error err
 
 (**********************************************************************)
 (* The command line interface *)
@@ -144,7 +144,7 @@ let default_cmd =
   let exits = Term.default_exits in
   (*let man = help_secs in*)
   Term.(ret (const (`Help (`Pager, None)))),
-  Term.info "modlog" ~version:"v1.0.0" ~doc ~sdocs ~exits (*~man*)
+  Term.info "modulog" ~version:"v1.0.0" ~doc ~sdocs ~exits (*~man*)
 
 let () =
   Term.(exit (eval_choice default_cmd [ typecheck_cmd

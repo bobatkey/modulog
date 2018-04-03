@@ -2,4 +2,4 @@
 
 (executable
  ((name driver)
-  (libraries (cmdliner datalog modlog relation_machine))))
+  (libraries (cmdliner datalog modulog relation_machine))))
