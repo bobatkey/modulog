@@ -60,7 +60,6 @@ Still to do:
 
 ## Related work
 
-- [*A calculus for the construction of modular prolog programs*](A
-  calculus for the construction of modular prolog programs) by Donald
+- [*A calculus for the construction of modular prolog programs*](https://www.sciencedirect.com/science/article/pii/0743106692900422) by Donald
   T. Sannella and Lincoln A. Wallen, J. Logic Programming, vol 12,
   issues 1-2, January 1992, pages 147-177.
