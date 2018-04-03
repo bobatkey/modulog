@@ -39,6 +39,7 @@ struct
           else
             loop (i+1)
               (let open! S in
+               let open! Bool in
                acc && x#.val_fields.(i) == y#.val_fields.(i))
         in
         loop 1
@@ -57,6 +58,7 @@ struct
           else
             let e = loop (i+1) in
             let open! S in
+            let open! Bool in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
@@ -75,6 +77,7 @@ struct
           else
             let e = loop (i+1) in
             let open! S in
+            let open! Bool in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
@@ -261,6 +264,9 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
   let map_seq f =
     List.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
 
+  let array_map_seq f =
+    Array.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
+
   module BL = Idealised_algol.Block_list.Make (IA) ()
 
   module type INDEXED_TABLE = INDEXED_TABLE with module S = IA
@@ -274,9 +280,9 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
   module AttrEnv = Map.Make (Syntax.Attr)
 
   let rec and_list = function
-    | []    -> IA.true_
+    | []    -> IA.Bool.true_
     | [e]   -> e
-    | e::es -> IA.(&&) e (and_list es)
+    | e::es -> IA.Bool.(&&) e (and_list es)
 
   let condition lenv exps = let open! IA in function
     | (i, Syntax.Attr nm) -> exps.(i) == AttrEnv.find nm lenv
@@ -300,12 +306,11 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     end
 
   let print_exps exps =
-    let open! IA in
-    begin%monoid
-      IA.print_str "   ";
-      (exps
-       |> Array.map (fun e -> print_int e ^^ print_str " ")
-       |> Array.fold_left (^^) empty);
+    begin%monoid.IA
+      for i = 0 to Array.length exps - 1 do
+        if i > 0 then IA.print_str ",";
+        IA.print_int exps.(i);
+      done;
       IA.print_newline
     end
 
@@ -375,7 +380,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
            | Plain handle -> BL.is_empty handle
            | Indexed _    -> failwith "emptiness test on an indexed table"
        in
-       IA.while_ (IA.not (and_list (List.map check_empty vars)))
+       IA.while_ (IA.Bool.not (and_list (List.map check_empty vars)))
          ~do_:(translate_comms env body)
 
     | Insert (relvar, expr) ->

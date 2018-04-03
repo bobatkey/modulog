@@ -457,6 +457,7 @@ end = struct
     | Arg (nm, typ, a) -> fun acc -> get_args a ((Some_type typ, nm) :: acc)
     | Ref (nm, typ, a) -> fun acc -> get_args a ((Some_type (Pointer typ), nm) :: acc)
 
+  (* FIXME: being very trusting about name collisions here *)
   let rec apply : type a. a arg_spec -> a -> block_stmt list = function
     | RetVoid        -> fun c -> gen c
     | RetVal t       -> fun e -> [Statement (Return (un_expr e))]
@@ -485,11 +486,15 @@ end = struct
 
   (**********************************************************************)
 
-  let true_ = Expr (BoolLit true)
-  let false_ = Expr (BoolLit false)
-  let (&&) e1 e2 = Expr (Binop (un_expr e1, LAnd, un_expr e2))
-  let (||) e1 e2 = Expr (Binop (un_expr e1, LOr, un_expr e2))
-  let not e = Expr (Unop (LNot, un_expr e))
+  module Bool = struct
+    let true_ = Expr (BoolLit true)
+    let false_ = Expr (BoolLit false)
+    let (&&) e1 e2 = Expr (Binop (un_expr e1, LAnd, un_expr e2))
+    let (||) e1 e2 = Expr (Binop (un_expr e1, LOr, un_expr e2))
+    let not e = Expr (Unop (LNot, un_expr e))
+  end
+
+  (**********************************************************************)
 
   let empty ng =
     ng, []
@@ -566,6 +571,8 @@ end = struct
   let (#->) struct_ptr_exp field =
     Expr (Field (un_expr (deref struct_ptr_exp), field))
 
+  (**********************************************************************)
+
   let const i = Expr (IntLit i)
   let ( <  ) e1 e2 = Expr (Binop (un_expr e1, Lt, un_expr e2))
   let ( >  ) e1 e2 = Expr (Binop (un_expr e1, Gt, un_expr e2))
@@ -578,10 +585,13 @@ end = struct
   let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
   let int32_max = Expr Int32Max
 
+  (**********************************************************************)
+
   let ( =*= ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
   let ( =!*= ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
   let null = Expr Null
 
+  (* FIXME: https://stackoverflow.com/questions/9225567/how-to-print-a-int64-t-type-in-c *)
   let print_int e ng =
     ng, [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
 

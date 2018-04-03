@@ -41,11 +41,13 @@ module type S = sig
 
   (** {3 Boolean expressions} *)
 
-  val true_  : bool exp
-  val false_ : bool exp
-  val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
-  val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
-  val not    : (bool, [>`exp]) expr -> bool exp
+  module Bool : sig
+    val true_  : bool exp
+    val false_ : bool exp
+    val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+    val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+    val not    : (bool, [>`exp]) expr -> bool exp
+  end
 
   (** {3 Integer expressions} *)
 

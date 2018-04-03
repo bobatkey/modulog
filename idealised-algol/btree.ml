@@ -87,6 +87,7 @@ module Make
       ~name:"find_key"
       ~typ:(("i", int32) @&-> ("x",ptr node) @-> ("key",K.t) @-> return_void)
       ~body:begin fun i x key ->
+        let open! Bool in
         begin%monoid
           i := const 0l;
           while_ (i < x#->nkeys && K.lt x#->keys#@i key)
@@ -107,12 +108,12 @@ module Make
     declare ~name:"i" int32 body
 
   let loop body =
-    while_ true_ ~do_:body
+    while_ Bool.true_ ~do_:body
 
 
   let declare body =
     alloc_node @@ fun x -> begin%monoid
-      x#->leaf := true_;
+      x#->leaf := Bool.true_;
       x#->nkeys := const 0l;
       body x
       (* FIXME: free the tree afterwards? *)
@@ -123,6 +124,7 @@ module Make
     with_nodeptr ~name:"cursor" t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
+      let open! Bool in
       find_key i (to_exp x) key;
       ifthen (i < x#->nkeys && K.eq x#->keys#@i key)
         ~then_:begin%monoid yes; break end;
@@ -136,6 +138,7 @@ module Make
     with_nodeptr ~name:"cursor" t @@ fun x ->
     with_int @@ fun i ->
     loop begin%monoid
+      let open! Bool in
       find_key i (to_exp x) from;
       ifthen (i < x#->nkeys && K.le x#->keys#@i upto)
         begin%monoid yes; break end;
@@ -164,6 +167,7 @@ module Make
         x := x#->children#@i
       end;
       loop begin%monoid
+        let open! Bool in
         while_ (i < x#->nkeys && K.le x#->keys#@i upto)
           ~do_:begin%monoid
             body x#->keys#@i;
@@ -202,7 +206,7 @@ module Make
     with_nodeptr ~name:"cursor" tree @@ fun x ->
     Stk.with_stack max_stack_depth (ptr node) int32 @@
     fun Stk.{push;pop;top;is_empty} -> begin%monoid
-      while_ (not x#->leaf)
+      while_ (Bool.not x#->leaf)
         ~do_:begin%monoid
           push x (const 0l);
           x := x#->children#@(const 0l)
@@ -229,7 +233,7 @@ module Make
 
           x := x#->children#@(i + const 1l);
 
-          while_ (not x#->leaf)
+          while_ (Bool.not x#->leaf)
             ~do_:begin%monoid
               push x (const 0l);
               x := x#->children#@(const 0l)
@@ -272,7 +276,7 @@ module Make
             ~dst:(fun j -> z#->keys#@j);
 
           (* copy the children over (if not a leaf node) *)
-          ifthen (not y#->leaf) begin
+          ifthen (Bool.not y#->leaf) begin
             copy ~n:(const P.min_children)
               ~src:(fun j -> y#->children#@(j + const P.min_children))
               ~dst:(fun j -> z#->children#@j)
@@ -310,7 +314,7 @@ module Make
         with_nodeptr ~name:"insert_cursor" x' @@ fun x ->
         with_int @@ fun i ->
         begin%monoid
-          while_ (not x#->leaf) begin%monoid
+          while_ (Bool.not x#->leaf) begin%monoid
             find_key i (to_exp x) key;
             ifthen (node_is_full x#->children#@i)
               ~then_:begin%monoid
@@ -339,7 +343,7 @@ module Make
           ifthen (node_is_full root) begin
             alloc_node @@ fun s ->
             begin%monoid
-              s #-> leaf := false_;
+              s #-> leaf := Bool.false_;
               s #-> nkeys := const 0l;
               s#->children#@(const 0l) := root;
               split_child (to_exp s) (const 0l);
