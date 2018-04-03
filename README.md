@@ -57,3 +57,10 @@ Still to do:
  - Recursive modules, which turned out to be more important than I
    thought.
  - More expressive datatype language.
+
+## Related work
+
+- [*A calculus for the construction of modular prolog programs*](A
+  calculus for the construction of modular prolog programs) by Donald
+  T. Sannella and Lincoln A. Wallen, J. Logic Programming, vol 12,
+  issues 1-2, January 1992, pages 147-177.
