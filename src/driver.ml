@@ -48,6 +48,18 @@ let gen_c filename =
          Modulog.Checker.pp_error err
 
 let compile filename outname =
+  (* FIXME: check that filename ends with '.mlog' *)
+  let outname =
+    (* FIXME: some kind of validation here *)
+    match outname with
+      | None ->
+         if Filename.check_suffix filename ".mlog" then
+           Filename.chop_extension filename
+         else
+           filename ^ ".exe"
+      | Some outname ->
+         outname
+  in
   let structure = read_structure_from_file filename in
   match Modulog.Checker.type_structure structure with
     | Ok (str, sg) ->
@@ -123,7 +135,7 @@ let with_indexes_opt =
 
 let output_file_arg =
   let doc = "Output filename" in
-  Arg.(value & opt string "a.out" & info ["o";"output"] ~doc)
+  Arg.(value & opt (some string) None & info ["o";"output"] ~doc)
 
 let typecheck_cmd =
   let doc = "Typecheck a Modular Datalog program and print the signature" in
