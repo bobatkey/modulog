@@ -639,3 +639,17 @@ let output f x fmt =
   PP.pp_stmts fmt stmts;
   Format.fprintf fmt "@]@,}@,";
   Format.pp_close_box fmt ()
+
+let compile outputname program x =
+  (* FIXME: should probably quote 'output' somehow, or use a better API *)
+  let cmd = Printf.sprintf "gcc -o %s -xc -O2 -" outputname in
+  let ch  = Unix.open_process_out cmd in
+  let fmt = Format.formatter_of_out_channel ch in
+  output program x fmt;
+  Format.pp_flush_formatter fmt;
+  flush ch;
+  let status = Unix.close_process_out ch in
+  match status with
+    | Unix.WEXITED 0 -> ()
+    | _ ->
+       Printf.eprintf "GCC process exited with an error\n"

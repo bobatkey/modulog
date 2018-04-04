@@ -3,6 +3,6 @@
 (library
  ((name        idealised_algol)
   (public_name idealised_algol)
-  (libraries  (fmt display_names))
+  (libraries  (fmt display_names unix))
   (preprocess (pps (ppx_monoid)))
   (flags (:standard -w -49+44 -safe-string))))

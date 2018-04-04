@@ -463,3 +463,7 @@ let generator (type comm)
 let translate program =
   let open! Idealised_algol in
   C.output { Syntax.generate = generator } program Format.std_formatter
+
+let compile outname program =
+  let open! Idealised_algol in
+  C.compile outname { Syntax.generate = generator } program

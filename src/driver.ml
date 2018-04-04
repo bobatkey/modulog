@@ -47,6 +47,19 @@ let gen_c filename =
          "@[<v>%a@]\n"
          Modulog.Checker.pp_error err
 
+let compile filename outname =
+  let structure = read_structure_from_file filename in
+  match Modulog.Checker.type_structure structure with
+    | Ok (str, sg) ->
+       let rules    = Modulog.To_rules.from_structure str in
+       let code     = Relation_machine.Of_rules.translate rules in
+       Relation_machine.Codegen.compile outname code
+
+    | Error err ->
+       Format.printf
+         "@[<v>%a@]\n"
+         Modulog.Checker.pp_error err
+
 
 let rules filename =
   let structure = read_structure_from_file filename in
@@ -108,6 +121,10 @@ let with_indexes_opt =
   let doc = "Whether to print computed index information" in
   Arg.(value & flag & info ["i";"with-indexes"] ~doc)
 
+let output_file_arg =
+  let doc = "Output filename" in
+  Arg.(value & opt string "a.out" & info ["o";"output"] ~doc)
+
 let typecheck_cmd =
   let doc = "Typecheck a Modular Datalog program and print the signature" in
   Term.(const typecheck $ filename_arg),
@@ -122,6 +139,11 @@ let gen_c_cmd =
   let doc = "Compile a Modular Datalog program to C" in
   Term.(const gen_c $ filename_arg),
   Term.info "gen_c" ~doc ~exits:Term.default_exits
+
+let compile_cmd =
+  let doc = "Compile a Modular Datalog program to an executable via C" in
+  Term.(const compile $ filename_arg $ output_file_arg),
+  Term.info "compile" ~doc ~exits:Term.default_exits
 
 let rules_cmd =
   let doc = "Compile a Modular Datalog program to flat datalog rules" in
@@ -152,4 +174,5 @@ let () =
                                       ; gen_c_cmd
                                       ; rules_cmd
                                       ; rules_graph_cmd
-                                      ; exec_cmd ]))
+                                      ; exec_cmd
+                                      ; compile_cmd ]))
