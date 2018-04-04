@@ -12,11 +12,6 @@ module type S = sig
   (** Representation of the type of booleans. *)
   val bool : bool typ
 
-  (** Representation of arrays of statically known size. *)
-  type 'a array
-
-  val array : 'a typ -> int32 -> 'a array typ
-
   (** {3 Representations of structure types} *)
 
   type 'a structure
@@ -74,10 +69,18 @@ module type S = sig
   (** Structure literals. *)
   val struct_const : 's structure typ -> exp_box list -> 's structure exp
 
-  (** {3 Array indexing} *)
+  (** {3 Raw arrays} *)
 
-  (** Array indexing. *)
-  val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
+  module RawArray : sig
+
+    type 'a array
+
+    val array : 'a typ -> int32 -> 'a array typ
+
+    (** Array indexing. *)
+    val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
+
+  end
 
   (** {2 Commands} *)
 

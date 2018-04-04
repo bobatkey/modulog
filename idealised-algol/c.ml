@@ -388,12 +388,11 @@ end = struct
   let to_exp (Expr e) = Expr e
 
   type nonrec 'a typ = 'a typ
-  type nonrec 'a array = 'a array
+
   type nonrec 'a structure = 'a structure
 
   let int32 = Int32
   let bool = Bool
-  let array x n = Array (x,n)
 
   (**********************************************************************)
   type ('s,'a) field = string
@@ -538,9 +537,6 @@ end = struct
     let ng, body = body (Expr (Var nm)) ng in
     ng, decl :: body
 
-  let (#@) array_exp idx_exp =
-    Expr (Idx (un_expr array_exp, un_expr idx_exp))
-
   let (#.) struct_exp field =
     Expr (Field (un_expr struct_exp, field))
 
@@ -563,9 +559,19 @@ end = struct
   let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
   let int32_max = Expr Int32Max
 
-  (**********************************************************************)
 
-  module Ptr = struct
+  module RawArray = struct
+
+    type nonrec 'a array = 'a array
+
+    let array x n = Array (x,n)
+
+    let (#@) array_exp idx_exp =
+      Expr (Idx (un_expr array_exp, un_expr idx_exp))
+
+  end
+
+  module RawPtr = struct
   
     type nonrec 'a ptr = 'a ptr
 
