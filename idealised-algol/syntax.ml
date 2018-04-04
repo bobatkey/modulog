@@ -1,11 +1,8 @@
 module type S = sig
 
-  (**{2 Representation of generated types} *)
+  (**{2 Representation of data types} *)
 
   type 'a typ
-  type 'a ptr
-  type 'a array
-  type 'a structure
 
   (**{3 Representations of basic types}*)
 
@@ -15,14 +12,14 @@ module type S = sig
   (** Representation of the type of booleans. *)
   val bool : bool typ
 
-  (** Representation of pointers to memory containing a value of some
-      other type. *)
-  val ptr : 'a typ -> 'a ptr typ
-
   (** Representation of arrays of statically known size. *)
+  type 'a array
+
   val array : 'a typ -> int32 -> 'a array typ
 
   (** {3 Representations of structure types} *)
+
+  type 'a structure
 
   type ('s, 'a) field
 
@@ -31,13 +28,17 @@ module type S = sig
   val field     : 's structure typ -> string -> 'a typ -> ('s, 'a) field
   val seal      : 's structure typ -> unit
 
-  (** {2 Expressions and Assignables} *)
+  (** {2 Phrase types} *)
 
   type ('a,_) expr
   type 'a exp = ('a,[`exp]) expr
   type 'a var = ('a,[`var|`exp]) expr
 
   val to_exp : 'a var -> 'a exp
+
+  (** Representation of a command. A command represents some process
+      for altering the current state. *)
+  type comm
 
   (** {3 Boolean expressions} *)
 
@@ -73,33 +74,12 @@ module type S = sig
   (** Structure literals. *)
   val struct_const : 's structure typ -> exp_box list -> 's structure exp
 
-  (** {3 Pointer expressions *)
-
-  (** Null pointer. *)
-  val null : 'a ptr exp
-
-  (** Pointer dereferencing. *)
-  val deref : ('a ptr, [>`exp]) expr -> ('a,[<`exp|`var]) expr
-
-  (** Pointer equality *)
-  val (=*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
-
-  (** Pointer disequality *)
-  val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
-
-  (** Combined pointer dereference and structure field access. *)
-  val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
-
   (** {3 Array indexing} *)
 
   (** Array indexing. *)
   val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
 
   (** {2 Commands} *)
-
-  (** Representation of a command. A command represents some process
-      for altering the current state. *)
-  type comm
 
   (** The command that does nothing. *)
   val empty : comm
@@ -126,17 +106,6 @@ module type S = sig
       value. *)
   val declare : ?name:string -> 'a typ -> ?init:('a,[>`exp]) expr -> ('a var -> comm) -> comm
 
-  (** Heap allocate some memory to hold values of a given type. *)
-  val malloc : 'a ptr var -> 'a typ -> comm
-
-  (** Heap allocate some memory to holds values of a given type, and
-      dynamically some extra memory. *)
-  val malloc_ext : 'a ptr var -> 'a typ -> (int32,[>`exp]) expr -> _ typ -> comm
-  (* TODO: distinguish arbitrary length from fixed length structures somehow. *)
-
-  (** Free heap allocated memory that came from malloc. *)
-  val free : ('a ptr, [>`exp]) expr -> comm
-
   (** Print an integer to standard out. *)
   val print_int : (int32, [>`exp]) expr -> comm
 
@@ -145,6 +114,44 @@ module type S = sig
 
   (** Print a (static) string to standard out. *)
   val print_str : string -> comm
+
+  (** {3 Raw pointer manipulation*)
+
+  module RawPtr : sig
+
+    type 'a ptr
+
+    (** Representation of pointers to memory containing a value of some
+        other type. *)
+    val ptr : 'a typ -> 'a ptr typ
+
+    (** Null pointer. *)
+    val null : 'a ptr exp
+
+    (** Pointer dereferencing. *)
+    val deref : ('a ptr, [>`exp]) expr -> ('a,[<`exp|`var]) expr
+
+    (** Pointer equality *)
+    val (=*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
+
+    (** Pointer disequality *)
+    val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
+
+    (** Combined pointer dereference and structure field access. *)
+    val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+
+    (** Heap allocate some memory to hold values of a given type. *)
+    val malloc : 'a ptr var -> 'a typ -> comm
+
+    (** Heap allocate some memory to holds values of a given type, and
+        dynamically some extra memory. *)
+    val malloc_ext : 'a ptr var -> 'a typ -> (int32,[>`exp]) expr -> _ typ -> comm
+    (* TODO: distinguish arbitrary length from fixed length structures somehow. *)
+
+    (** Free heap allocated memory that came from malloc. *)
+    val free : ('a ptr, [>`exp]) expr -> comm
+
+  end
 
   (** {3 Function declarations} *)
 

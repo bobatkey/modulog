@@ -20,6 +20,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
   module S = S
 
   open! S
+  open S.RawPtr
 
   let block_size = 16l
 

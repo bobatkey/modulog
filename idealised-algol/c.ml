@@ -388,13 +388,11 @@ end = struct
   let to_exp (Expr e) = Expr e
 
   type nonrec 'a typ = 'a typ
-  type nonrec 'a ptr = 'a ptr
   type nonrec 'a array = 'a array
   type nonrec 'a structure = 'a structure
 
   let int32 = Int32
   let bool = Bool
-  let ptr x = Pointer x
   let array x n = Array (x,n)
 
   (**********************************************************************)
@@ -540,17 +538,6 @@ end = struct
     let ng, body = body (Expr (Var nm)) ng in
     ng, decl :: body
 
-  let malloc v typ ng =
-    ng, [Statement (Malloc (un_expr v, typ, None))]
-
-  let malloc_ext v typ n typ' ng =
-    ng, [Statement (Malloc (un_expr v, typ, Some (un_expr n, typ')))]
-
-  let free e ng =
-    ng, [Statement (Free (un_expr e))]
-
-  let deref e = Expr (Deref (un_expr e))
-
   let (#@) array_exp idx_exp =
     Expr (Idx (un_expr array_exp, un_expr idx_exp))
 
@@ -561,9 +548,6 @@ end = struct
 
   let struct_const (Struct name) exps =
     Expr (StructLit (name, List.map (fun (Exp e) -> un_expr e) exps))
-
-  let (#->) struct_ptr_exp field =
-    Expr (Field (un_expr (deref struct_ptr_exp), field))
 
   (**********************************************************************)
 
@@ -581,10 +565,36 @@ end = struct
 
   (**********************************************************************)
 
-  let ( =*= ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
-  let ( =!*= ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
-  let null = Expr Null
+  module Ptr = struct
+  
+    type nonrec 'a ptr = 'a ptr
 
+    let ptr x = Pointer x
+        
+    let malloc v typ ng =
+      ng, [Statement (Malloc (un_expr v, typ, None))]
+
+    let malloc_ext v typ n typ' ng =
+      ng, [Statement (Malloc (un_expr v, typ, Some (un_expr n, typ')))]
+
+    let free e ng =
+      ng, [Statement (Free (un_expr e))]
+
+    let deref e = Expr (Deref (un_expr e))
+
+    let ( =*= ) e1 e2 =
+      Expr (Binop (un_expr e1, Eq, un_expr e2))
+
+    let ( =!*= ) e1 e2 =
+      Expr (Binop (un_expr e1, Ne, un_expr e2))
+
+    let null = Expr Null
+
+    let (#->) struct_ptr_exp field =
+      Expr (Field (un_expr (deref struct_ptr_exp), field))
+
+  end
+    
   (* FIXME: https://stackoverflow.com/questions/9225567/how-to-print-a-int64-t-type-in-c *)
   let print_int e ng =
     ng, [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]

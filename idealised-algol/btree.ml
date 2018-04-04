@@ -59,6 +59,7 @@ module Make
   module S = S
 
   open! S
+  open S.RawPtr
 
   let min_keys = Int32.sub P.min_children 1l
   let max_keys = Int32.(sub (mul P.min_children 2l) 1l)
