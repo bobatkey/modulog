@@ -389,47 +389,54 @@ end = struct
 
   type nonrec 'a typ = 'a typ
 
-  type nonrec 'a structure = 'a structure
-
-  let int32 = Int32
-  let bool = Bool
-
   (**********************************************************************)
-  type ('s,'a) field = string
+  module Struct = struct
+    type 'a t = 'a structure
 
-  let structures : (string, structure_field list) Hashtbl.t =
-    Hashtbl.create 12
-  let structures_ordered =
-    ref []
+    type ('s,'a) field = string
+
+    let structures : (string, structure_field list) Hashtbl.t =
+      Hashtbl.create 12
+    let structures_ordered =
+      ref []
+
+    let make name =
+      let name = Display_names.Fresh.choose (Hashtbl.mem structures) name in
+      Hashtbl.add structures name [];
+      structures_ordered := name :: !structures_ordered;
+      Struct name
+
+    let field (Struct name) fname typ =
+      let rec add = function
+        | [] -> [StructField { fld_name = fname; fld_type = typ }]
+        | StructField { fld_name } as head :: rest ->
+           if fld_name = fname then
+             invalid_arg "Imp_syntax.S.field: duplicate fields in structure"
+           else
+             head :: add rest
+      in
+      let fields = Hashtbl.find structures name in
+      Hashtbl.replace structures name (add fields);
+      fname
+
+    let seal (Struct name) =
+      (* FIXME: do something here -- mark this structure as finished. *)
+      ()
+
+    let (#.) struct_exp field =
+      Expr (Field (un_expr struct_exp, field))
+
+    type exp_box = Exp : 'a exp -> exp_box
+
+    let const (Struct name) exps =
+      Expr (StructLit (name, List.map (fun (Exp e) -> un_expr e) exps))
+  end
 
   let struct_decls () =
     List.rev_map
-      (fun name -> { name; fields = Hashtbl.find structures name })
-      !structures_ordered
-
-  let structure name =
-    let name = Display_names.Fresh.choose (Hashtbl.mem structures) name in
-    Hashtbl.add structures name [];
-    structures_ordered := name :: !structures_ordered;
-    Struct name
-
-  let field (Struct name) fname typ =
-    let rec add = function
-      | [] -> [StructField { fld_name = fname; fld_type = typ }]
-      | StructField { fld_name } as head :: rest ->
-         if fld_name = fname then
-           invalid_arg "Imp_syntax.S.field: duplicate fields in structure"
-         else
-           head :: add rest
-    in
-    let fields = Hashtbl.find structures name in
-    Hashtbl.replace structures name (add fields);
-    fname
-
-  let seal (Struct name) =
-    (* FIXME: do something here -- mark this structure as finished. *)
-    ()
-
+      (fun name -> { name; fields = Hashtbl.find Struct.structures name })
+      !Struct.structures_ordered
+  
   (**********************************************************************)
   type _ arg_spec =
     | RetVoid : comm arg_spec
@@ -484,6 +491,7 @@ end = struct
   (**********************************************************************)
 
   module Bool = struct
+    let t = Bool
     let true_ = Expr (BoolLit true)
     let false_ = Expr (BoolLit false)
     let (&&) e1 e2 = Expr (Binop (un_expr e1, LAnd, un_expr e2))
@@ -537,28 +545,24 @@ end = struct
     let ng, body = body (Expr (Var nm)) ng in
     ng, decl :: body
 
-  let (#.) struct_exp field =
-    Expr (Field (un_expr struct_exp, field))
-
-  type exp_box = Exp : 'a exp -> exp_box
-
-  let struct_const (Struct name) exps =
-    Expr (StructLit (name, List.map (fun (Exp e) -> un_expr e) exps))
-
   (**********************************************************************)
 
-  let const i = Expr (IntLit i)
-  let ( <  ) e1 e2 = Expr (Binop (un_expr e1, Lt, un_expr e2))
-  let ( >  ) e1 e2 = Expr (Binop (un_expr e1, Gt, un_expr e2))
-  let ( >= ) e1 e2 = Expr (Binop (un_expr e1, Ge, un_expr e2))
-  let ( <= ) e1 e2 = Expr (Binop (un_expr e1, Le, un_expr e2))
-  let ( == ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
-  let ( != ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
-  let ( +  ) e1 e2 = Expr (Binop (un_expr e1, Plus, un_expr e2))
-  let ( *  ) e1 e2 = Expr (Binop (un_expr e1, Mult, un_expr e2))
-  let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
-  let int32_max = Expr Int32Max
+  module Int32 = struct
 
+    let t = Int32
+    let const i = Expr (IntLit i)
+    let ( <  ) e1 e2 = Expr (Binop (un_expr e1, Lt, un_expr e2))
+    let ( >  ) e1 e2 = Expr (Binop (un_expr e1, Gt, un_expr e2))
+    let ( >= ) e1 e2 = Expr (Binop (un_expr e1, Ge, un_expr e2))
+    let ( <= ) e1 e2 = Expr (Binop (un_expr e1, Le, un_expr e2))
+    let ( == ) e1 e2 = Expr (Binop (un_expr e1, Eq, un_expr e2))
+    let ( != ) e1 e2 = Expr (Binop (un_expr e1, Ne, un_expr e2))
+    let ( +  ) e1 e2 = Expr (Binop (un_expr e1, Plus, un_expr e2))
+    let ( *  ) e1 e2 = Expr (Binop (un_expr e1, Mult, un_expr e2))
+    let ( -  ) e1 e2 = Expr (Binop (un_expr e1, Sub, un_expr e2))
+    let maximum = Expr Int32Max
+
+  end
 
   module RawArray = struct
 

@@ -15,9 +15,11 @@ end = struct
   open S.RawArray
 
   let incr i =
+    let open! S.Int32 in
     i := i + const 1l
 
   let decr i =
+    let open! S.Int32 in
     i := i - const 1l
 
   type ('a, 'b) stack_ops =
@@ -30,7 +32,7 @@ end = struct
   let with_stack max_depth typ1 typ2 body =
     declare ~name:"stack1_" (array typ1 max_depth) @@ fun stack1 ->
     declare ~name:"stack2_" (array typ2 max_depth) @@ fun stack2 ->
-    declare ~name:"stackptr" int32 ~init:(const 0l) @@ fun stackptr ->
+    declare ~name:"stackptr" S.Int32.t ~init:(S.Int32.const 0l) @@ fun stackptr ->
     let push x1 x2 =
       begin%monoid
         stack1#@stackptr := x1;
@@ -40,9 +42,11 @@ end = struct
     and pop =
       decr stackptr
     and top =
+      let open! S.Int32 in
       (stack1#@(stackptr - const 1l),
        stack2#@(stackptr - const 1l))
     and is_empty =
+      let open! S.Int32 in
       stackptr == const 0l
     in
     body {push; pop; top; is_empty}

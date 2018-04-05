@@ -19,6 +19,10 @@ end
 module Make (S : Syntax.S) () : S with module S = S = struct
   module S = S
 
+  let int32_of_int = Int32.of_int
+  let int32_to_int = Int32.to_int
+  let int32_mul    = Int32.mul
+
   open! S
   open S.RawPtr
   open S.RawArray
@@ -26,16 +30,16 @@ module Make (S : Syntax.S) () : S with module S = S = struct
   let block_size = 16l
 
   type list_node
-  let list_node : list_node structure typ = structure "list_node"
-  let occupied = field list_node "occupied" int32
-  let next     = field list_node "next" (ptr list_node)
-  let values   = field list_node "values" (array int32 1l)
-  let ()       = seal list_node
+  let list_node : list_node Struct.t typ = Struct.make "list_node"
+  let occupied = Struct.field list_node "occupied" S.Int32.t
+  let next     = Struct.field list_node "next" (ptr list_node)
+  let values   = Struct.field list_node "values" (array S.Int32.t 1l)
+  let ()       = Struct.seal list_node
 
   type handle =
     { arity : int32
     ; name  : string
-    ; var   : list_node structure ptr var
+    ; var   : list_node Struct.t ptr var
     }
 
   let is_empty {var} =
@@ -60,34 +64,38 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     end
 
   let write val_array offset vals =
+    let open! S.Int32 in
     vals |>
     Array.mapi begin fun i v ->
-      let i = Int32.of_int i in
+      let i = int32_of_int i in
       val_array#@(offset + const i) := v
     end |>
     Array.fold_left (^^) empty
 
   let read val_array offset arity =
-    Array.init (Int32.to_int arity)
-      (fun i -> val_array#@(offset + const (Int32.of_int i)))
+    let open! Int32 in
+    Array.init (int32_to_int arity)
+      (fun i -> val_array#@(offset + const (int32_of_int i)))
 
   let new_block v ~arity ~vals ~next:nxt =
-    let length = Int32.mul arity block_size in
+    let length = int32_mul arity block_size in
+    let open! S.Int32 in
     begin%monoid
-      malloc_ext v list_node (const length) int32;
+      malloc_ext v list_node (const length) S.Int32.t;
       v#->occupied := const 1l;
       v#->next := nxt;
       write (v#->values) (const 0l) vals
     end
 
   let insert {var=head; arity} vals =
-    if Array.length vals <> Int32.to_int arity then
+    if Array.length vals <> int32_to_int arity then
       invalid_arg "Block_list.Make.insert: arity mismatch";
     if_ (head =*= null)
       ~then_:begin%monoid
         new_block head ~arity ~vals ~next:null
       end
       ~else_:begin%monoid
+        let open! S.Int32 in
         if_ (head#->occupied == const block_size)
           ~then_:begin%monoid
             declare (ptr list_node) @@ fun new_head -> begin%monoid
@@ -106,7 +114,8 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     begin%monoid
       while_ (node =!*= null)
         ~do_:begin%monoid
-          declare ~name:"i" int32 ~init:(const 0l) @@ fun i ->
+          let open! S.Int32 in
+          declare ~name:"i" S.Int32.t ~init:(const 0l) @@ fun i ->
           begin%monoid
             while_ (i < (node#->occupied * const arity))
               ~do_:begin%monoid
@@ -119,7 +128,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     end
 
   let declare ~name ~arity k =
-    let arity = Int32.of_int arity in
+    let arity = int32_of_int arity in
     declare ~name (ptr list_node) ~init:null @@ fun var ->
     begin%monoid
       k { arity; name; var };

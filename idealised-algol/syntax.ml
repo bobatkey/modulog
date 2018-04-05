@@ -4,32 +4,11 @@ module type S = sig
 
   type 'a typ
 
-  (**{3 Representations of basic types}*)
-
-  (** Representation of the type of machine integers. *)
-  val int32 : int32 typ
-
-  (** Representation of the type of booleans. *)
-  val bool : bool typ
-
-  (** {3 Representations of structure types} *)
-
-  type 'a structure
-
-  type ('s, 'a) field
-
-  (* Creation of types; a Ctypes style interface *)
-  val structure : string -> 's structure typ
-  val field     : 's structure typ -> string -> 'a typ -> ('s, 'a) field
-  val seal      : 's structure typ -> unit
-
   (** {2 Phrase types} *)
 
   type ('a,_) expr
   type 'a exp = ('a,[`exp]) expr
   type 'a var = ('a,[`var|`exp]) expr
-
-  val to_exp : 'a var -> 'a exp
 
   (** Representation of a command. A command represents some process
       for altering the current state. *)
@@ -38,52 +17,75 @@ module type S = sig
   (** {3 Boolean expressions} *)
 
   module Bool : sig
+    val t : bool typ
+
     val true_  : bool exp
+
     val false_ : bool exp
+
     val ( && ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+
     val ( || ) : (bool, [>`exp]) expr -> (bool, [>`exp]) expr -> bool exp
+
     val not    : (bool, [>`exp]) expr -> bool exp
   end
 
   (** {3 Integer expressions} *)
 
-  val const : int32 -> int32 exp
-  val ( < ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( > ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( >= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( <= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( == ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( != ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
-  val ( + ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
-  val ( * ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
-  val ( - ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
-  val int32_max : int32 exp
+  module Int32 : sig
+    val t : int32 typ
+
+    val const : int32 -> int32 exp
+
+    val ( < ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( > ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( >= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( <= ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( == ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( != ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> bool exp
+
+    val ( + ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+
+    val ( * ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+
+    val ( - ) : (int32, [>`exp]) expr -> (int32, [>`exp]) expr -> int32 exp
+
+    val maximum : int32 exp
+  end
 
   (** {3 Structs} *)
 
-  (** Structure field access. *)
-  val (#.) : ('s structure, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+  module Struct : sig
+    type 'a t
 
-  type exp_box = Exp : 'a exp -> exp_box
+    type ('s, 'a) field
 
-  (** Structure literals. *)
-  val struct_const : 's structure typ -> exp_box list -> 's structure exp
+    (* Creation of types; a Ctypes style interface *)
+    val make  : string -> 's t typ
 
-  (** {3 Raw arrays} *)
+    val field : 's t typ -> string -> 'a typ -> ('s, 'a) field
 
-  module RawArray : sig
+    val seal  : 's t typ -> unit
 
-    type 'a array
+    (** Structure field access. *)
+    val (#.) : ('s t, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
 
-    val array : 'a typ -> int32 -> 'a array typ
+    type exp_box = Exp : 'a exp -> exp_box
 
-    (** Array indexing. *)
-    val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
-
+    (** Structure literals. *)
+    val const : 's t typ -> exp_box list -> 's t exp
   end
 
   (** {2 Commands} *)
 
+  
+  val to_exp : 'a var -> 'a exp
+  
   (** The command that does nothing. *)
   val empty : comm
 
@@ -109,6 +111,8 @@ module type S = sig
       value. *)
   val declare : ?name:string -> 'a typ -> ?init:('a,[>`exp]) expr -> ('a var -> comm) -> comm
 
+  (** {3 Printing} *)
+  
   (** Print an integer to standard out. *)
   val print_int : (int32, [>`exp]) expr -> comm
 
@@ -117,6 +121,19 @@ module type S = sig
 
   (** Print a (static) string to standard out. *)
   val print_str : string -> comm
+
+  (** {2 Raw arrays} *)
+
+  module RawArray : sig
+
+    type 'a array
+
+    val array : 'a typ -> int32 -> 'a array typ
+
+    (** Array indexing. *)
+    val (#@) : ('a array, [>`exp]) expr -> (int32, [>`exp]) expr -> ('a,[<`exp|`var]) expr
+
+  end
 
   (** {3 Raw pointer manipulation*)
 
@@ -141,7 +158,7 @@ module type S = sig
     val (=!*=) : ('a ptr, [>`exp]) expr -> ('a ptr, [>`exp]) expr -> bool exp
 
     (** Combined pointer dereference and structure field access. *)
-    val (#->) : ('s structure ptr, [>`exp]) expr -> ('s, 'a) field -> ('a,[<`exp|`var]) expr
+    val (#->) : ('s Struct.t ptr, [>`exp]) expr -> ('s, 'a) Struct.field -> ('a,[<`exp|`var]) expr
 
     (** Heap allocate some memory to hold values of a given type. *)
     val malloc : 'a ptr var -> 'a typ -> comm
@@ -157,7 +174,7 @@ module type S = sig
   end
 
   (** {3 Function declarations} *)
-
+  
   type 'a arg_spec
 
   val return_void : comm arg_spec

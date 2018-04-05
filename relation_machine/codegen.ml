@@ -15,50 +15,56 @@ struct
   module S = S
 
   type key
-  type t = key S.structure
-  let t : t S.typ = S.structure "key"
+  type t = key S.Struct.t
+  let t : t S.typ = S.Struct.make "key"
   let val_fields =
-    Array.init A.arity (fun i -> S.field t (Printf.sprintf "x%d" i) S.int32)
-  let () = S.seal t
+    Array.init A.arity (fun i -> S.Struct.field t (Printf.sprintf "x%d" i) S.Int32.t)
+  let () = S.Struct.seal t
 
   let create exps =
-    S.struct_const t (Array.to_list (Array.map (fun e -> S.Exp e) exps))
+    S.Struct.const t (Array.to_list (Array.map (fun e -> S.Struct.Exp e) exps))
 
   let get x i =
-    let open! S in
+    let open! S.Struct in
     x#.val_fields.(i)
 
   let eq =
     S.declare_func
       ~name:"eq"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
       ~body:begin fun x y ->
         let rec loop i acc =
           if i = A.arity then
             acc
           else
             loop (i+1)
-              (let open! S in
-               let open! Bool in
-               acc && x#.val_fields.(i) == y#.val_fields.(i))
+              (let open! S.Bool in let open! S.Int32 in
+               let open! S.Struct in
+               S.(acc && x#.val_fields.(i) == y#.val_fields.(i)))
         in
         loop 1
-          (let open! S in x#.val_fields.(0) == y#.val_fields.(0))
+          (let open! S in let open! S.Bool in let open! S.Int32 in
+           let open! S.Struct in
+           x#.val_fields.(0) == y#.val_fields.(0))
       end
 
   let le =
     S.declare_func
       ~name:"le"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
       ~body:begin fun x y ->
         let rec loop i =
           if i = A.arity - 1 then
             let open! S in
+            let open! S.Int32 in
+            let open! S.Struct in
             x#.val_fields.(i) <= y#.val_fields.(i)
           else
             let e = loop (i+1) in
             let open! S in
             let open! Bool in
+            let open! Int32 in
+            let open! S.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
@@ -68,16 +74,20 @@ struct
   let lt =
     S.declare_func
       ~name:"lt"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return bool)
+      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
       ~body:begin fun x y ->
         let rec loop i =
           if i = A.arity - 1 then
             let open! S in
+            let open! S.Int32 in
+            let open! S.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
           else
             let e = loop (i+1) in
             let open! S in
-            let open! Bool in
+            let open! S.Bool in
+            let open! S.Int32 in
+            let open! S.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
@@ -210,7 +220,7 @@ struct
               if i < Array.length prefix_pat then
                 get_fixed (pat.(prefix_pat.(i)))
               else
-                S.const 0l))
+                S.Int32.const 0l))
     in
     let maximum =
       Key.create
@@ -219,7 +229,7 @@ struct
               if i < Array.length prefix_pat then
                 get_fixed (pat.(prefix_pat.(i)))
               else
-                S.int32_max))
+                S.Int32.maximum))
     in
     k handle minimum maximum perm_inv
 
@@ -284,13 +294,13 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | [e]   -> e
     | e::es -> IA.Bool.(&&) e (and_list es)
 
-  let condition lenv exps = let open! IA in function
+  let condition lenv exps = let open! IA.Int32 in function
     | (i, Syntax.Attr nm) -> exps.(i) == AttrEnv.find nm lenv
     | (i, Syntax.Lit j)   -> exps.(i) == const j
 
   let exp_of_scalar lenv = function
     | Syntax.Attr nm -> AttrEnv.find nm lenv
-    | Syntax.Lit j   -> IA.const j
+    | Syntax.Lit j   -> IA.Int32.const j
 
   let pattern_of_conditions arity lenv conditions =
     let pat = Array.make arity `Wild in
