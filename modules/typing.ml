@@ -52,6 +52,8 @@ module type CORE_TYPING = sig
 
     val valtype_match : Env.t -> Core.val_type -> Core.val_type -> bool
 
+    val rec_safe_valtype : Env.t -> Core.val_type -> bool
+
     val deftype_equiv :
       Env.t -> Core.kind -> Core.def_type -> Core.def_type -> bool
 
@@ -326,6 +328,7 @@ struct
     | Type_already_manifest of string list
     | Kind_mismatch_in_with of Tgt.Core.Names.ident * Tgt.Core.kind * string list * Tgt.Core.kind * Tgt.Core.def_type
     | Path_not_found of string list
+    | Unsafe_recursion
 
   type error = Location.t * error_detail
 
@@ -372,6 +375,11 @@ struct
            "At %a, the path %a does not refer to a type in this signature"
            Location.pp location
            pp_path path
+      | Unsafe_recursion ->
+         (* FIXME: more detail -- why is the type unsafe? *)
+         Format.fprintf pp
+           "At %a, recursive module has unsafe type"
+           Location.pp location
 
   let lift_lookup_error loc = function
     | Ok value  -> Ok value
@@ -384,6 +392,10 @@ struct
   let lift_match_error loc reason = function
     | Ok value  -> Ok value
     | Error err -> Error (loc, Match_error (reason, err))
+
+  let lift_safety_error loc = function
+    | Ok value -> Ok value
+    | Error () -> Error (loc, Unsafe_recursion)
 
   let check_manifest env loc kind = function
     | None -> Ok None
@@ -551,7 +563,8 @@ struct
          check_signature env (item :: rev_sig) seen rem
 
   (* Checks to see if the module type is 'safe' for recursion: it is a
-     signature, and all of its submodules have signature type. *)
+     signature, all its value declarations have safe type, and all of
+     its submodules have signature type. *)
   let rec modtype_is_safe env = function
     | Tgt.{modtype_data=Modtype_longident id} ->
        modtype_is_safe env (Env.lookup_modtype id env)
@@ -559,16 +572,20 @@ struct
        signature_is_safe env [] sg >>= fun sg ->
        Ok (Tgt.{modtype_loc; modtype_data=Modtype_signature sg})
     | Tgt.{modtype_data=Modtype_functor _} ->
-       failwith "Unsafe recursive module" (* FIXME: proper error *)
+       Error ()
     | Tgt.{modtype_data=Modtype_withtype _} ->
        failwith "internal error: unexpanded 'with type' in checked module type"
 
   and signature_is_safe env rev_sig = function
     | [] ->
        Ok (List.rev rev_sig)
-    | (Tgt.{sigitem_data=Sig_value _} as item) :: items ->
-       signature_is_safe env (item :: rev_sig) items
+    | (Tgt.{sigitem_data=Sig_value (ident, val_type)} as item) :: items ->
+       if CTC.rec_safe_valtype env val_type then
+         signature_is_safe env (item :: rev_sig) items
+       else
+         Error ()
     | (Tgt.{sigitem_data=Sig_type _} as item) :: items ->
+       (* FIXME: not sure what to do here -- should probably reject? *)
        signature_is_safe env (item :: rev_sig) items
     | Tgt.{sigitem_data=Sig_module (ident, modty); sigitem_loc} :: items ->
        modtype_is_safe env modty >>= fun modty ->
@@ -747,11 +764,14 @@ struct
        Ok (new_env, List.rev rev_acc)
     | (ident, modty, modl) :: bindings ->
        check_modtype env modty >>= fun modty ->
-       modtype_is_safe env modty >>= fun modty ->
+       lift_safety_error modty.modtype_loc
+         (modtype_is_safe env modty) >>= fun modty ->
        (* FIXME: mark these bindings as recursive, information that
           can be used by the core type checker. *)
        let ident, new_env = Env.add_module ident modty new_env in
-       check_rec_module_types env new_env ((ident, modty, modl) :: rev_acc) bindings
+       check_rec_module_types env new_env
+         ((ident, modty, modl) :: rev_acc)
+         bindings
 
   and check_rec_module_terms rec_env new_env rev_acc rev_sig = function
     | [] ->

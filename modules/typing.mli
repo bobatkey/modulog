@@ -47,6 +47,8 @@ module type CORE_TYPING = sig
 
     val valtype_match : Env.t -> Core.val_type -> Core.val_type -> bool
 
+    val rec_safe_valtype : Env.t -> Core.val_type -> bool
+
     val deftype_equiv : Env.t -> Core.kind -> Core.def_type -> Core.def_type -> bool
 
     val kind_match : Env.t -> Core.kind -> Core.kind -> bool

@@ -188,9 +188,7 @@ module Eval = struct
            Val_predicate (name, decl_type),
            ignore_builder_error (RS.Builder.add_idb_predicate name rules)
         | Core.Value _ ->
-           (* FIXME: better error -- ideally this should be caught by
-              the type checker. *)
-           failwith "Attempt to predeclare a recursive value"
+           failwith "internal error: unsafe recursive constant defn"
   end
 end
 

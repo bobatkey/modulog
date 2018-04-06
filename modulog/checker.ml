@@ -389,6 +389,10 @@ module Core_typing = struct
       { Core.domtype_loc  = Location.generated
       ;      domtype_data = Type_typename path
       }
+
+    let rec_safe_valtype env = function
+      | Core.Predicate _ -> true
+      | Core.Value _     -> false
   end
 end
 
