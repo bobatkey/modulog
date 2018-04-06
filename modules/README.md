@@ -25,8 +25,9 @@ implementation:
  - An implementation of recursive modules, based on ([Leroy's design
    notes for OCaml's recursive
    modules](http://caml.inria.fr/pub/papers/xleroy-recursive_modules-03.pdf)),
-   but slighly simpler.
+   but slightly simpler.
 
 Still to do (no particular order):
 
  - Multi-file programs (like OCaml's separate compilation support).
+ - `include` and `open` support.
