@@ -3,8 +3,6 @@ module RS = Datalog.Ruleset
 module Eval = struct
   module Core = Checked_syntax.Core
 
-  open Core
-
   type 'a eval =
     RS.Builder.t -> 'a * RS.Builder.t
 
@@ -34,7 +32,7 @@ module Eval = struct
 
   type eval_value =
     | Val_predicate of RS.predicate_name * eval_type list
-    | Val_const     of expr
+    | Val_const     of Core.expr
 
   module Eval (Env : Modules.Evaluator.EVAL_ENV
                with type eval_value = eval_value
@@ -42,7 +40,7 @@ module Eval = struct
   struct
 
     let rec eval_type env () = function
-      | {domtype_data=Type_int} ->
+      | {Core.domtype_data=Type_int} ->
          Itype_int
       | {domtype_data=Type_typename lid} ->
          (match Env.find lid env with
@@ -76,7 +74,7 @@ module Eval = struct
 
     let rec flatten_expr env expr ty flexprs =
       match expr, ty with
-        | {expr_data = Expr_var vnm}, ty ->
+        | {Core.expr_data = Expr_var vnm}, ty ->
            eta_expand_var vnm [] ty flexprs
         | {expr_data = Expr_literal i}, Itype_int ->
            RS.Lit i :: flexprs
@@ -107,7 +105,7 @@ module Eval = struct
       flatten_exprs env exprs tys []
 
     let eval_atom env = function
-      | {atom_data=Atom_predicate { pred; args }} ->
+      | Core.{atom_data=Atom_predicate { pred; args }} ->
          (match Env.find pred env with
            | Some (`Value (Val_predicate (pred, typ))) ->
               let args = flatten_args env args typ in
@@ -115,7 +113,7 @@ module Eval = struct
            | _ ->
               failwith "internal error: type error in eval_atom")
 
-    let eval_rule env {rule_pred; rule_args; rule_rhs} =
+    let eval_rule env Core.{rule_pred; rule_args; rule_rhs} =
       match Env.find (Modules.Path.Pident rule_pred) env with
         | Some (`Value (Val_predicate (pred, typ))) ->
            let args = flatten_args env rule_args typ in
@@ -128,14 +126,18 @@ module Eval = struct
       | Ok x -> x
       | Error _ -> failwith "internal error: builder error"
 
-    let eval_predicate env defs rules =
+    let make_ident path ident =
+      (* FIXME: better way of communicating structured names *)
+      String.concat "_" (List.rev (Modules.Ident.name ident :: path))
+
+    let eval_predicate env path defs rules =
       let bindings, rules =
         List.fold_right
-          (fun {decl_name; decl_type} (bindings, rules) ->
-             let ident     = Modules.Ident.name decl_name in
+          (fun Core.{decl_name; decl_type} (bindings, rules) ->
+             let ident     = make_ident path decl_name in
              let decl_type = List.map (eval_type env ()) decl_type.predty_data in
              let arity     = arity_of_decl_type decl_type in
-             let name      = RS.Builder.freshen_name RS.{ident;arity} rules in
+             let name      = RS.{ident;arity} in
              let rules =
                ignore_builder_error (RS.Builder.add_idb_predicate name rules)
              in
@@ -146,7 +148,7 @@ module Eval = struct
       let env = Env.add_values bindings env in
       let rules =
         List.fold_right
-          (fun {decl_rules} ->
+          (fun Core.{decl_rules} ->
              List.fold_right
                (fun rule rules ->
                   ignore_builder_error
@@ -157,29 +159,43 @@ module Eval = struct
       in
       bindings, rules
 
-    let eval_external env { external_name; external_type } rules =
-      let ident     = Modules.Ident.name external_name in
+    let eval_external env path Core.{ external_name; external_type } rules =
+      let ident     = make_ident path external_name in
       let decl_type = List.map (eval_type env ()) external_type.predty_data in
       let arity     = arity_of_decl_type decl_type in
-      let name      = RS.Builder.freshen_name RS.{ident;arity} rules in
+      let name      = RS.{ident;arity} in
       [ (external_name, Val_predicate (name, decl_type)) ],
       ignore_builder_error (RS.Builder.add_edb_predicate name rules)
 
-    let eval_term env term rules =
+    let eval_term env path term rules =
       match term with
-        | PredicateDefs defs ->
-           eval_predicate env defs rules
-        | External ext ->
-           eval_external env ext rules
-        | ConstantDef {const_name;const_expr} ->
+        | Core.PredicateDefs defs ->
+           eval_predicate env path defs rules
+        | Core.External ext ->
+           eval_external env path ext rules
+        | Core.ConstantDef {const_name;const_expr} ->
            [ (const_name, Val_const const_expr) ],
            rules
 
+    let eval_decl env path ident val_type rules =
+      match val_type with
+        | Core.Predicate predty ->
+           (* FIXME: factor out this common code, also in eval_external and eval_predicate *)
+           let ident     = make_ident path ident in
+           let decl_type = List.map (eval_type env ()) predty.predty_data in
+           let arity     = arity_of_decl_type decl_type in
+           let name      = RS.{ident;arity} in
+           Val_predicate (name, decl_type),
+           ignore_builder_error (RS.Builder.add_idb_predicate name rules)
+        | Core.Value _ ->
+           (* FIXME: better error -- ideally this should be caught by
+              the type checker. *)
+           failwith "Attempt to predeclare a recursive value"
   end
 end
 
-module Evaluator =
+module ModEval =
   Modules.Evaluator.Make (Checked_syntax.Mod) (Eval)
 
 let from_structure structure =
-  Eval.run (Evaluator.eval_structure structure)
+  Eval.run (ModEval.eval_structure structure)

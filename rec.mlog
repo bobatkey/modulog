@@ -1,0 +1,20 @@
+define edge : int * int
+       edge(1,2)
+       edge(0,1)
+
+module type PATH = sig
+  path : int * int
+  (* constant foo : int *)
+end
+
+module rec P : PATH = struct
+  define path : int * int
+         path(?x,?y) :- edge(?x,?y)
+         path(?x,?z) :- P.path(?x,?y), edge(?y,?z)
+
+(*   constant foo : int = P.foo *)
+end
+
+
+define reachable : int
+       reachable(?x) :- P.path(0,?x)

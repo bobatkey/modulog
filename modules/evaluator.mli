@@ -36,7 +36,9 @@ module type CORE_EVAL = sig
 
     val eval_type : Env.t -> Core.kind -> Core.def_type -> eval_type
 
-    val eval_term : Env.t -> Core.term -> (Ident.t * eval_value) list eval
+    val eval_decl : Env.t -> string list -> Ident.t -> Core.val_type -> eval_value eval
+
+    val eval_term : Env.t -> string list -> Core.term -> (Ident.t * eval_value) list eval
 
   end
 end

@@ -1,7 +1,7 @@
 (*
 Requirements:
 - Tokens: DOT, IDENT, FUNCTOR, LPAREN, COLON, RPAREN, ARROW, SIG, END, WITH
-          MODULE, STRUCT, TYPE, EQUALS
+          MODULE, STRUCT, TYPE, EQUALS, REC
 - Non terminals: longident, str_value, str_type(NAME), sig_value, sig_type
 - An implementation of MOD_SYNTAX_RAW is open
 
@@ -97,6 +97,13 @@ str_item:
 | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_modty (id, mty) } }
+| MODULE; REC; bindings=separated_nonempty_list(AND, rec_module_binding)
+    { { stritem_loc  = Location.mk $startpos $endpos
+      ; stritem_data = Str_modrec bindings } }
+
+rec_module_binding:
+| id=IDENT; COLON; mty=mod_type; EQUALS; modl=mod_term2
+    { (id, mty, modl) }
 
 functor_decls:
 | EQUALS; modl=mod_term

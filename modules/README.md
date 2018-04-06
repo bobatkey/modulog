@@ -22,8 +22,11 @@ implementation:
    numbers.
  - An evaluator, for 'executing' the module language to produce a
    module-free program with all functors instantiated.
+ - An implementation of recursive modules, based on ([Leroy's design
+   notes for OCaml's recursive
+   modules](http://caml.inria.fr/pub/papers/xleroy-recursive_modules-03.pdf)),
+   but slighly simpler.
 
 Still to do (no particular order):
 
  - Multi-file programs (like OCaml's separate compilation support).
- - Recursive modules.

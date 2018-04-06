@@ -183,8 +183,11 @@ module Builder = struct
          Ok { t with predicates_so_far =
                        PredicateNameMap.add name info t.predicates_so_far
             }
-      | _ ->
-         Error (Predicate_already_declared name)
+      | { intensional = previous_intensionality } ->
+         if previous_intensionality = intensional then
+           Ok t
+         else
+           Error (Predicate_already_declared name)
 
   let add_edb_predicate name t =
     add_predicate name false t

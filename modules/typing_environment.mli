@@ -32,6 +32,8 @@ module type S = sig
 
   val bind_value : Ident.t -> Mod.Core.val_type -> t -> t
 
+  val bind_module : Ident.t -> Mod.mod_type -> t -> t
+
 
   val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 

@@ -140,6 +140,7 @@ module type MOD_SYNTAX_RAW = sig
     | Str_type   of Core.Names.ident * Core.kind * Core.def_type
     | Str_module of Core.Names.ident * mod_term
     | Str_modty  of Core.Names.ident * mod_type
+    | Str_modrec of (Core.Names.ident * mod_type * mod_term) list
 
   val pp_modterm : Format.formatter -> mod_term -> unit
   val pp_structure : Format.formatter -> structure -> unit
@@ -256,6 +257,7 @@ struct
     | Str_type   of Core.Names.ident * Core.kind * Core.def_type
     | Str_module of Core.Names.ident * mod_term
     | Str_modty  of Core.Names.ident * mod_type
+    | Str_modrec of (Core.Names.ident * mod_type * mod_term) list
 
   let rec pp_modterm pp = function
     | {modterm_data = Mod_functor (id, mty, modl)} ->
@@ -306,6 +308,23 @@ struct
        Format.fprintf fmt "@[<v 2>module type %a =@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
+    | {stritem_data = Str_modrec bindings} ->
+       Format.fprintf fmt "@[<v 0>@[<v 2>module rec %a@]"
+         pp_module_bindings bindings
+
+  and pp_module_bindings fmt = function
+    | [] -> ()
+    | [(id, modty, modl)] ->
+       Format.fprintf fmt "%a : %a =@ %a@]"
+         Core.Names.pp_ident id
+         pp_modtype          modty
+         pp_modterm          modl
+    | (id, modty, modl)::bindings ->
+       Format.fprintf fmt "%a : %a =@ %a@]@ @[<v 2>and %a"
+         Core.Names.pp_ident id
+         pp_modtype          modty
+         pp_modterm          modl
+         pp_module_bindings  bindings
 end
 
 module type CORE_SYNTAX_CONCRETE =

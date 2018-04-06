@@ -50,6 +50,8 @@ module type S = sig
 
   val bind_value : Ident.t -> Mod.Core.val_type -> t -> t
 
+  val bind_module : Ident.t -> Mod.mod_type -> t -> t
+
 
   val find_value : String_names.longident -> t -> (Path.t * Mod.Core.val_type, lookup_error) result
 
@@ -102,6 +104,12 @@ struct
     ; names    = NameMap.add (Ident.name id) id names
     }
 
+  (* FIXME: why is this different to add_module_by_ident? *)
+  let bind_module id vty {bindings; names} =
+    { bindings = Ident.Table.add id (Module vty) bindings
+    ; names    = NameMap.add (Ident.name id) id names
+    }
+
   let add_type id decl = add id (Type decl)
 
   let add_module id mty = add id (Module mty)
@@ -109,6 +117,7 @@ struct
   let add_modty id mty = add id (Modty mty)
 
   let add_by_ident ident binding env =
+    (* FIXME: why doesn't this update the names field? *)
     {env with bindings = Ident.Table.add ident binding env.bindings}
 
   let add_module_by_ident ident mty env =

@@ -550,6 +550,32 @@ struct
          in
          check_signature env (item :: rev_sig) seen rem
 
+  (* Checks to see if the module type is 'safe' for recursion: it is a
+     signature, and all of its submodules have signature type. *)
+  let rec modtype_is_safe env = function
+    | Tgt.{modtype_data=Modtype_longident id} ->
+       modtype_is_safe env (Env.lookup_modtype id env)
+    | Tgt.{modtype_data=Modtype_signature sg; modtype_loc} ->
+       signature_is_safe env [] sg >>= fun sg ->
+       Ok (Tgt.{modtype_loc; modtype_data=Modtype_signature sg})
+    | Tgt.{modtype_data=Modtype_functor _} ->
+       failwith "Unsafe recursive module" (* FIXME: proper error *)
+    | Tgt.{modtype_data=Modtype_withtype _} ->
+       failwith "internal error: unexpanded 'with type' in checked module type"
+
+  and signature_is_safe env rev_sig = function
+    | [] ->
+       Ok (List.rev rev_sig)
+    | (Tgt.{sigitem_data=Sig_value _} as item) :: items ->
+       signature_is_safe env (item :: rev_sig) items
+    | (Tgt.{sigitem_data=Sig_type _} as item) :: items ->
+       signature_is_safe env (item :: rev_sig) items
+    | Tgt.{sigitem_data=Sig_module (ident, modty); sigitem_loc} :: items ->
+       modtype_is_safe env modty >>= fun modty ->
+       let item = Tgt.{sigitem_data=Sig_module (ident, modty); sigitem_loc} in
+       signature_is_safe env (item :: rev_sig) items
+    | (Tgt.{sigitem_data=Sig_modty _} as item) :: items ->
+       signature_is_safe env (item :: rev_sig) items
 
 
   let rec type_modterm env = function
@@ -693,6 +719,56 @@ struct
              }
        in
        type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
+
+    | Src.{stritem_loc; stritem_data=Str_modrec bindings} :: items ->
+       (* Plan:
+          1. Check all the module types in the current environment
+             (no recursive module types yet)
+             (additionally, all the module types must be signatures, 
+              which only contain structures and values. This is because
+              we can't evaluate recursively defined functors, which would cause
+              looping in the evaluator. This is a slightly different safety
+              condition to the OCaml one)
+          2. Add the module types to the environment (tagged as recursive?)
+          3. Check the module bodies in turn in the extended environment
+          4. Add the module types to the environment again, this time not tagged as
+             recursive.
+       *)
+       check_rec_module_types env env [] bindings
+       >>= fun (rec_env, bindings) ->
+       check_rec_module_terms rec_env env [] rev_sig bindings
+       >>= fun (new_env, bindings, rev_sig) ->
+       let stritem = Tgt.{ stritem_loc; stritem_data = Str_modrec bindings } in
+       type_structure new_env rev_sig (stritem :: rev_str) seen items
+
+  (* FIXME: thread the seen set through to check for repeated names *)
+  and check_rec_module_types env new_env rev_acc = function
+    | [] ->
+       Ok (new_env, List.rev rev_acc)
+    | (ident, modty, modl) :: bindings ->
+       check_modtype env modty >>= fun modty ->
+       modtype_is_safe env modty >>= fun modty ->
+       (* FIXME: mark these bindings as recursive, information that
+          can be used by the core type checker. *)
+       let ident, new_env = Env.add_module ident modty new_env in
+       check_rec_module_types env new_env ((ident, modty, modl) :: rev_acc) bindings
+
+  and check_rec_module_terms rec_env new_env rev_acc rev_sig = function
+    | [] ->
+       Ok (new_env, List.rev rev_acc, rev_sig)
+    | (ident, modty, modl) :: bindings ->
+       type_modterm rec_env modl >>= fun (modl, modty') ->
+       (* FIXME: better location information, and error message *)
+       lift_match_error modty.modtype_loc "definition of a recursive module"
+         (modtype_match rec_env modty' modty) >>= fun () ->
+       let new_env = Env.bind_module ident modty new_env in
+       let sigitem = Tgt.{ sigitem_loc  = Location.generated
+                         ;     sigitem_data = Sig_module (ident, modty) }
+       in
+       check_rec_module_terms rec_env new_env
+         ((ident, modty, modl) :: rev_acc)
+         (sigitem :: rev_sig)
+         bindings
 
   let type_structure env str =
     type_structure env [] [] SeenSet.empty str

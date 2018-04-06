@@ -133,6 +133,7 @@ module type MOD_SYNTAX_RAW = sig
     | Str_type   of Core.Names.ident * Core.kind * Core.def_type
     | Str_module of Core.Names.ident * mod_term
     | Str_modty  of Core.Names.ident * mod_type
+    | Str_modrec of (Core.Names.ident * mod_type * mod_term) list
 
   val pp_modterm : Format.formatter -> mod_term -> unit
 
