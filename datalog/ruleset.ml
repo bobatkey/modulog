@@ -44,21 +44,21 @@ let pp_atom fmt = function
        pred.ident
        pp_exprs args
 
-let pp_rhs = Fmt.list ~sep:(Fmt.always ",@ ") pp_atom
+let pp_rhs =
+  Fmt.list ~sep:(Fmt.always ",@ ") pp_atom
 
-let pp_rule fmt {pred; args; rhs} =
-  match rhs with
-    | [] ->
-       Format.fprintf fmt
-         "%s(@[<h>%a@])."
-         pred.ident
-         pp_exprs args
-    | rhs ->
-       Format.fprintf fmt
-         "@[<v4>%s(@[<h>%a@]) :-@ %a.@]"
-         pred.ident
-         pp_exprs args
-         pp_rhs rhs
+let pp_rule fmt = function
+  | { pred; args; rhs=[] } ->
+     Format.fprintf fmt
+       "%s(@[<h>%a@])."
+       pred.ident
+       pp_exprs args
+  | { pred; args; rhs } ->
+     Format.fprintf fmt
+       "@[<v4>%s(@[<h>%a@]) :-@ %a.@]"
+       pred.ident
+       pp_exprs args
+       pp_rhs rhs
 
 (**********************************************************************)
 module PredicateNameMap = Map.Make (PredicateName)
@@ -97,7 +97,7 @@ type rule_id = int
 
 let rule_id i = i
 
-let rule i set = set.rules.(i)
+let rule_of_id i set = set.rules.(i)
 
 let predicates {pred_info} =
   PredicateNameMap.bindings pred_info
@@ -121,9 +121,9 @@ module Builder = struct
     | Predicate_already_declared of predicate_name
 
   let empty =
-    { rules_so_far = []
-    ; next_rule_id = 0
-    ; index_so_far = PredicateNameMap.empty
+    { rules_so_far      = []
+    ; next_rule_id      = 0
+    ; index_so_far      = PredicateNameMap.empty
     ; predicates_so_far = PredicateNameMap.empty
     }
 
@@ -179,11 +179,10 @@ module Builder = struct
          else
            Error (Predicate_already_declared name)
 
-  let add_edb_predicate name t =
-    add_predicate name false t
-
-  let add_idb_predicate name t =
-    add_predicate name true t
+  let add_predicate name int t =
+    match int with
+      | `Extensional -> add_predicate name false t
+      | `Intensional -> add_predicate name true t
 
   let finish { rules_so_far; next_rule_id; index_so_far; predicates_so_far } =
     let rules_of_pred = index_so_far
@@ -201,8 +200,10 @@ module Builder = struct
       { rules; rules_of_pred; pred_info }
 end
 
+type builder = Builder.t
+
 (**********************************************************************)
-module G = struct
+module As_graph = struct
   type t = ruleset
 
   module V = struct
@@ -243,22 +244,22 @@ end
 
 (** A rule is self recursive if it mentions the head predicate in the
     right hand side. *)
-let rule_is_self_recursive ruleset rule_id =
+let rule_is_self_recursive rule_id ruleset =
   let rule = ruleset.rules.(rule_id) in
   List.exists (fun (Atom {pred}) -> pred = rule.pred) rule.rhs
 
-module SCC = Graph.Components.Make (G)
+module SCC = Graph.Components.Make (As_graph)
 
 let form_of_component ruleset = function
   | [] ->
      assert false
-  | [rule_id] ->
-     if rule_is_self_recursive ruleset rule_id then
-       `Recursive [rule rule_id ruleset]
+  | [id] ->
+     if rule_is_self_recursive id ruleset then
+       `Recursive [rule_of_id id ruleset]
      else
-       `Direct (rule rule_id ruleset)
+       `Direct (rule_of_id id ruleset)
   | rules ->
-     `Recursive (List.map (fun id -> rule id ruleset) rules)
+     `Recursive (List.map (fun id -> rule_of_id id ruleset) rules)
 
 let components ruleset =
   List.map (form_of_component ruleset) (SCC.scc_list ruleset)

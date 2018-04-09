@@ -1,6 +1,6 @@
 let dot_of_ruleset fmt ruleset =
   let module G = struct
-    include Ruleset.G
+    include Ruleset.As_graph
 
     let graph_attributes _ =
       [ ]
@@ -15,8 +15,8 @@ let dot_of_ruleset fmt ruleset =
       Printf.sprintf "rule%d" (Ruleset.rule_id id)
 
     let vertex_attributes id =
-      [ `Label (Format.asprintf "@[%a@]" Ruleset.pp_rule (Ruleset.rule id ruleset))
-      ]
+      let rule = Ruleset.rule_of_id id ruleset in
+      [ `Label (Format.asprintf "@[%a@]" Ruleset.pp_rule rule) ]
 
     let default_edge_attributes _ = []
 
@@ -24,8 +24,6 @@ let dot_of_ruleset fmt ruleset =
 
     let get_subgraph _ =
       None
-  end
-  in
-  let module Dot_of_ruleset = Graph.Graphviz.Dot (G)
-  in
+  end in
+  let module Dot_of_ruleset = Graph.Graphviz.Dot (G) in
   Dot_of_ruleset.fprint_graph fmt ruleset

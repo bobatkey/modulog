@@ -1,19 +1,28 @@
-module RS = Datalog.Ruleset
+module Ruleset = Datalog.Ruleset
+
+module List = struct
+  include List
+
+  let fold_righti f l a =
+    snd (List.fold_right (fun x (i, a) -> (i+1, f i x a)) l (0,a))
+end
 
 module Eval = struct
   module Core = Checked_syntax.Core
 
   type 'a eval =
-    RS.Builder.t -> 'a * RS.Builder.t
+    Ruleset.builder -> 'a * Ruleset.builder
 
-  let return x rules = (x, rules)
+  let return x rules =
+    (x, rules)
+
   let (>>=) c f rules =
     let a, rules = c rules in
     f a rules
 
   let run c =
-    let _, rules = c RS.Builder.empty in
-    RS.Builder.finish rules
+    let (), rules = c Ruleset.Builder.empty in
+    Ruleset.Builder.finish rules
 
   type eval_type =
     | Itype_int
@@ -31,12 +40,12 @@ module Eval = struct
     List.fold_left (fun a typ -> arity_of_eval_type typ + a) 0 typs
 
   type eval_value =
-    | Val_predicate of RS.predicate_name * eval_type list
+    | Val_predicate of Ruleset.predicate_name * eval_type list
     | Val_const     of Core.expr
 
   module Eval (Env : Modules.Evaluator.EVAL_ENV
                with type eval_value = eval_value
-                and type eval_type = eval_type) =
+                and type eval_type  = eval_type) =
   struct
 
     let rec eval_type env () = function
@@ -50,45 +59,46 @@ module Eval = struct
          Itype_tuple (List.map (eval_type env ()) tys)
       | {domtype_data=Type_enum syms} ->
          Itype_enum syms
-
+    
     let rec eta_expand_var vnm suffix ty flexprs =
       match ty with
         | Itype_int | Itype_enum _ ->
-           let vnm =
-             vnm ^ (String.concat "/" (List.map string_of_int (List.rev suffix)))
+           let vnm = vnm ^ (String.concat "/" (List.rev_map string_of_int suffix))
            in
-           RS.Var vnm :: flexprs
+           Ruleset.Var vnm :: flexprs
         | Itype_tuple tys ->
-           snd (List.fold_right
-                  (fun ty (i, l) ->
-                     (i+1, eta_expand_var vnm (i::suffix) ty l))
-                  tys
-                  (0,flexprs))
+           List.fold_righti
+             (fun i ty l -> eta_expand_var vnm (i::suffix) ty l)
+             tys
+             flexprs
 
     let rec eta_expand_underscore ty flexprs =
       match ty with
         | Itype_int | Itype_enum _ ->
-           RS.Underscore :: flexprs
+           Ruleset.Underscore :: flexprs
         | Itype_tuple tys ->
            List.fold_right eta_expand_underscore tys flexprs
+
+    let num_of_symbol sym syms =
+      let rec find i = function
+        | [] -> failwith "internal error: dodgy enum symbol"
+        | s :: _ when String.equal s sym -> Int32.of_int i
+        | _ :: syms -> find (i+1) syms
+      in
+      find 0 syms
 
     let rec flatten_expr env expr ty flexprs =
       match expr, ty with
         | {Core.expr_data = Expr_var vnm}, ty ->
            eta_expand_var vnm [] ty flexprs
         | {expr_data = Expr_literal i}, Itype_int ->
-           RS.Lit i :: flexprs
+           Ruleset.Lit i :: flexprs
         | {expr_data = Expr_underscore}, ty ->
            eta_expand_underscore ty flexprs
         | {expr_data = Expr_tuple exprs}, Itype_tuple tys ->
            flatten_exprs env exprs tys flexprs
         | {expr_data = Expr_enum sym}, Itype_enum syms ->
-           let rec find i = function
-             | [] -> failwith "internal error: dodgy enum symbol"
-             | s :: _ when s = sym -> Int32.of_int i
-             | _ :: syms -> find (i+1) syms
-           in
-           RS.Lit (find 0 syms) :: flexprs
+           Ruleset.Lit (num_of_symbol sym syms) :: flexprs
         | {expr_data = Expr_lid lid}, ty ->
            (match Env.find lid env with
              | Some (`Value (Val_const expr)) ->
@@ -109,7 +119,7 @@ module Eval = struct
          (match Env.find pred env with
            | Some (`Value (Val_predicate (pred, typ))) ->
               let args = flatten_args env args typ in
-              RS.Atom {pred; args}
+              Ruleset.Atom {pred; args}
            | _ ->
               failwith "internal error: type error in eval_atom")
 
@@ -118,78 +128,80 @@ module Eval = struct
         | Some (`Value (Val_predicate (pred, typ))) ->
            let args = flatten_args env rule_args typ in
            let rhs  = List.map (eval_atom env) rule_rhs in
-           RS.{ pred; args; rhs }
+           Ruleset.{ pred; args; rhs }
         | _ ->
            failwith "internal error: type error in eval_rule"
 
-    let ignore_builder_error = function
-      | Ok x -> x
-      | Error _ -> failwith "internal error: builder error"
+    let builder_map f l s =
+      let rec loop acc s = function
+        | []   -> List.rev acc, s
+        | x::l -> let y, s = f x s in loop (y::acc) s l
+      in
+      loop [] s l
+
+    let builder_iter f l s =
+      let rec loop s = function
+        | []   -> (), s
+        | x::l -> let (), s = f x s in loop s l
+      in
+      loop s l
+
+    let builder f rules =
+      match f rules with
+        | Ok rules -> (), rules
+        | Error _ -> failwith "internal error: builder error"
 
     let make_ident path ident =
       (* FIXME: better way of communicating structured names *)
       String.concat "_" (List.rev (Modules.Ident.name ident :: path))
 
-    let eval_predicate env path defs rules =
-      let bindings, rules =
-        List.fold_right
-          (fun Core.{decl_name; decl_type} (bindings, rules) ->
-             let ident     = make_ident path decl_name in
-             let decl_type = List.map (eval_type env ()) decl_type.predty_data in
-             let arity     = arity_of_decl_type decl_type in
-             let name      = RS.{ident;arity} in
-             let rules =
-               ignore_builder_error (RS.Builder.add_idb_predicate name rules)
-             in
-             ((decl_name, Val_predicate (name, decl_type)) :: bindings, rules))
-          defs
-          ([], rules)
-      in
-      let env = Env.add_values bindings env in
-      let rules =
-        List.fold_right
-          (fun Core.{decl_rules} ->
-             List.fold_right
-               (fun rule rules ->
-                  ignore_builder_error
-                    (RS.Builder.add_rule (eval_rule env rule) rules))
-               decl_rules)
-          defs
-          rules
-      in
-      bindings, rules
-
-    let eval_external env path Core.{ external_name; external_type } rules =
-      let ident     = make_ident path external_name in
-      let decl_type = List.map (eval_type env ()) external_type.predty_data in
+    let declare_pred env path decl_name int decl_type =
+      let ident     = make_ident path decl_name in
+      let decl_type = List.map (eval_type env ()) decl_type.Core.predty_data in
       let arity     = arity_of_decl_type decl_type in
-      let name      = RS.{ident;arity} in
-      [ (external_name, Val_predicate (name, decl_type)) ],
-      ignore_builder_error (RS.Builder.add_edb_predicate name rules)
+      let name      = Ruleset.{ident;arity} in
+      builder (Ruleset.Builder.add_predicate name int) >>= fun () ->
+      return (decl_name, Val_predicate (name, decl_type))
 
-    let eval_term env path term rules =
+    let eval_predicate env path defs =
+      builder_map
+        Core.(fun decl ->
+            declare_pred env path decl.decl_name `Intensional decl.decl_type)
+        defs
+      >>= fun bindings ->
+      let env = Env.add_values bindings env in
+      builder_iter
+        (fun Core.{decl_rules} ->
+           builder_iter
+             (fun rule -> builder (Ruleset.Builder.add_rule (eval_rule env rule)))
+             decl_rules)
+        defs
+      >>= fun () ->
+      return bindings
+
+    let eval_external env path Core.{ external_name; external_type } =
+      declare_pred env path external_name `Extensional external_type
+      >>= fun binding ->
+      return [binding]
+
+    let eval_term env path term =
       match term with
         | Core.PredicateDefs defs ->
-           eval_predicate env path defs rules
+           eval_predicate env path defs
         | Core.External ext ->
-           eval_external env path ext rules
+           eval_external env path ext
         | Core.ConstantDef {const_name;const_expr} ->
-           [ (const_name, Val_const const_expr) ],
-           rules
+           return [ (const_name, Val_const const_expr) ]
 
-    let eval_decl env path ident val_type rules =
+    let eval_decl env path ident val_type =
       match val_type with
         | Core.Predicate predty ->
-           (* FIXME: factor out this common code, also in eval_external and eval_predicate *)
-           let ident     = make_ident path ident in
-           let decl_type = List.map (eval_type env ()) predty.predty_data in
-           let arity     = arity_of_decl_type decl_type in
-           let name      = RS.{ident;arity} in
-           Val_predicate (name, decl_type),
-           ignore_builder_error (RS.Builder.add_idb_predicate name rules)
+           declare_pred env path ident `Intensional predty >>= fun (_, typ) ->
+           return typ
         | Core.Value _ ->
            failwith "internal error: unsafe recursive constant defn"
   end
+
 end
 
 module ModEval =

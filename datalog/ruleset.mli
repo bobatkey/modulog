@@ -1,5 +1,7 @@
 (** Datalog programs as sets of rules. *)
 
+(** {1 Datalog programs} *)
+
 type predicate_name =
   { ident : string
   ; arity : int
@@ -19,19 +21,13 @@ type rule =
   ; rhs  : atom list
   }
 
-val pp_rule : Format.formatter -> rule -> unit
-
 type ruleset
-
-val pp : Format.formatter -> ruleset -> unit
 
 type rule_id
 
 val rule_id : rule_id -> int
 
-val rule : rule_id -> ruleset -> rule
-
-val rule_is_self_recursive : ruleset -> rule_id -> bool
+val rule_of_id : rule_id -> ruleset -> rule
 
 type predicate_info =
   { intensional : bool
@@ -39,8 +35,20 @@ type predicate_info =
 
 val predicates : ruleset -> (predicate_name * predicate_info) list
 
+val components : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
+
+(** {2 Pretty printing} *)
+
+val pp_rule : rule Fmt.t
+
+val pp : ruleset Fmt.t
+
+(** {2 Construction of rulesets} *)
+
+type builder
+
 module Builder : sig
-  type t
+  type t = builder
 
   type error =
     | Undeclared_predicate of predicate_name
@@ -52,19 +60,20 @@ module Builder : sig
     | Predicate_already_declared of predicate_name
 
   val empty : t
+
+  val add_predicate : predicate_name -> [`Intensional | `Extensional ] -> t -> (t, error) result
+
   val add_rule : rule -> t -> (t, error) result
-  val add_idb_predicate : predicate_name -> t -> (t, error) result
-  val add_edb_predicate : predicate_name -> t -> (t, error) result
 
   val finish : t -> ruleset
 end
 
-val components : ruleset -> [> `Direct of rule | `Recursive of rule list ] list
+(** {2 Graph representation} *)
 
 (** Graph representation of a set of datalog rules. Each vertex is a
     rule. There exists an edge [r1 -> r2] if the head of [r2] is
     mentioned on th right-hand side of [r1]. *)
-module G : sig
+module As_graph : sig
   type t = ruleset
 
   module V : sig
