@@ -127,16 +127,6 @@ module Builder = struct
     ; predicates_so_far = PredicateNameMap.empty
     }
 
-  let freshen_name base {predicates_so_far} =
-    let used candidate =
-      PredicateNameMap.mem
-        { ident = candidate; arity = base.arity }
-        predicates_so_far
-    in
-    { ident = Display_names.Fresh.choose used base.ident
-    ; arity = base.arity
-    }
-
   let update_index pred f map =
     let existing =
       match PredicateNameMap.find pred map with
