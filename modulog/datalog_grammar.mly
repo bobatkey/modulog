@@ -12,6 +12,7 @@ open Syntax.Mod
 %token<int32> INT_LITERAL
 %token<string> IDENT ENUM_IDENT MV_IDENT
 %token EOF
+%token UNKNOWN
 
 %start <Syntax.Mod.structure> program
 

@@ -1,51 +1,62 @@
 open Modulog.Std
 
-let typecheck filename =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checked_syntax.Mod.pp_signature sg
+let (>>=) x f = match x with
+  | Ok a    -> f a
+  | Error e -> Error e
+let (>>!) x f = match x with
+  | Ok a    -> Ok a
+  | Error e -> f e
 
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+let report_parse_error (pos, message, state, lexeme) =
+  Format.printf
+    "@[<v>@[<v 2>Parse error at %a:@ @[%s:@ %a@]@]@ (parser state %d)@]\n"
+    Modulog.Location.pp pos
+    (match lexeme with
+      | "" -> "At the end of the input"
+      | lexeme -> Printf.sprintf "On the input '%s'" lexeme)
+    Fmt.text message
+    state;
+  Error ()
+
+let report_check_error err =
+  Format.printf
+    "@[<v>%a@]\n"
+    Modulog.Checker.pp_error err;
+  Error ()
+
+let parse_and_check filename =
+  read_structure_from_file filename >>! report_parse_error
+  >>= fun structure ->
+  Modulog.Checker.type_structure structure >>! report_check_error
+
+let typecheck filename =
+  parse_and_check filename >>= fun (str, sg) ->
+  Format.printf
+    "@[<v>%a@]\n"
+    Modulog.Checked_syntax.Mod.pp_signature sg;
+  Ok ()
 
 let relmachine filename with_indexes =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules    = Modulog.To_rules.from_structure str in
-       let code     = Relation_machine.Of_rules.translate rules in
-       Format.printf
-         "@[<v>%a@]\n%!"
-         Relation_machine.Syntax.pp_program code;
-       if with_indexes then begin
-         let indexes = Relation_machine.Indexes.indexes code in
-         Format.printf
-           "\n@[<v>%a@]\n%!"
-           Relation_machine.Indexes.pp_all_orderings indexes
-       end
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules    = Modulog.To_rules.from_structure str in
+  let code     = Relation_machine.Of_rules.translate rules in
+  Format.printf
+    "@[<v>%a@]\n%!"
+    Relation_machine.Syntax.pp_program code;
+  if with_indexes then begin
+    let indexes = Relation_machine.Indexes.indexes code in
+    Format.printf
+      "\n@[<v>%a@]\n%!"
+      Relation_machine.Indexes.pp_all_orderings indexes
+  end;
+  Ok ()
 
 let gen_c filename =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules    = Modulog.To_rules.from_structure str in
-       let code     = Relation_machine.Of_rules.translate rules in
-       Relation_machine.Codegen.translate code
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules    = Modulog.To_rules.from_structure str in
+  let code     = Relation_machine.Of_rules.translate rules in
+  Relation_machine.Codegen.translate code;
+  Ok ()
 
 let compile filename outname =
   (* FIXME: check that filename ends with '.mlog' *)
@@ -60,62 +71,38 @@ let compile filename outname =
       | Some outname ->
          outname
   in
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules    = Modulog.To_rules.from_structure str in
-       let code     = Relation_machine.Of_rules.translate rules in
-       Relation_machine.Codegen.compile outname code
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules = Modulog.To_rules.from_structure str in
+  let code  = Relation_machine.Of_rules.translate rules in
+  Relation_machine.Codegen.compile outname code;
+  Ok ()
 
 
 let rules filename =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules = Modulog.To_rules.from_structure str in
-       Format.printf
-         "@[<v>%a@]\n"
-         Datalog.Ruleset.pp rules
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules = Modulog.To_rules.from_structure str in
+  Format.printf
+    "@[<v>%a@]\n"
+    Datalog.Ruleset.pp rules;
+  Ok ()
 
 let rules_graph filename =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules = Modulog.To_rules.from_structure str in
-       Format.printf
-         "@[<v>%a@]\n"
-         Datalog.Graphviz.dot_of_ruleset rules
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules = Modulog.To_rules.from_structure str in
+  Format.printf
+    "@[<v>%a@]\n"
+    Datalog.Graphviz.dot_of_ruleset rules;
+  Ok ()
 
 let exec filename =
-  let structure = read_structure_from_file filename in
-  match Modulog.Checker.type_structure structure with
-    | Ok (str, sg) ->
-       let rules    = Modulog.To_rules.from_structure str in
-       let code     = Relation_machine.Of_rules.translate rules in
-       let env      = Relation_machine.Interpreter.eval code in
-       Format.printf
-         "@[<v>%a@]\n"
-         Relation_machine.Interpreter.Env.pp env
-
-    | Error err ->
-       Format.printf
-         "@[<v>%a@]\n"
-         Modulog.Checker.pp_error err
+  parse_and_check filename >>= fun (str, sg) ->
+  let rules    = Modulog.To_rules.from_structure str in
+  let code     = Relation_machine.Of_rules.translate rules in
+  let env      = Relation_machine.Interpreter.eval code in
+  Format.printf
+    "@[<v>%a@]\n"
+    Relation_machine.Interpreter.Env.pp env;
+  Ok ()
 
 (**********************************************************************)
 (* The command line interface *)

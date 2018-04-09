@@ -7,6 +7,9 @@ type t =
 let mk loc_start loc_end =
   FromSource { loc_start; loc_end }
 
+let of_lexbuf lexbuf =
+  mk (Lexing.lexeme_start_p lexbuf) (Lexing.lexeme_end_p lexbuf)
+
 let generated = Generated
 
 open Lexing

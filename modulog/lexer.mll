@@ -28,8 +28,8 @@ rule token = parse
 | "rec"      { REC }
 | '('        { LPAREN }
 | ')'        { RPAREN }
-| '['        { LBRACE }
-| ']'        { RBRACE }
+| '{'        { LBRACE }
+| '}'        { RBRACE }
 | '|'        { BAR }
 | ['0'-'9']+ { INT_LITERAL (Int32.of_string (Lexing.lexeme lexbuf)) }
 | ['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']*
@@ -39,6 +39,7 @@ rule token = parse
 | '?'(['A'-'Z''a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']* as ident)
              { MV_IDENT ident }
 | '_'        { UNDERSCORE }
+| _          { UNKNOWN }
 | eof        { EOF }
 
 and comment = parse

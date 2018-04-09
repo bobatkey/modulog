@@ -3,8 +3,6 @@ module Core_typing = struct
   module Src      = Syntax.Core
   module Core     = Checked_syntax.Core
 
-  open Rresult
-
   type error_detail =
     | Lookup_error of Modules.Typing_environment.lookup_error
     | Type_mismatch of { expected : Core.def_type
@@ -68,8 +66,12 @@ module Core_typing = struct
            "@[<hv>Reference@ to@ constant@ %a,@ where@ a@ reference@ to@ a@ predicate@ was@ expected@]"
            Src.Names.pp_longident lid
 
-  let lift_lookup_error loc r =
-    R.reword_error (fun e -> (loc, Lookup_error e)) r
+  let (>>|) x f = match x with Ok a -> Ok (f a) | Error e -> Error e
+  let (>>=) x f = match x with Ok a -> f a | Error e -> Error e
+
+  let lift_lookup_error loc = function
+    | Ok a    -> Ok a
+    | Error e -> Error (loc, Lookup_error e)
 
   module Checker (Env : Modules.Typing.TYPING_ENV
                   with type val_type = Core.val_type

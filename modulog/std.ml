@@ -8,8 +8,9 @@ let read_structure_from_file filename =
       ; pos_cnum = 0
       ; pos_bol = 0
       };
-    let structure = Parser.program Lexer.token lexbuf in
+    let result = Parser_driver.parse filename lexbuf in
     close_in ch;
-    structure
+    result
   with e ->
     close_in ch; raise e
+

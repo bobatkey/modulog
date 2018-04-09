@@ -1,0 +1,1510 @@
+program: CONSTANT IDENT COLON INT EQUALS IDENT WITH 
+##
+## Ends in an error in state: 110.
+##
+## expr -> longident . [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COMMA ]
+## longident -> longident . DOT IDENT [ TYPE RPAREN MODULE EXTERNAL EOF END DOT DEFINE CONSTANT COMMA ]
+##
+## The known suffix of the stack is as follows:
+## longident 
+##
+
+having read a identifier, expecting either a new declaration or a '.' followed by an identifier.
+
+program: CONSTANT IDENT COLON INT EQUALS LPAREN WITH 
+##
+## Ends in an error in state: 104.
+##
+## expr -> LPAREN . loption(separated_nonempty_list(COMMA,expr)) RPAREN [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COMMA ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+expecting either a closing ')' or a comma separated list of expressions followed by a ')'.
+
+program: CONSTANT IDENT COLON INT EQUALS WITH 
+##
+## Ends in an error in state: 138.
+##
+## str_value -> CONSTANT IDENT COLON domain_type EQUALS . expr [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT COLON domain_type EQUALS 
+##
+
+expecting an expresson after the '=' in a constant declaration.
+
+program: CONSTANT IDENT COLON INT WITH 
+##
+## Ends in an error in state: 137.
+##
+## str_value -> CONSTANT IDENT COLON domain_type . EQUALS expr [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT COLON domain_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
+##
+
+expecting an '=' after the type of a constant declaration in a structure.
+
+program: CONSTANT IDENT COLON WITH 
+##
+## Ends in an error in state: 136.
+##
+## str_value -> CONSTANT IDENT COLON . domain_type EQUALS expr [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT COLON 
+##
+
+expecting a type after the ':' in a constant declaration.
+
+program: CONSTANT IDENT WITH 
+##
+## Ends in an error in state: 135.
+##
+## str_value -> CONSTANT IDENT . COLON domain_type EQUALS expr [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT 
+##
+
+expecting a type annotation (": <type>") on constant declaration.
+
+program: CONSTANT WITH 
+##
+## Ends in an error in state: 134.
+##
+## str_value -> CONSTANT . IDENT COLON domain_type EQUALS expr [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT 
+##
+
+expecting an identifier after 'constant'.
+
+program: DEFINE IDENT COLON IDENT AND WITH 
+##
+## Ends in an error in state: 130.
+##
+## list(__anonymous_0) -> AND . pred_decl list(__anonymous_0) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## AND 
+##
+
+expecting additional predicate declarations after an 'and'.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT LPAREN RPAREN COMMA WITH 
+##
+## Ends in an error in state: 126.
+##
+## separated_nonempty_list(COMMA,atom) -> atom COMMA . separated_nonempty_list(COMMA,atom) [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## atom COMMA 
+##
+
+expecting additional atoms after the comma.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT LPAREN RPAREN WITH 
+##
+## Ends in an error in state: 125.
+##
+## separated_nonempty_list(COMMA,atom) -> atom . [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+## separated_nonempty_list(COMMA,atom) -> atom . COMMA separated_nonempty_list(COMMA,atom) [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## atom 
+##
+
+after an atom, expecting a new declaration or a comma and additional atoms.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT LPAREN WITH 
+##
+## Ends in an error in state: 122.
+##
+## atom -> longident LPAREN . loption(separated_nonempty_list(COMMA,expr)) RPAREN [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT COMMA AND ]
+##
+## The known suffix of the stack is as follows:
+## longident LPAREN 
+##
+
+expecting either an expression or a closing parenthesis in an atom's argument list.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT WITH 
+##
+## Ends in an error in state: 121.
+##
+## atom -> longident . LPAREN loption(separated_nonempty_list(COMMA,expr)) RPAREN [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT COMMA AND ]
+## longident -> longident . DOT IDENT [ LPAREN DOT ]
+##
+## The known suffix of the stack is as follows:
+## longident 
+##
+
+expecting either an argument list, or an long predicate identifier.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH WITH 
+##
+## Ends in an error in state: 119.
+##
+## rule -> decl_head COLON_DASH . separated_nonempty_list(COMMA,atom) [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## decl_head COLON_DASH 
+##
+
+expecting a comma separated list of atoms after a ':-' in a rule declaration.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN WITH 
+##
+## Ends in an error in state: 118.
+##
+## rule -> decl_head . COLON_DASH separated_nonempty_list(COMMA,atom) [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+## rule -> decl_head . [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## decl_head 
+##
+
+expecting either a list of clauses (':- a(..), b(...)') or a new declaration after a rule head.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN UNDERSCORE COMMA WITH 
+##
+## Ends in an error in state: 112.
+##
+## separated_nonempty_list(COMMA,expr) -> expr COMMA . separated_nonempty_list(COMMA,expr) [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## expr COMMA 
+##
+
+expecting an expression after the comma.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN UNDERSCORE WITH 
+##
+## Ends in an error in state: 111.
+##
+## separated_nonempty_list(COMMA,expr) -> expr . [ RPAREN ]
+## separated_nonempty_list(COMMA,expr) -> expr . COMMA separated_nonempty_list(COMMA,expr) [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## expr 
+##
+
+expecting either a closing parenthesis ')', or a comma followed by more expressions.
+
+program: DEFINE IDENT COLON INT IDENT LPAREN WITH 
+##
+## Ends in an error in state: 101.
+##
+## decl_head -> IDENT LPAREN . loption(separated_nonempty_list(COMMA,expr)) RPAREN [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT COLON_DASH AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT LPAREN 
+##
+
+expecting either a closing parenthesis ')', or a comma separated list of expressions followed by a ')'.
+
+program: DEFINE IDENT COLON INT IDENT WITH 
+##
+## Ends in an error in state: 100.
+##
+## decl_head -> IDENT . LPAREN loption(separated_nonempty_list(COMMA,expr)) RPAREN [ TYPE MODULE IDENT EXTERNAL EOF END DEFINE CONSTANT COLON_DASH AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT 
+##
+
+expecting an argument list in parentheses for this rule head.
+
+program: DEFINE IDENT COLON INT WITH 
+##
+## Ends in an error in state: 99.
+##
+## pred_decl -> IDENT COLON predicate_type . list(rule) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON predicate_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 73, spurious reduction of production predicate_type -> separated_nonempty_list(STAR,domain_type0) 
+##
+
+after the type declaration for this predicate, expecting either a list of rules or a new declaration.
+
+program: DEFINE IDENT COLON WITH 
+##
+## Ends in an error in state: 98.
+##
+## pred_decl -> IDENT COLON . predicate_type list(rule) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON 
+##
+
+expecting a type declaration following the colon.
+
+program: DEFINE IDENT WITH 
+##
+## Ends in an error in state: 97.
+##
+## pred_decl -> IDENT . COLON predicate_type list(rule) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT 
+##
+
+expecting a colon followed by a type declaration.
+
+program: DEFINE WITH 
+##
+## Ends in an error in state: 96.
+##
+## str_value -> DEFINE . pred_decl list(__anonymous_0) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## DEFINE 
+##
+
+expecting an identifier after 'define'.
+
+program: EXTERNAL IDENT COLON WITH 
+##
+## Ends in an error in state: 94.
+##
+## str_value -> EXTERNAL IDENT COLON . predicate_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## EXTERNAL IDENT COLON 
+##
+
+expecting a type declaration for this external predicate declaration.
+
+program: EXTERNAL IDENT WITH 
+##
+## Ends in an error in state: 93.
+##
+## str_value -> EXTERNAL IDENT . COLON predicate_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## EXTERNAL IDENT 
+##
+
+expecting a colon followed by a type declaration for this external predicate declaration.
+
+program: EXTERNAL WITH 
+##
+## Ends in an error in state: 92.
+##
+## str_value -> EXTERNAL . IDENT COLON predicate_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## EXTERNAL 
+##
+
+expecting a predicate name after an 'external' declaration.
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT RPAREN ARROW WITH 
+##
+## Ends in an error in state: 153.
+##
+## mod_term -> FUNCTOR LPAREN IDENT COLON mod_type RPAREN ARROW . mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type RPAREN ARROW 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT RPAREN WITH 
+##
+## Ends in an error in state: 152.
+##
+## mod_term -> FUNCTOR LPAREN IDENT COLON mod_type RPAREN . ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type RPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 151.
+##
+## mod_term -> FUNCTOR LPAREN IDENT COLON mod_type . RPAREN ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON WITH 
+##
+## Ends in an error in state: 150.
+##
+## mod_term -> FUNCTOR LPAREN IDENT COLON . mod_type RPAREN ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT WITH 
+##
+## Ends in an error in state: 149.
+##
+## mod_term -> FUNCTOR LPAREN IDENT . COLON mod_type RPAREN ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR LPAREN WITH 
+##
+## Ends in an error in state: 148.
+##
+## mod_term -> FUNCTOR LPAREN . IDENT COLON mod_type RPAREN ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS FUNCTOR WITH 
+##
+## Ends in an error in state: 147.
+##
+## mod_term -> FUNCTOR . LPAREN IDENT COLON mod_type RPAREN ARROW mod_term [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS IDENT AND 
+##
+## Ends in an error in state: 154.
+##
+## mod_term -> mod_term2 . [ TYPE RPAREN MODULE EXTERNAL EOF END DEFINE CONSTANT COLON ]
+## mod_term2 -> mod_term2 . LPAREN mod_term RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON ]
+##
+## The known suffix of the stack is as follows:
+## mod_term2 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 158, spurious reduction of production mod_term2 -> longident 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS IDENT COLON 
+##
+## Ends in an error in state: 142.
+##
+## list(str_item) -> str_item . list(str_item) [ EOF END ]
+##
+## The known suffix of the stack is as follows:
+## str_item 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 158, spurious reduction of production mod_term2 -> longident 
+## In state 154, spurious reduction of production mod_term -> mod_term2 
+## In state 177, spurious reduction of production functor_decls -> EQUALS mod_term 
+## In state 179, spurious reduction of production str_item -> MODULE IDENT functor_decls 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS IDENT LPAREN IDENT TYPE 
+##
+## Ends in an error in state: 156.
+##
+## mod_term2 -> mod_term2 LPAREN mod_term . RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## mod_term2 LPAREN mod_term 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 158, spurious reduction of production mod_term2 -> longident 
+## In state 154, spurious reduction of production mod_term -> mod_term2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS IDENT LPAREN WITH 
+##
+## Ends in an error in state: 155.
+##
+## mod_term2 -> mod_term2 LPAREN . mod_term RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## mod_term2 LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS IDENT WITH 
+##
+## Ends in an error in state: 158.
+##
+## longident -> longident . DOT IDENT [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DOT DEFINE CONSTANT COLON AND ]
+## mod_term2 -> longident . [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## longident 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS LPAREN IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 163.
+##
+## mod_term2 -> LPAREN mod_term COLON mod_type . RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN mod_term COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS LPAREN IDENT COLON WITH 
+##
+## Ends in an error in state: 162.
+##
+## mod_term2 -> LPAREN mod_term COLON . mod_type RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN mod_term COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS LPAREN IDENT TYPE 
+##
+## Ends in an error in state: 160.
+##
+## mod_term2 -> LPAREN mod_term . COLON mod_type RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+## mod_term2 -> LPAREN mod_term . RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN mod_term 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 158, spurious reduction of production mod_term2 -> longident 
+## In state 154, spurious reduction of production mod_term -> mod_term2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS LPAREN WITH 
+##
+## Ends in an error in state: 146.
+##
+## mod_term2 -> LPAREN . mod_term COLON mod_type RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+## mod_term2 -> LPAREN . mod_term RPAREN [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT EQUALS STRUCT TYPE IDENT EQUALS IDENT EOF 
+##
+## Ends in an error in state: 144.
+##
+## mod_term2 -> STRUCT list(str_item) . END [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## STRUCT list(str_item) 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 16, spurious reduction of production domain_type0 -> longident 
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
+## In state 24, spurious reduction of production str_type(IDENT) -> TYPE IDENT EQUALS domain_type 
+## In state 141, spurious reduction of production str_item -> str_type(IDENT) 
+## In state 142, spurious reduction of production list(str_item) -> 
+## In state 143, spurious reduction of production list(str_item) -> str_item list(str_item) 
+##
+
+One or more declarations have been read in this structure, but it seems to end abruptly. Did you forget an 'end'?
+
+program: MODULE IDENT EQUALS STRUCT WITH 
+##
+## Ends in an error in state: 91.
+##
+## mod_term2 -> STRUCT . list(str_item) END [ TYPE RPAREN MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## STRUCT 
+##
+
+expecting a structure item after a 'struct'. Structure items look like FIXME.
+
+program: MODULE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 176.
+##
+## functor_decls -> EQUALS . mod_term [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## EQUALS 
+##
+
+expecting a module term after the '=' for this module definition.
+
+program: MODULE IDENT LPAREN IDENT COLON IDENT RPAREN WITH 
+##
+## Ends in an error in state: 175.
+##
+## functor_decls -> LPAREN IDENT COLON mod_type RPAREN . functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON mod_type RPAREN 
+##
+
+expecting more functor parameter declarations or an '=' followed by a module term.
+
+program: MODULE IDENT LPAREN IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 174.
+##
+## functor_decls -> LPAREN IDENT COLON mod_type . RPAREN functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT LPAREN IDENT COLON WITH 
+##
+## Ends in an error in state: 173.
+##
+## functor_decls -> LPAREN IDENT COLON . mod_type RPAREN functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT LPAREN IDENT WITH 
+##
+## Ends in an error in state: 172.
+##
+## functor_decls -> LPAREN IDENT . COLON mod_type RPAREN functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT LPAREN WITH 
+##
+## Ends in an error in state: 171.
+##
+## functor_decls -> LPAREN . IDENT COLON mod_type RPAREN functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE IDENT WITH 
+##
+## Ends in an error in state: 170.
+##
+## str_item -> MODULE IDENT . functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT COLON IDENT EQUALS IDENT AND WITH 
+##
+## Ends in an error in state: 168.
+##
+## separated_nonempty_list(AND,rec_module_binding) -> rec_module_binding AND . separated_nonempty_list(AND,rec_module_binding) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## rec_module_binding AND 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT COLON IDENT EQUALS IDENT RPAREN 
+##
+## Ends in an error in state: 165.
+##
+## mod_term2 -> mod_term2 . LPAREN mod_term RPAREN [ TYPE MODULE LPAREN EXTERNAL EOF END DEFINE CONSTANT AND ]
+## rec_module_binding -> IDENT COLON mod_type EQUALS mod_term2 . [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON mod_type EQUALS mod_term2 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 158, spurious reduction of production mod_term2 -> longident 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT COLON IDENT EQUALS WITH 
+##
+## Ends in an error in state: 90.
+##
+## rec_module_binding -> IDENT COLON mod_type EQUALS . mod_term2 [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON mod_type EQUALS 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 89.
+##
+## rec_module_binding -> IDENT COLON mod_type . EQUALS mod_term2 [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT COLON WITH 
+##
+## Ends in an error in state: 88.
+##
+## rec_module_binding -> IDENT COLON . mod_type EQUALS mod_term2 [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC IDENT WITH 
+##
+## Ends in an error in state: 87.
+##
+## rec_module_binding -> IDENT . COLON mod_type EQUALS mod_term2 [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE REC WITH 
+##
+## Ends in an error in state: 86.
+##
+## str_item -> MODULE REC . separated_nonempty_list(AND,rec_module_binding) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE REC 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT RPAREN ARROW WITH 
+##
+## Ends in an error in state: 55.
+##
+## mod_type -> FUNCTOR LPAREN IDENT COLON mod_type RPAREN ARROW . mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type RPAREN ARROW 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT RPAREN WITH 
+##
+## Ends in an error in state: 54.
+##
+## mod_type -> FUNCTOR LPAREN IDENT COLON mod_type RPAREN . ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type RPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 53.
+##
+## mod_type -> FUNCTOR LPAREN IDENT COLON mod_type . RPAREN ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON WITH 
+##
+## Ends in an error in state: 42.
+##
+## mod_type -> FUNCTOR LPAREN IDENT COLON . mod_type RPAREN ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT WITH 
+##
+## Ends in an error in state: 41.
+##
+## mod_type -> FUNCTOR LPAREN IDENT . COLON mod_type RPAREN ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN WITH 
+##
+## Ends in an error in state: 40.
+##
+## mod_type -> FUNCTOR LPAREN . IDENT COLON mod_type RPAREN ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS FUNCTOR WITH 
+##
+## Ends in an error in state: 39.
+##
+## mod_type -> FUNCTOR . LPAREN IDENT COLON mod_type RPAREN ARROW mod_type [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## FUNCTOR 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS IDENT UNDERSCORE 
+##
+## Ends in an error in state: 57.
+##
+## longident -> longident . DOT IDENT [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DOT DEFINE CONSTANT ]
+## mod_type2 -> longident . [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## longident 
+##
+
+unexpected input following identifer.
+
+program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT DOT WITH 
+##
+## Ends in an error in state: 47.
+##
+## separated_nonempty_list(DOT,IDENT) -> IDENT DOT . separated_nonempty_list(DOT,IDENT) [ EQUALS ]
+##
+## The known suffix of the stack is as follows:
+## IDENT DOT 
+##
+
+expecting an identifier in '.'-separated path.
+
+program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 50.
+##
+## str_type(separated_nonempty_list(DOT,IDENT)) -> TYPE separated_nonempty_list(DOT,IDENT) EQUALS . domain_type [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE separated_nonempty_list(DOT,IDENT) EQUALS 
+##
+
+expecting a type after 'with type <ident> ='.
+
+program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT WITH 
+##
+## Ends in an error in state: 46.
+##
+## separated_nonempty_list(DOT,IDENT) -> IDENT . [ EQUALS ]
+## separated_nonempty_list(DOT,IDENT) -> IDENT . DOT separated_nonempty_list(DOT,IDENT) [ EQUALS ]
+##
+## The known suffix of the stack is as follows:
+## IDENT 
+##
+
+expecting a '.'-separated path to be followed by '= <type>'.
+
+program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE WITH 
+##
+## Ends in an error in state: 45.
+##
+## str_type(separated_nonempty_list(DOT,IDENT)) -> TYPE . separated_nonempty_list(DOT,IDENT) EQUALS domain_type [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE 
+##
+
+expecting a '.'-separated path to a type after 'with type'.
+
+program: MODULE TYPE IDENT EQUALS IDENT WITH WITH 
+##
+## Ends in an error in state: 44.
+##
+## mod_type2 -> mod_type2 WITH . str_type(separated_nonempty_list(DOT,IDENT)) [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## mod_type2 WITH 
+##
+
+expecting 'type <path> = <type>' after 'with' in a module type.
+
+program: MODULE TYPE IDENT EQUALS LPAREN IDENT TYPE 
+##
+## Ends in an error in state: 58.
+##
+## mod_type2 -> LPAREN mod_type . RPAREN [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+a module type has been read from the input. Now expecting either a closing ')', or a continuation of this module type.
+
+program: MODULE TYPE IDENT EQUALS LPAREN WITH 
+##
+## Ends in an error in state: 38.
+##
+## mod_type2 -> LPAREN . mod_type RPAREN [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+expecting a module type expression. FIXME give examples.
+
+program: MODULE TYPE IDENT EQUALS SIG CONSTANT IDENT COLON WITH 
+##
+## Ends in an error in state: 77.
+##
+## sig_value -> CONSTANT IDENT COLON . domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT COLON 
+##
+
+expecting a type after 'constant <identifier> :'.
+
+program: MODULE TYPE IDENT EQUALS SIG CONSTANT IDENT WITH 
+##
+## Ends in an error in state: 76.
+##
+## sig_value -> CONSTANT IDENT . COLON domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT IDENT 
+##
+
+expecting a ':' after 'constant <identifier>', followed by a type for this constant.
+
+program: MODULE TYPE IDENT EQUALS SIG CONSTANT WITH 
+##
+## Ends in an error in state: 75.
+##
+## sig_value -> CONSTANT . IDENT COLON domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## CONSTANT 
+##
+
+expecting an identifier after 'constant'.
+
+program: MODULE TYPE IDENT EQUALS SIG END UNDERSCORE 
+##
+## Ends in an error in state: 43.
+##
+## mod_type -> mod_type2 . [ TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+## mod_type2 -> mod_type2 . WITH str_type(separated_nonempty_list(DOT,IDENT)) [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## mod_type2 
+##
+
+unexpected input after a module type expression.
+
+program: MODULE TYPE IDENT EQUALS SIG IDENT COLON IDENT WITH 
+##
+## Ends in an error in state: 81.
+##
+## list(sig_item) -> sig_item . list(sig_item) [ END ]
+##
+## The known suffix of the stack is as follows:
+## sig_item 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 16, spurious reduction of production domain_type0 -> longident 
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 73, spurious reduction of production predicate_type -> separated_nonempty_list(STAR,domain_type0) 
+## In state 74, spurious reduction of production sig_value -> IDENT COLON predicate_type 
+## In state 79, spurious reduction of production sig_item -> sig_value 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG IDENT COLON WITH 
+##
+## Ends in an error in state: 72.
+##
+## sig_value -> IDENT COLON . predicate_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG IDENT WITH 
+##
+## Ends in an error in state: 71.
+##
+## sig_value -> IDENT . COLON predicate_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT COLON WITH 
+##
+## Ends in an error in state: 67.
+##
+## functor_type_decls -> COLON . mod_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON IDENT RPAREN WITH 
+##
+## Ends in an error in state: 66.
+##
+## functor_type_decls -> LPAREN IDENT COLON mod_type RPAREN . functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON mod_type RPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON IDENT TYPE 
+##
+## Ends in an error in state: 65.
+##
+## functor_type_decls -> LPAREN IDENT COLON mod_type . RPAREN functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON mod_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 57, spurious reduction of production mod_type2 -> longident 
+## In state 43, spurious reduction of production mod_type -> mod_type2 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON WITH 
+##
+## Ends in an error in state: 64.
+##
+## functor_type_decls -> LPAREN IDENT COLON . mod_type RPAREN functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT COLON 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT WITH 
+##
+## Ends in an error in state: 63.
+##
+## functor_type_decls -> LPAREN IDENT . COLON mod_type RPAREN functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN WITH 
+##
+## Ends in an error in state: 62.
+##
+## functor_type_decls -> LPAREN . IDENT COLON mod_type RPAREN functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT WITH 
+##
+## Ends in an error in state: 61.
+##
+## sig_item -> MODULE IDENT . functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE IDENT 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 37.
+##
+## sig_item -> MODULE TYPE IDENT EQUALS . mod_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE IDENT EQUALS 
+##
+
+expecting a module type expression after 'module type <identifier> ='.
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT WITH 
+##
+## Ends in an error in state: 36.
+##
+## sig_item -> MODULE TYPE IDENT . EQUALS mod_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE IDENT 
+##
+
+expecting an '=' after 'module type <identifier>'.
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE WITH 
+##
+## Ends in an error in state: 35.
+##
+## sig_item -> MODULE TYPE . IDENT EQUALS mod_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE 
+##
+
+expecting an identifier after 'module' 'type'.
+
+program: MODULE TYPE IDENT EQUALS SIG MODULE WITH 
+##
+## Ends in an error in state: 34.
+##
+## sig_item -> MODULE . IDENT functor_type_decls [ TYPE MODULE IDENT END CONSTANT ]
+## sig_item -> MODULE . TYPE IDENT EQUALS mod_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE 
+##
+
+expecting either 'type' or an identifier after 'module'.
+
+program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 32.
+##
+## sig_type -> TYPE IDENT EQUALS . domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE IDENT EQUALS 
+##
+
+expecting a type after the '=' in a type declaration in a module signature.
+
+program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT WITH 
+##
+## Ends in an error in state: 31.
+##
+## sig_type -> TYPE IDENT . [ TYPE MODULE IDENT END CONSTANT ]
+## sig_type -> TYPE IDENT . EQUALS domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE IDENT 
+##
+
+after 'type <identifier>' in a module signature, expecting either an '='s followed by a type definition, or a new module signature item.
+
+program: MODULE TYPE IDENT EQUALS SIG TYPE WITH 
+##
+## Ends in an error in state: 30.
+##
+## sig_type -> TYPE . IDENT [ TYPE MODULE IDENT END CONSTANT ]
+## sig_type -> TYPE . IDENT EQUALS domain_type [ TYPE MODULE IDENT END CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE 
+##
+
+expecting an identifier after the keyword 'type'. An example type declaration in a module signature looks like:
+  type type_name
+or, if this type is not abstract:
+  type type_name = int * int
+where 'type_name' is the name of the newly defined type.
+
+program: MODULE TYPE IDENT EQUALS SIG WITH 
+##
+## Ends in an error in state: 29.
+##
+## mod_type2 -> SIG . list(sig_item) END [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## SIG 
+##
+
+expecting a module signature item after 'sig'. FIXME: give some examples.
+
+program: MODULE TYPE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 28.
+##
+## str_item -> MODULE TYPE IDENT EQUALS . mod_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE IDENT EQUALS 
+##
+
+expecting a module type after 'module type <identifier> = ...'. Module types look like: 'sig ...', 'functor ...', or the name of another module type.
+
+program: MODULE TYPE IDENT WITH 
+##
+## Ends in an error in state: 27.
+##
+## str_item -> MODULE TYPE IDENT . EQUALS mod_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE IDENT 
+##
+
+expecting an '=' after 'module type <identifier>'.
+
+program: MODULE TYPE WITH 
+##
+## Ends in an error in state: 26.
+##
+## str_item -> MODULE TYPE . IDENT EQUALS mod_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE TYPE 
+##
+
+expecting an identifier after 'module type'.
+
+program: MODULE WITH 
+##
+## Ends in an error in state: 25.
+##
+## str_item -> MODULE . IDENT functor_decls [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+## str_item -> MODULE . TYPE IDENT EQUALS mod_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+## str_item -> MODULE . REC separated_nonempty_list(AND,rec_module_binding) [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## MODULE 
+##
+
+invalid module declaration. Expecting either an identifier, 'type', or 'rec' after the 'module' keyword.
+
+program: TYPE IDENT EQUALS IDENT DOT WITH 
+##
+## Ends in an error in state: 17.
+##
+## longident -> longident DOT . IDENT [ WITH TYPE STAR RPAREN MODULE LPAREN IDENT EXTERNAL EQUALS EOF END DOT DEFINE CONSTANT COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## longident DOT 
+##
+
+Expecting an identifier after the '.'.
+
+program: TYPE IDENT EQUALS IDENT END 
+##
+## Ends in an error in state: 181.
+##
+## program -> list(str_item) . EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## list(str_item) 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 16, spurious reduction of production domain_type0 -> longident 
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
+## In state 24, spurious reduction of production str_type(IDENT) -> TYPE IDENT EQUALS domain_type 
+## In state 141, spurious reduction of production str_item -> str_type(IDENT) 
+## In state 142, spurious reduction of production list(str_item) -> 
+## In state 143, spurious reduction of production list(str_item) -> str_item list(str_item) 
+##
+
+unexpected input after some top-level declarations.
+
+program: TYPE IDENT EQUALS IDENT UNDERSCORE 
+##
+## Ends in an error in state: 16.
+##
+## domain_type0 -> longident . [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+## longident -> longident . DOT IDENT [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DOT DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## longident 
+##
+
+unexpected input after a long identifier.
+
+program: TYPE IDENT EQUALS INT STAR WITH 
+##
+## Ends in an error in state: 20.
+##
+## separated_nonempty_list(STAR,domain_type0) -> domain_type0 STAR . separated_nonempty_list(STAR,domain_type0) [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## domain_type0 STAR 
+##
+
+expecting another type after '*' in a tuple type.
+
+program: TYPE IDENT EQUALS INT UNDERSCORE 
+##
+## Ends in an error in state: 19.
+##
+## separated_nonempty_list(STAR,domain_type0) -> domain_type0 . [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+## separated_nonempty_list(STAR,domain_type0) -> domain_type0 . STAR separated_nonempty_list(STAR,domain_type0) [ WITH TYPE RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## domain_type0 
+##
+
+expecting either the end of a type, or a '*' followed by another type.
+
+program: TYPE IDENT EQUALS LBRACE ENUM_IDENT BAR WITH 
+##
+## Ends in an error in state: 8.
+##
+## separated_nonempty_list(BAR,ENUM_IDENT) -> ENUM_IDENT BAR . separated_nonempty_list(BAR,ENUM_IDENT) [ RBRACE ]
+##
+## The known suffix of the stack is as follows:
+## ENUM_IDENT BAR 
+##
+
+expecting an enumeration member name (for example, "`X") after a '|' in an enumeration type.
+
+program: TYPE IDENT EQUALS LBRACE ENUM_IDENT WITH 
+##
+## Ends in an error in state: 7.
+##
+## separated_nonempty_list(BAR,ENUM_IDENT) -> ENUM_IDENT . [ RBRACE ]
+## separated_nonempty_list(BAR,ENUM_IDENT) -> ENUM_IDENT . BAR separated_nonempty_list(BAR,ENUM_IDENT) [ RBRACE ]
+##
+## The known suffix of the stack is as follows:
+## ENUM_IDENT 
+##
+
+expecting either a closing '}' or another enumeration member '| ...' in enumeration type.
+
+program: TYPE IDENT EQUALS LBRACE WITH 
+##
+## Ends in an error in state: 6.
+##
+## domain_type0 -> LBRACE . loption(separated_nonempty_list(BAR,ENUM_IDENT)) RBRACE [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## LBRACE 
+##
+
+expecting a '|' separated list of enumeration values after an opening '{'.
+
+program: TYPE IDENT EQUALS LPAREN INT WITH 
+##
+## Ends in an error in state: 22.
+##
+## domain_type0 -> LPAREN domain_type . RPAREN [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN domain_type 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 19, spurious reduction of production separated_nonempty_list(STAR,domain_type0) -> domain_type0 
+## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
+##
+
+following an opening '(' and a type, expecting a closing ')' or continuation of the type description.
+
+program: TYPE IDENT EQUALS LPAREN WITH 
+##
+## Ends in an error in state: 4.
+##
+## domain_type0 -> LPAREN . RPAREN [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+## domain_type0 -> LPAREN . domain_type RPAREN [ WITH TYPE STAR RPAREN MODULE IDENT EXTERNAL EQUALS EOF END DEFINE CONSTANT AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN 
+##
+
+following an opening '(' in a type expression, expecting a type or a closing parenthesis.
+
+program: TYPE IDENT EQUALS WITH 
+##
+## Ends in an error in state: 3.
+##
+## str_type(IDENT) -> TYPE IDENT EQUALS . domain_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE IDENT EQUALS 
+##
+
+expecting a type definition here.
+(FIXME: do some example type definitions)
+
+program: TYPE IDENT WITH 
+##
+## Ends in an error in state: 2.
+##
+## str_type(IDENT) -> TYPE IDENT . EQUALS domain_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE IDENT 
+##
+
+Expecting an '=' after 'type <identifier>'.
+
+program: TYPE WITH 
+##
+## Ends in an error in state: 1.
+##
+## str_type(IDENT) -> TYPE . IDENT EQUALS domain_type [ TYPE MODULE EXTERNAL EOF END DEFINE CONSTANT ]
+##
+## The known suffix of the stack is as follows:
+## TYPE 
+##
+
+Expecting an identifier after the 'type' keyword.
+
+program: WITH 
+##
+## Ends in an error in state: 0.
+##
+## program' -> . program [ # ]
+##
+## The known suffix of the stack is as follows:
+## 
+##
+
+expecting a type, constant, predicate, module, or external predicate definition at the start of the program.
+
