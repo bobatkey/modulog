@@ -3,9 +3,9 @@ module type INPUT = sig
 
   type token
 
-  is_index : index
+  pred is_index : index
 
-  token_at : index * token * index
+  pred token_at : index * token * index
 end
 
 module type GRAMMAR = sig
@@ -21,21 +21,21 @@ module type GRAMMAR = sig
      are non-terminals or tokens. If it is 'infinite' state, then we'd
      have data driven parsers? *)
 
-  nt_to_rhs : non_terminal * rhs
+  pred nt_to_rhs : non_terminal * rhs
 
-  rhs_nt   : rhs * non_terminal * rhs
-  rhs_tok  : rhs * token * rhs
-  rhs_stop : rhs
+  pred rhs_nt   : rhs * non_terminal * rhs
+  pred rhs_tok  : rhs * token * rhs
+  pred rhs_stop : rhs
 end
 
 module ExprGrammar = struct
-  type non_terminal = [ `E ]
+  type non_terminal = { `E }
 
   constant start : non_terminal = `E
 
-  type token = [ `x | `plus ]
+  type token = { `x | `plus }
 
-  type rhs = [ `E1_0 | `E1_1 | `E2_0 | `E2_1 | `E2_2 | `E2_3 ]
+  type rhs = { `E1_0 | `E1_1 | `E2_0 | `E2_1 | `E2_2 | `E2_3 }
 
   define nt_to_rhs : non_terminal * rhs
       nt_to_rhs (`E, `E1_0)
@@ -87,7 +87,7 @@ end
 module TestInput = struct
   type index = int
 
-  type token = [`x | `plus]
+  type token = { `x | `plus }
 
   define is_index : index
       is_index (0)

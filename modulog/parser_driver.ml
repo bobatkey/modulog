@@ -81,7 +81,10 @@ let parse source lexbuf =
        let pos     = Location.of_lexbuf lexbuf in
        let lexeme  = Lexing.lexeme lexbuf in
        let state   = MI.current_state_number env in
-       let message = Parser_messages.message state in
+       let message =
+         try Parser_messages.message state
+         with Not_found -> "unknown parse error"
+       in
        let message = expand_message source env message in
        let message = trim_newline message in
        Error (pos, message, state, lexeme)

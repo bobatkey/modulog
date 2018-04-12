@@ -6,7 +6,7 @@ open Syntax.Mod
 %token COMMA
 %token COLON_DASH
 %token COLON
-%token STAR DOT ARROW EQUALS BAR UNDERSCORE
+%token STAR DOT ARROW EQUALS BAR UNDERSCORE PRED
 %token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEFINE CONSTANT WITH EXTERNAL REC
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
@@ -140,7 +140,7 @@ str_type(NAME):
 
 %public
 sig_value:
-| id=IDENT; COLON; ty=predicate_type
+| PRED; id=IDENT; COLON; ty=predicate_type
     { (id, Predicate ty) }
 | CONSTANT; id=IDENT; COLON; ty=domain_type
     { (id, Value ty) }

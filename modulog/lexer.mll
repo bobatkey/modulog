@@ -26,6 +26,7 @@ rule token = parse
 | "constant" { CONSTANT }
 | "with"     { WITH }
 | "rec"      { REC }
+| "pred"     { PRED }
 | '('        { LPAREN }
 | ')'        { RPAREN }
 | '{'        { LBRACE }
