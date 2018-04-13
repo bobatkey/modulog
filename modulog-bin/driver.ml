@@ -7,15 +7,14 @@ let (>>!) x f = match x with
   | Ok a    -> Ok a
   | Error e -> f e
 
-let report_parse_error (pos, message, state, lexeme) =
+let report_parse_error (pos, message, lexeme) =
   Format.printf
-    "@[<v>@[<v 2>Parse error at %a:@ @[%s:@ %a@]@]@ (parser state %d)@]\n"
+    "@[<v 2>Parse error at %a:@ @[%s:@ %a@]@]\n"
     Modulog.Location.pp pos
     (match lexeme with
       | "" -> "At the end of the input"
       | lexeme -> Printf.sprintf "On the input '%s'" lexeme)
-    Fmt.text message
-    state;
+    Fmt.text message;
   Error ()
 
 let report_check_error err =

@@ -12,14 +12,22 @@
 (rule
  ((targets (parser.ml parser.mli))
   (deps    (datalog_grammar.mly parser.messages))
-  (action  (chdir ${ROOT} (run ${bin:menhir} --table --base modulog/parser ${<} ${lib:modules:modules_grammar.mly})))))
+  (action  (chdir ${ROOT}
+            (run ${bin:menhir} --table
+                               --base modulog/parser
+                               ${<}
+                               ${lib:modules:modules_grammar.mly})))))
 
 (rule
  ((targets (parser_messages.ml))
   (deps    (datalog_grammar.mly parser.messages))
   (action  (chdir ${ROOT}
             (with-stdout-to modulog/parser_messages.ml
-             (run ${bin:menhir} --table --base modulog/parser ${<} ${lib:modules:modules_grammar.mly} --compile-errors modulog/parser.messages))))))
+             (run ${bin:menhir} --table
+                                --base modulog/parser
+                                ${<}
+                                ${lib:modules:modules_grammar.mly}
+                                --compile-errors modulog/parser.messages))))))
 
 
 (ocamllex

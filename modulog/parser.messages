@@ -9,7 +9,7 @@ program: CONSTANT IDENT COLON INT EQUALS IDENT WITH
 ## longident 
 ##
 
-having read a identifier in an expression, expecting either a new declaration or a '.' followed by an identifier.
+unexpected input after reading $0 in an expression.
 
 program: CONSTANT IDENT COLON INT EQUALS LPAREN WITH 
 ##
@@ -33,7 +33,7 @@ program: CONSTANT IDENT COLON INT EQUALS WITH
 ## CONSTANT IDENT COLON domain_type EQUALS 
 ##
 
-expecting an expresson after $4 $3 $2 $1 $0.
+expecting an expresson after $4-0.
 
 program: CONSTANT IDENT COLON INT WITH 
 ##
@@ -52,8 +52,7 @@ program: CONSTANT IDENT COLON INT WITH
 ## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
 ##
 
-when parsing the declaration of the constant $2, the type $0 has been understood. If this is the end of the type then an '=' is expected next before the definition of $2. For example:
-  constant cname : int = 5
+expecting a '=' followed by an expression in a constant declaration after $3-0.
 
 program: CONSTANT IDENT COLON WITH 
 ##
@@ -65,7 +64,7 @@ program: CONSTANT IDENT COLON WITH
 ## CONSTANT IDENT COLON 
 ##
 
-expecting a type after the ':' in a constant declaration after $2 $1 $0.
+expecting a type followed by '= <expression>' after $2-0.
 
 program: CONSTANT IDENT WITH 
 ##
@@ -77,7 +76,7 @@ program: CONSTANT IDENT WITH
 ## CONSTANT IDENT 
 ##
 
-expecting a type annotation (": <type>") on constant declaration after $1 $0.
+expecting a type annotation (": <type>") after $1-0.
 
 program: CONSTANT WITH 
 ##
@@ -89,7 +88,7 @@ program: CONSTANT WITH
 ## CONSTANT 
 ##
 
-expecting an identifier after £0.
+expecting an identifier after $0.
 
 program: DEFINE IDENT COLON IDENT AND WITH 
 ##
@@ -113,7 +112,7 @@ program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT LPAREN RPAR
 ## atom COMMA 
 ##
 
-expecting additional atoms after the $0.
+expecting additional atoms after $0.
 
 program: DEFINE IDENT COLON INT IDENT LPAREN RPAREN COLON_DASH IDENT LPAREN RPAREN WITH 
 ##
@@ -359,7 +358,7 @@ program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT TYPE
 ## In state 48, spurious reduction of production mod_type -> mod_type2 
 ##
 
-the module type $0 has been read for the functor parameter declaration. If this is the end of the type then there should be a closing ')'.
+the module type $0 has been read for a functor parameter declaration. If this is the end of the type then there should be a closing ')'.
 
 program: MODULE IDENT EQUALS FUNCTOR LPAREN IDENT COLON WITH 
 ##
@@ -395,7 +394,7 @@ program: MODULE IDENT EQUALS FUNCTOR LPAREN WITH
 ## FUNCTOR LPAREN 
 ##
 
-expecting a parameter name after 'functor ('.
+expecting a parameter name after $1-0.
 
 program: MODULE IDENT EQUALS FUNCTOR WITH 
 ##
@@ -407,7 +406,7 @@ program: MODULE IDENT EQUALS FUNCTOR WITH
 ## FUNCTOR 
 ##
 
-expecting a parameter specification after 'functor'. FIXME: an example.
+expecting a parameter specification after $0. FIXME: an example.
 
 program: MODULE IDENT EQUALS IDENT AND 
 ##
@@ -426,7 +425,7 @@ program: MODULE IDENT EQUALS IDENT AND
 ## In state 159, spurious reduction of production mod_term2 -> longident 
 ##
 
-having read the module term $0, expecting more declarations or a functor application parameter.
+having read the module term $0, expecting more declarations or a functor application in parentheses. FIXME: examples.
 
 program: MODULE IDENT EQUALS IDENT COLON 
 ##
@@ -542,7 +541,7 @@ program: MODULE IDENT EQUALS LPAREN IDENT TYPE
 ## In state 155, spurious reduction of production mod_term -> mod_term2 
 ##
 
-after reading a $1 and the module term $0, expecting to see a closing ')', or a ':' (if this is a module type constraint term).
+after reading a $1-0, expecting to see a closing ')', or a ':'.
 
 program: MODULE IDENT EQUALS LPAREN WITH 
 ##
@@ -579,7 +578,7 @@ program: MODULE IDENT EQUALS STRUCT TYPE IDENT EQUALS IDENT EOF
 ## In state 144, spurious reduction of production list(str_item) -> str_item list(str_item) 
 ##
 
-One or more declarations have been read in this structure, but it seems to end abruptly. Did you forget an 'end'?
+One or more declarations have been read in this structure $1-0, but it seems to end abruptly. Did you forget an 'end'?
 
 program: MODULE IDENT EQUALS STRUCT WITH 
 ##
@@ -682,7 +681,7 @@ program: MODULE IDENT WITH
 ## MODULE IDENT 
 ##
 
-after 'module $0', expecting an optional list of functor parameter declarations followed by a '='.
+after $1-0, expecting an optional list of functor parameter declarations followed by a '='.
 
 program: MODULE REC IDENT COLON IDENT EQUALS IDENT AND WITH 
 ##
@@ -725,7 +724,7 @@ program: MODULE REC IDENT COLON IDENT EQUALS WITH
 ## IDENT COLON mod_type EQUALS 
 ##
 
-expecting a module term after the $0 in the recursive module binding for $3.
+expecting a module term after $3-0 in a recursive module list.
 
 program: MODULE REC IDENT COLON IDENT TYPE 
 ##
@@ -780,7 +779,7 @@ program: MODULE REC WITH
 ## MODULE REC 
 ##
 
-expecting to see an identifier after $1 $0.
+expecting to see an identifier after $1-0.
 
 program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON IDENT RPAREN ARROW WITH 
 ##
@@ -835,7 +834,7 @@ program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT COLON WITH
 ## FUNCTOR LPAREN IDENT COLON 
 ##
 
-expecting to see a module type after the $3 $2 $1 $0 in a functor type expression.
+expecting to see a module type after the $3-0 in a functor type expression.
 
 program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT WITH 
 ##
@@ -847,7 +846,7 @@ program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN IDENT WITH
 ## FUNCTOR LPAREN IDENT 
 ##
 
-expecting to see a ':' followed by a module type after the $2 $1 $0 in a functor type expression.
+expecting to see a ':' followed by a module type after the $2-0 in a functor type expression.
 
 program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN WITH 
 ##
@@ -859,7 +858,7 @@ program: MODULE TYPE IDENT EQUALS FUNCTOR LPAREN WITH
 ## FUNCTOR LPAREN 
 ##
 
-expecting to see an identifier for this functor parameter after $1 $0 in a functor type expression.
+expecting to see an identifier for this functor parameter after $1-0 in a functor type expression.
 
 program: MODULE TYPE IDENT EQUALS FUNCTOR WITH 
 ##
@@ -896,7 +895,7 @@ program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT DOT WITH
 ## IDENT DOT 
 ##
 
-expecting an identifier after $1 $0 in this path expression.
+expecting an identifier after $1-0 in this path expression.
 
 program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT EQUALS WITH 
 ##
@@ -908,7 +907,7 @@ program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT EQUALS WITH
 ## TYPE separated_nonempty_list(DOT,IDENT) EQUALS 
 ##
 
-expecting a type after $2 $1 $0 in this 'with type' constraint.
+expecting a type after $2-0 in this 'with type' constraint.
 
 program: MODULE TYPE IDENT EQUALS IDENT WITH TYPE IDENT WITH 
 ##
@@ -964,7 +963,7 @@ program: MODULE TYPE IDENT EQUALS LPAREN IDENT TYPE
 ## In state 48, spurious reduction of production mod_type -> mod_type2 
 ##
 
-a module type $0 has been read, if this type is complete then a closing ')' is expected.
+a module type $1-0 has been read, if this type is complete then a closing ')' is expected.
 
 program: MODULE TYPE IDENT EQUALS LPAREN WITH 
 ##
@@ -988,7 +987,7 @@ program: MODULE TYPE IDENT EQUALS SIG CONSTANT IDENT COLON WITH
 ## CONSTANT IDENT COLON 
 ##
 
-expecting a type after $2 $1 $0.
+expecting a type after the constant type declaration $2-0.
 
 program: MODULE TYPE IDENT EQUALS SIG CONSTANT IDENT WITH 
 ##
@@ -1000,7 +999,7 @@ program: MODULE TYPE IDENT EQUALS SIG CONSTANT IDENT WITH
 ## CONSTANT IDENT 
 ##
 
-expecting a ':' after $1 $0, followed by a type for this constant.
+expecting a ':' after $1-0, followed by a type for this constant.
 
 program: MODULE TYPE IDENT EQUALS SIG CONSTANT WITH 
 ##
@@ -1059,7 +1058,7 @@ program: MODULE TYPE IDENT EQUALS SIG PRED IDENT COLON WITH
 ## PRED IDENT COLON 
 ##
 
-expecting a predicate type after $2 $1 $0.
+expecting a predicate type after $2-0.
 
 program: MODULE TYPE IDENT EQUALS SIG PRED IDENT WITH 
 ##
@@ -1126,7 +1125,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON WITH
 ## LPAREN IDENT COLON 
 ##
 
-expecting a module type expression after a ':' in a functor parameter declaration.
+expecting a module type expression after $2-0 in a functor parameter declaration.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT WITH 
 ##
@@ -1162,7 +1161,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT WITH
 ## MODULE IDENT 
 ##
 
-after "module $0" in a signature, expecting an list of zero or more functor parameter declarations, followed by an ':' and a module type.
+after $1-0 in a signature, expecting an list of zero or more functor parameter declarations, followed by an ':' and a module type.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT EQUALS WITH 
 ##
@@ -1174,7 +1173,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT EQUALS WITH
 ## MODULE TYPE IDENT EQUALS 
 ##
 
-expecting a module type expression after $3 $2 $1 $0.
+expecting a module type expression after $3-0.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT WITH 
 ##
@@ -1186,7 +1185,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT WITH
 ## MODULE TYPE IDENT 
 ##
 
-expecting an '=' after 'module type $0'.
+expecting an '=' after $2-0.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE WITH 
 ##
@@ -1198,7 +1197,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE WITH
 ## MODULE TYPE 
 ##
 
-expecting an identifier after 'module' 'type'.
+expecting an identifier after $1-0.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE WITH 
 ##
@@ -1211,7 +1210,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE WITH
 ## MODULE 
 ##
 
-expecting either 'type' or an identifier after 'module'.
+expecting either 'type' or an identifier after $0 in a module signature.
 
 program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT EQUALS WITH 
 ##
@@ -1223,7 +1222,7 @@ program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT EQUALS WITH
 ## TYPE IDENT EQUALS 
 ##
 
-expecting a type after the '=' in a type declaration in a module signature.
+expecting a type after $2-0 in a type declaration in a module signature.
 
 program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT WITH 
 ##
@@ -1236,7 +1235,7 @@ program: MODULE TYPE IDENT EQUALS SIG TYPE IDENT WITH
 ## TYPE IDENT 
 ##
 
-after 'type $0' in a module signature, expecting either an '='s followed by a type definition, or a new module signature item.
+after $1-0 in a module signature, expecting either an '='s followed by a type definition, the next module signature item, or the end of the signature.
 
 program: MODULE TYPE IDENT EQUALS SIG TYPE WITH 
 ##
@@ -1249,7 +1248,7 @@ program: MODULE TYPE IDENT EQUALS SIG TYPE WITH
 ## TYPE 
 ##
 
-expecting an identifier after the keyword 'type'. An example type declaration in a module signature looks like:
+expecting an identifier after $0. An example type declaration in a module signature looks like:
   type tname
 or, if this type is not abstract:
   type tname = int * int
@@ -1265,7 +1264,7 @@ program: MODULE TYPE IDENT EQUALS SIG WITH
 ## SIG 
 ##
 
-expecting module signature items after 'sig'. FIXME: give some examples.
+expecting module signature items after $0. FIXME: give some examples.
 
 program: MODULE TYPE IDENT EQUALS WITH 
 ##
@@ -1277,7 +1276,7 @@ program: MODULE TYPE IDENT EQUALS WITH
 ## MODULE TYPE IDENT EQUALS 
 ##
 
-expecting a module type after 'module type $1 = ...'. Module types look like: 'sig ...', 'functor ...', or the name of another module type.
+expecting a module type after $3-0. Module types look like: 'sig ...', 'functor ...', or the name of another module type.
 
 program: MODULE TYPE IDENT WITH 
 ##
@@ -1289,7 +1288,7 @@ program: MODULE TYPE IDENT WITH
 ## MODULE TYPE IDENT 
 ##
 
-expecting an '=' after 'module type <identifier>'.
+expecting an '=' after $2-0.
 
 program: MODULE TYPE WITH 
 ##
@@ -1301,7 +1300,7 @@ program: MODULE TYPE WITH
 ## MODULE TYPE 
 ##
 
-expecting an identifier after 'module type'.
+expecting an identifier after $1-0.
 
 program: MODULE WITH 
 ##
@@ -1315,7 +1314,7 @@ program: MODULE WITH
 ## MODULE 
 ##
 
-invalid module declaration. Expecting either an identifier, 'type', or 'rec' after the 'module' keyword.
+expecting either an identifier, 'type', or 'rec' after $0.
 
 program: TYPE IDENT EQUALS IDENT DOT WITH 
 ##
@@ -1327,7 +1326,7 @@ program: TYPE IDENT EQUALS IDENT DOT WITH
 ## longident DOT 
 ##
 
-Expecting an identifier after the '.'.
+Expecting an identifier after $1-0.
 
 program: TYPE IDENT EQUALS IDENT END 
 ##
@@ -1364,7 +1363,7 @@ program: TYPE IDENT EQUALS IDENT UNDERSCORE
 ## longident 
 ##
 
-unexpected input after a long identifier.
+unexpected input after $0 in a type expression.
 
 program: TYPE IDENT EQUALS INT STAR WITH 
 ##
@@ -1445,7 +1444,7 @@ program: TYPE IDENT EQUALS LPAREN INT WITH
 ## In state 15, spurious reduction of production domain_type -> separated_nonempty_list(STAR,domain_type0) 
 ##
 
-after reading the $1 $0, expecting a closing ')' or continuation of the type description.
+after reading $1-0, expecting a closing ')' or continuation of the type description.
 
 program: TYPE IDENT EQUALS LPAREN WITH 
 ##
@@ -1470,7 +1469,7 @@ program: TYPE IDENT EQUALS WITH
 ## TYPE IDENT EQUALS 
 ##
 
-expecting a type declaration after $2 $1 $0.
+expecting a type expression after $2-0.
 
 program: TYPE IDENT WITH 
 ##
@@ -1482,7 +1481,7 @@ program: TYPE IDENT WITH
 ## TYPE IDENT 
 ##
 
-expecting an '=' after 'type $0'.
+expecting an '=' followed by a type expression after $1-0 in a structure.
 
 program: TYPE WITH 
 ##
@@ -1494,7 +1493,7 @@ program: TYPE WITH
 ## TYPE 
 ##
 
-expecting an identifier after 'type' in a declaration.
+expecting an identifier after $0 in a structure.
 
 program: WITH 
 ##
