@@ -135,7 +135,7 @@ module type S = sig
 
   end
 
-  (** {3 Raw pointer manipulation*)
+  (** {3 Raw pointer manipulation}*)
 
   module RawPtr : sig
 
