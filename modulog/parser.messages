@@ -1071,7 +1071,7 @@ program: MODULE TYPE IDENT EQUALS SIG PRED IDENT WITH
 ## PRED IDENT 
 ##
 
-expecting a ':' followed by a predicate type after the declaration of the predicate $0.
+expecting a ':' followed by a predicate type after $1 $0 in a module signature.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT COLON WITH 
 ##
@@ -1095,7 +1095,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON IDENT RPAR
 ## LPAREN IDENT COLON mod_type RPAREN 
 ##
 
-expecting either an ':' followed by a module type, or another functor parameter declaration.
+having read a functor parameter declaration, expecting either an ':' followed by a module type, or another functor parameter declaration.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE IDENT LPAREN IDENT COLON IDENT TYPE 
 ##
@@ -1174,7 +1174,7 @@ program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT EQUALS WITH
 ## MODULE TYPE IDENT EQUALS 
 ##
 
-expecting a module type expression after 'module type $1 ='.
+expecting a module type expression after $3 $2 $1 $0.
 
 program: MODULE TYPE IDENT EQUALS SIG MODULE TYPE IDENT WITH 
 ##
