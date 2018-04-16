@@ -78,7 +78,7 @@ module type S = sig
     type exp_box = Exp : 'a exp -> exp_box
 
     (** Structure literals. *)
-    val const : 's t typ -> exp_box list -> 's t exp
+    val const : 's t typ -> exp_box array -> 's t exp
   end
 
   (** {2 Commands} *)

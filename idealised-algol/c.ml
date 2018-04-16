@@ -3,6 +3,8 @@
    - Wider range of integer types
 *)
 
+type 'a ocaml_array = 'a array
+
 type _ ptr = Ptr
 type _ array = Array
 type _ structure = Structure
@@ -75,7 +77,7 @@ type c_exp =
   | IntLit    of int32
   | Int32Max
   | StrLit    of string
-  | StructLit of string * c_exp list
+  | StructLit of string * c_exp ocaml_array
   | Binop     of c_exp * binop * c_exp
   | Unop      of unop * c_exp
   | Deref     of c_exp
@@ -182,7 +184,7 @@ module PP = struct
        Format.fprintf fmt
          "(struct %s){ @[<hv>%a@] }"
          name
-         Fmt.(list ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
+         Fmt.(array ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
     | Var vnm ->
        Format.pp_print_string fmt vnm
     | Field (Deref expr, fnm) ->
@@ -429,7 +431,7 @@ end = struct
     type exp_box = Exp : 'a exp -> exp_box
 
     let const (Struct name) exps =
-      Expr (StructLit (name, List.map (fun (Exp e) -> un_expr e) exps))
+      Expr (StructLit (name, Array.map (fun (Exp e) -> un_expr e) exps))
   end
 
   let struct_decls () =

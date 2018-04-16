@@ -20,7 +20,7 @@ struct
   let () = S.Struct.seal t
 
   let create exps =
-    S.Struct.const t (Array.to_list (Array.map (fun e -> S.Struct.Exp e) exps))
+    S.Struct.const t (Array.map (fun e -> S.Struct.Exp e) exps)
 
   let get x i =
     let open! S.Struct in
