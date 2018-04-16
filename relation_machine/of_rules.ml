@@ -103,7 +103,7 @@ let delta_ relvar =
 let new_ relvar =
   { relvar with ident = "new:" ^ relvar.ident }
 
-let select_all src =
+let select_all guard_relation src =
   let projections =
     Array.to_list (Array.init src.arity (fun i -> (i, Printf.sprintf "X%d" i)))
   in
@@ -113,11 +113,11 @@ let select_all src =
   Select { relation = src
          ; conditions = []
          ; projections
-         ; cont = Return { guard_relation = None; values }
+         ; cont = Return { guard_relation; values }
          }
 
-let mk_merge src tgt =
-  Insert (tgt, select_all src)
+let mk_merge ?(distinct=false) src tgt =
+  Insert (tgt, if distinct then select_all (Some tgt) src else select_all None src)
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -154,15 +154,14 @@ let translate_recursive ruleset rules =
         RelvarSet.concat_map_to_list
           (fun delta'd_predicate ->
              List.map
-               (fun rhs ->
-                  Insert (new_ pred, expr_of_rule (Some pred) args rhs))
+               (fun rhs -> Insert (new_ pred, expr_of_rule (Some pred) args rhs))
                (extract_predicate delta'd_predicate rhs))
           predicates
       end
       rules
   and merges =
     RelvarSet.map_to_list
-      (fun nm -> mk_merge (new_ nm) nm)
+      (fun nm -> mk_merge ~distinct:true (new_ nm) nm)
       predicates
   and moves =
     RelvarSet.map_to_list
