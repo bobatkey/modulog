@@ -5,6 +5,8 @@
 
 type 'a ocaml_array = 'a array
 
+
+
 type _ ptr = Ptr
 type _ array = Array
 type _ structure = Structure
@@ -28,98 +30,77 @@ type structure_desc =
   ; fields : structure_field list
   }
 
+module AST = struct
 
+  type binop =
+    | Plus
+    | Sub
+    | Mult
+    | Div
+    | Lt
+    | Le
+    | Eq
+    | Ne
+    | Ge
+    | Gt
+    | LAnd
+    | LOr
 
-type binop =
-  | Plus
-  | Sub
-  | Mult
-  | Div
-  | Lt
-  | Le
-  | Eq
-  | Ne
-  | Ge
-  | Gt
-  | LAnd
-  | LOr
+  type unop =
+    | Neg
+    | LNot
 
-let prec_of_binop = function
-  | Mult | Div        -> 5
-  | Plus | Sub        -> 6
-  | Lt | Le | Gt | Ge -> 8
-  | Eq | Ne           -> 9
-  | LAnd              -> 13
-  | LOr               -> 14
+  type exp =
+    | Var       of string
+    | Null
+    | BoolLit   of bool
+    | IntLit    of int32
+    | Int32Max
+    | StrLit    of string
+    | StructLit of string * exp ocaml_array
+    | Binop     of exp * binop * exp
+    | Unop      of unop * exp
+    | Deref     of exp
+    | Field     of exp * string
+    | Idx       of exp * exp
+    | AddrOf    of exp
+    | ECall     of string * exp list
 
-let str_of_binop = function
-  | Mult -> "*"
-  | Div  -> "/"
-  | Plus -> "+"
-  | Sub  -> "-"
-  | Lt   -> "<"
-  | Le   -> "<="
-  | Ge   -> ">="
-  | Gt   -> ">"
-  | Eq   -> "=="
-  | Ne   -> "!="
-  | LAnd -> "&&"
-  | LOr  -> "||"
+  type stmt =
+    | Assign  of exp * exp
+    | Malloc  : exp * 'a typ * (exp * 'b typ) option -> stmt
+    | Free    of exp
+    | If      of exp * stmt * stmt option
+    | While   of exp * stmt
+    | Break
+    | Block   of block_stmt list
+    | Return  of exp
+    | Call    of string * exp list
 
-type unop =
-  | Neg
-  | LNot
+  and block_stmt =
+    | Declaration : 'a typ * string * exp option -> block_stmt
+    | Statement   : stmt                         -> block_stmt
 
-type c_exp =
-  | Var       of string
-  | Null
-  | BoolLit   of bool
-  | IntLit    of int32
-  | Int32Max
-  | StrLit    of string
-  | StructLit of string * c_exp ocaml_array
-  | Binop     of c_exp * binop * c_exp
-  | Unop      of unop * c_exp
-  | Deref     of c_exp
-  | Field     of c_exp * string
-  | Idx       of c_exp * c_exp
-  | AddrOf    of c_exp
-  | ECall     of string * c_exp list
-
-type stmt =
-  | Assign  of c_exp * c_exp
-  | Malloc  : c_exp * 'a typ * (c_exp * 'b typ) option -> stmt
-  | Free    of c_exp
-  | If      of c_exp * stmt * stmt option
-  | While   of c_exp * stmt
-  | Break
-  | Block   of block_stmt list
-  | Return  of c_exp
-  | Call    of string * c_exp list
-
-and block_stmt =
-  | Declaration : 'a typ * string * c_exp option -> block_stmt
-  | Statement   : stmt                           -> block_stmt
-
-type fundecl =
-  { return_type : c_type
-  ; name        : string
-  ; arg_decls   : (c_type * string) list
-  ; body        : block_stmt list
-  }
+  type fundecl =
+    { return_type : c_type
+    ; name        : string
+    ; arg_decls   : (c_type * string) list
+    ; body        : block_stmt list
+    }
+end
 
 module PP = struct
   let rec pp_typ :
     type a. (bool -> Format.formatter -> unit) -> Format.formatter -> a typ -> unit =
     fun f fmt -> function
       | Void ->
-         Format.fprintf fmt "void %t" (f true)
+         Format.fprintf fmt "void%t" (f true)
       | Int32 ->
-         Format.fprintf fmt "int32_t %t" (f true)
+         Format.fprintf fmt "int32_t%t" (f true)
       | Bool ->
-         Format.fprintf fmt "bool %t" (f true)
+         Format.fprintf fmt "bool%t" (f true)
       | Struct nm ->
-         Format.fprintf fmt "struct %s %t" nm (f true)
+         Format.fprintf fmt "struct %s%t" nm (f true)
       | Pointer typ ->
          pp_typ
            (fun top fmt ->
@@ -134,7 +115,10 @@ module PP = struct
            typ
 
   let pp_decl fmt (typ, ident) =
-    pp_typ (fun l fmt -> Format.pp_print_string fmt ident) fmt typ
+    pp_typ
+      (fun l fmt -> Format.fprintf fmt " %s" ident)
+      fmt
+      typ
 
   let pp_struct_decl fmt { name; fields } =
     Format.fprintf fmt "@[<v>@[<v 4>struct %s {@ " name;
@@ -155,6 +139,30 @@ module PP = struct
 
   let pp_typename fmt typ =
     pp_typ (fun l fmt -> ()) fmt typ
+
+  open AST
+
+  let prec_of_binop = function
+    | Mult | Div        -> 5
+    | Plus | Sub        -> 6
+    | Lt | Le | Gt | Ge -> 8
+    | Eq | Ne           -> 9
+    | LAnd              -> 13
+    | LOr               -> 14
+
+  let str_of_binop = function
+    | Mult -> "*"
+    | Div  -> "/"
+    | Plus -> "+"
+    | Sub  -> "-"
+    | Lt   -> "<"
+    | Le   -> "<="
+    | Ge   -> ">="
+    | Gt   -> ">"
+    | Eq   -> "=="
+    | Ne   -> "!="
+    | LAnd -> "&&"
+    | LOr  -> "||"
 
   let rec pp_expr prec fmt = function
     | Binop (e1, (LAnd | LOr as op), e2) ->
@@ -363,33 +371,35 @@ module PP = struct
       pp_typename return_type
       name
       pp_arg_decls arg_decls
-      pp_stmts body
+      pp_stmts     body
 end
 
 module C () : sig
   include Syntax.S
 
-  val fun_decls : unit -> fundecl list
+  val fun_decls : unit -> AST.fundecl list
 
   val struct_decls : unit -> structure_desc list
 
-  val gen : comm -> block_stmt list
+  val gen : comm -> AST.block_stmt list
 end = struct
-  type namegen = int
-
-  let gen comm =
-    snd (comm 0)
-
-  type (_,_) expr = Expr of c_exp
+  type (_,_) expr = Expr of AST.exp
   type 'a exp = ('a, [`exp]) expr
   type 'a var = ('a, [`exp|`var]) expr
-  type comm = namegen -> namegen * block_stmt list
 
   let un_expr (Expr e) = e
 
   let to_exp (Expr e) = Expr e
 
   type nonrec 'a typ = 'a typ
+
+
+  type namegen = int
+
+  let gen comm =
+    snd (comm 0)
+
+  type comm = namegen -> namegen * AST.block_stmt list
 
   (**********************************************************************)
   module Struct = struct
@@ -438,13 +448,13 @@ end = struct
     List.rev_map
       (fun name -> { name; fields = Hashtbl.find Struct.structures name })
       !Struct.structures_ordered
-  
+
   (**********************************************************************)
   type _ arg_spec =
     | RetVoid : comm arg_spec
     | RetVal  : 'a typ -> ('a,[`exp]) expr arg_spec
-    | Arg : string * 'a typ * 'b arg_spec -> (('a, [`exp]) expr -> 'b) arg_spec
-    | Ref : string * 'a typ * 'b arg_spec -> (('a, [`exp|`var]) expr -> 'b) arg_spec
+    | Arg     : string * 'a typ * 'b arg_spec -> (('a, [`exp]) expr -> 'b) arg_spec
+    | Ref     : string * 'a typ * 'b arg_spec -> (('a, [`exp|`var]) expr -> 'b) arg_spec
 
   let return_void = RetVoid
   let return t = RetVal t
@@ -464,7 +474,7 @@ end = struct
     | Ref (nm, typ, a) -> fun acc -> get_args a ((Some_type (Pointer typ), nm) :: acc)
 
   (* FIXME: being very trusting about name collisions here *)
-  let rec apply : type a. a arg_spec -> a -> block_stmt list = function
+  let rec apply : type a. a arg_spec -> a -> AST.block_stmt list = function
     | RetVoid        -> fun c -> gen c
     | RetVal t       -> fun e -> [Statement (Return (un_expr e))]
     | Arg (nm, _, a) -> fun b -> apply a (b (Expr (Var nm)))
@@ -474,11 +484,9 @@ end = struct
     let name = Display_names.Fresh.choose (Hashtbl.mem decld_functions) name in
     decld_functions_order := name :: !decld_functions_order;
     let return_type, arg_decls = get_args typ [] in
-    let decl =
-      { name; return_type; arg_decls; body = apply typ body }
-    in
+    let decl = { AST.name; return_type; arg_decls; body = apply typ body } in
     Hashtbl.add decld_functions name decl;
-    let rec gen_call : type a. a arg_spec -> c_exp list -> a = function
+    let rec gen_call : type a. a arg_spec -> AST.exp list -> a = function
       | RetVoid ->
          fun l ng -> ng, [Statement (Call (name, List.rev l))]
       | RetVal _ ->
@@ -492,6 +500,8 @@ end = struct
 
   (**********************************************************************)
 
+  open AST
+
   module Bool = struct
     let t = Bool
     let true_ = Expr (BoolLit true)
@@ -500,8 +510,6 @@ end = struct
     let (||) e1 e2 = Expr (Binop (un_expr e1, LOr, un_expr e2))
     let not e = Expr (Unop (LNot, un_expr e))
   end
-
-  (**********************************************************************)
 
   let empty ng =
     ng, []
@@ -547,7 +555,6 @@ end = struct
     let ng, body = body (Expr (Var nm)) ng in
     ng, decl :: body
 
-  (**********************************************************************)
 
   module Int32 = struct
 
@@ -566,6 +573,7 @@ end = struct
 
   end
 
+
   module RawArray = struct
 
     type nonrec 'a array = 'a array
@@ -577,12 +585,13 @@ end = struct
 
   end
 
+
   module RawPtr = struct
-  
+
     type nonrec 'a ptr = 'a ptr
 
     let ptr x = Pointer x
-        
+
     let malloc v typ ng =
       ng, [Statement (Malloc (un_expr v, typ, None))]
 
@@ -606,7 +615,7 @@ end = struct
       Expr (Field (un_expr (deref struct_ptr_exp), field))
 
   end
-    
+
   (* FIXME: https://stackoverflow.com/questions/9225567/how-to-print-a-int64-t-type-in-c *)
   let print_int e ng =
     ng, [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
