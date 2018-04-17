@@ -1,68 +1,68 @@
 module type S = sig
   include Idealised_algol.Btree.KEY
 
-  val create : int32 S.exp array -> t S.exp
+  val create : int32 Syn.exp array -> t Syn.exp
 
-  val get : t S.exp -> int -> int32 S.exp
+  val get : t Syn.exp -> int -> int32 Syn.exp
 end
 
-module Make (S : Idealised_algol.Syntax.S) (A : sig val arity : int end) ()
-  : S with module S = S =
+module Make (Syn : Idealised_algol.Syntax.S) (A : sig val arity : int end) ()
+  : S with module Syn = Syn =
 struct
-  module S = S
+  module Syn = Syn
 
   type key
-  type t = key S.Struct.t
-  let t : t S.typ = S.Struct.make "key"
+  type t = key Syn.Struct.t
+  let t : t Syn.typ = Syn.Struct.make "key"
   let val_fields =
     Array.init A.arity
-      (fun i -> S.Struct.field t (Printf.sprintf "x%d" i) S.Int32.t)
-  let () = S.Struct.seal t
+      (fun i -> Syn.Struct.field t (Printf.sprintf "x%d" i) Syn.Int32.t)
+  let () = Syn.Struct.seal t
 
   let create exps =
-    S.Struct.const t (Array.map (fun e -> S.Struct.Exp e) exps)
+    Syn.Struct.const t (Array.map (fun e -> Syn.Struct.Exp e) exps)
 
   let get x i =
-    let open! S.Struct in
+    let open! Syn.Struct in
     x#.val_fields.(i)
 
   let eq =
-    S.declare_func
+    Syn.declare_func
       ~name:"eq"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
+      ~typ:Syn.(("x", t) @-> ("y", t) @-> return Syn.Bool.t)
       ~body:begin fun x y ->
         let rec loop i acc =
           if i = A.arity then
             acc
           else
             loop (i+1)
-              (let open! S.Bool in let open! S.Int32 in
-               let open! S.Struct in
-               S.(acc && x#.val_fields.(i) == y#.val_fields.(i)))
+              (let open! Syn.Bool in let open! Syn.Int32 in
+               let open! Syn.Struct in
+               Syn.(acc && x#.val_fields.(i) == y#.val_fields.(i)))
         in
         loop 1
-          (let open! S in let open! S.Bool in let open! S.Int32 in
-           let open! S.Struct in
+          (let open! Syn in let open! Syn.Bool in let open! Syn.Int32 in
+           let open! Syn.Struct in
            x#.val_fields.(0) == y#.val_fields.(0))
       end
 
   let le =
-    S.declare_func
+    Syn.declare_func
       ~name:"le"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
+      ~typ:Syn.(("x", t) @-> ("y", t) @-> return Syn.Bool.t)
       ~body:begin fun x y ->
         let rec loop i =
           if i = A.arity - 1 then
-            let open! S in
-            let open! S.Int32 in
-            let open! S.Struct in
+            let open! Syn in
+            let open! Syn.Int32 in
+            let open! Syn.Struct in
             x#.val_fields.(i) <= y#.val_fields.(i)
           else
             let e = loop (i+1) in
-            let open! S in
+            let open! Syn in
             let open! Bool in
             let open! Int32 in
-            let open! S.Struct in
+            let open! Syn.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
@@ -70,22 +70,22 @@ struct
       end
 
   let lt =
-    S.declare_func
+    Syn.declare_func
       ~name:"lt"
-      ~typ:S.(("x", t) @-> ("y", t) @-> return S.Bool.t)
+      ~typ:Syn.(("x", t) @-> ("y", t) @-> return Syn.Bool.t)
       ~body:begin fun x y ->
         let rec loop i =
           if i = A.arity - 1 then
-            let open! S in
-            let open! S.Int32 in
-            let open! S.Struct in
+            let open! Syn in
+            let open! Syn.Int32 in
+            let open! Syn.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
           else
             let e = loop (i+1) in
-            let open! S in
-            let open! S.Bool in
-            let open! S.Int32 in
-            let open! S.Struct in
+            let open! Syn in
+            let open! Syn.Bool in
+            let open! Syn.Int32 in
+            let open! Syn.Struct in
             x#.val_fields.(i) < y#.val_fields.(i)
             || (x#.val_fields.(i) == y#.val_fields.(i) && e)
         in
