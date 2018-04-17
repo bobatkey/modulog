@@ -183,8 +183,8 @@ struct
     alloc_node @@ fun x -> begin%monoid
       x#->leaf := Bool.true_;
       x#->nkeys := int32 0l;
-      body x
-      (* FIXME: free the tree afterwards? *)
+      body x;
+      free x
     end
 
   (************************************************************)
