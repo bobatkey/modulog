@@ -1,14 +1,26 @@
-(* Indexes:
-     - work out which indexes are needed:
-       - for each select, we know the inputs and the outputs required.
-       - therefore, we know what sub-indexes to maintain for each relation
+module PatternSet : sig
+  module Pattern : sig
+    type t
 
-     Optimisations:
-     - if a selection has no projections, then it can just be a membership
-       test, which avoids the necessity to loop.
-  *)
+    val complete : int -> t
+    val of_list : int list -> t
+    val elements : t -> int list
+    val pp : t Fmt.t
+  end
 
-module PatternSet = struct
+  type t
+
+  val empty : t
+
+  val add : Pattern.t -> t -> t
+
+  val pp : t Fmt.t
+
+  include Minimalpathcover.G
+    with type t   := t
+     and type V.t = Pattern.t
+
+end = struct
   (* This could be more efficiently implemented with using BDDs, but
      it is probably not worth it for the sizes of sets we will be
      dealing with. *)
@@ -24,11 +36,10 @@ module PatternSet = struct
       Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Fmt.int)
   end
 
-  type pattern = Pattern.t
-
   include Set.Make (Pattern)
 
-  let pp = Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Pattern.pp)
+  let pp =
+    Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Pattern.pp)
 
   module V = struct
     type t = Pattern.t
@@ -58,7 +69,7 @@ module PredicatePats : sig
 
   val pats : Syntax.relvar -> t -> PatternSet.t
 
-  val add : Syntax.relvar -> PatternSet.pattern -> t -> t
+  val add : Syntax.relvar -> PatternSet.Pattern.t -> t -> t
 
   val map_to_list : (Syntax.relvar -> PatternSet.t -> 'a) -> t -> 'a list
 
@@ -76,10 +87,8 @@ end = struct
       | set -> set
 
   let add pred pat t =
-    if PatternSet.Pattern.is_empty pat then t
-    else
-      let set = pats pred t in
-      VarMap.add pred (PatternSet.add pat set) t
+    let set = pats pred t in
+    VarMap.add pred (PatternSet.add pat set) t
 
   let map_to_list f t =
     VarMap.fold (fun p pats -> List.cons (f p pats)) t []
@@ -106,7 +115,10 @@ let rec search_patterns_of_expr pats = function
 let rec search_patterns_of_command pats = function
   | Syntax.WhileNotEmpty (_, comms) | DeclareBuffers (_, comms) ->
      search_patterns_of_commands pats comms
-  | Insert (_, expr) ->
+  | Insert (relvar, expr) ->
+     (* account for the search needed for the membership test *)
+     let pat  = PatternSet.Pattern.complete relvar.Syntax.arity in
+     let pats = PredicatePats.add relvar pat pats in
      search_patterns_of_expr pats expr
   | Swap _ ->
      pats
@@ -144,6 +156,7 @@ let orderings_of_patterns pred pats =
   in
   (pred, pattern_paths)
 
+(* FIXME: generate a Map, instead of an association list *)
 let indexes program : (Syntax.relvar * int array array) list =
   PredicatePats.map_to_list
     orderings_of_patterns
@@ -175,14 +188,3 @@ let pp_all_orderings =
             (pair ~sep:(always " =>@ ")
                Syntax.pp_relvar
                pp_orderings)))
-
-(* Now to work out the indexes required for each relation:
-   - run "search_patterns program"
-   - for each predicate, get the minimal path cover - each path is an index.
-   - Two types of 'relation'
-     - sequential only: typically new_* and delta_*
-       - these are only used to (a) add things to; and (b) iterate over. Just use a linked list of blocks.
-     - lookup oriented ones
-       - will have 1 or more indexes
-       - insertion updates the indexes (all data is stored in the indexes anyway)
-*)

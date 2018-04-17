@@ -184,7 +184,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     let indexes =
       match List.assoc relvar indexes with
         | exception Not_found ->
-           [|Array.init relvar.Syntax.arity (fun i -> i)|]
+           failwith "internal error: [codegen] relation missing an index"
         | indexes ->
            indexes
     in
