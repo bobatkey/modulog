@@ -1,35 +1,37 @@
+module Buf (IA : Idealised_algol.Syntax.S) = struct
+  module type S = Codegen_double_buf.S with module Syn = IA
+
+  type t = Buf : (module S with type handle = 'h) * 'h -> t
+
+  let declare arity k =
+    let module Config = struct let arity = arity end in
+    let module B = Codegen_double_buf.Make (IA) (Config) () in
+    B.declare (fun h -> k (Buf ((module B), h)))
+
+  let insert (Buf (m, h)) vals =
+    let module B = (val m) in
+    B.insert h vals
+
+  let iterate_all (Buf (m, h)) k =
+    let module B = (val m) in
+    B.iterate_all h k
+
+  let swap (Buf (m, h)) =
+    let module B = (val m) in
+    B.swap h
+
+  let is_empty (Buf (m, h)) =
+    let module B = (val m) in
+    B.is_empty h
+end
+
 module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
   let map_seq f =
     List.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
 
-  module Buf = struct
-    module type S = Codegen_double_buf.S with module Syn = IA
-
-    type t = Buf : (module S with type handle = 'h) * 'h -> t
-
-    let declare arity k =
-      let module Config = struct let arity = arity end in
-      let module B = Codegen_double_buf.Make (IA) (Config) () in
-      B.declare (fun h -> k (Buf ((module B), h)))
-
-    let insert (Buf (m, h)) vals =
-      let module B = (val m) in
-      B.insert h vals
-
-    let iterate_all (Buf (m, h)) k =
-      let module B = (val m) in
-      B.iterate_all h k
-
-    let swap (Buf (m, h)) =
-      let module B = (val m) in
-      B.swap h
-
-    let is_empty (Buf (m, h)) =
-      let module B = (val m) in
-      B.is_empty h
-  end
-
+  module Buf = Buf (IA)
+  
   (* FIXME: do the same thing for Tables as for Buffers *)
   module type INDEXED_TABLE = Codegen_indexed_table.S with module S = IA
 
@@ -95,11 +97,14 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
        begin
          match RelEnv.find relation env with
            | Buffer _ ->
-              failwith "plain relation used as a guard"
+              (* FIXME: in some cases, it would make sense to check
+                 the write end of the buffer for duplicates before
+                 checking the relation itself. *)
+              failwith "internal error: [codegen] buffer used as a guard"
            | Table (m, handle) ->
               let module IT = (val m) in
-              let vals = Array.map (exp_of_scalar lenv) values in
-              IT.ifmember handle vals
+              let values = Array.map (exp_of_scalar lenv) values in
+              IT.ifmember handle values
                 ~then_:IA.empty
                 ~else_:(translate_expr cont env lenv k)
        end
@@ -142,8 +147,10 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Syntax.WhileNotEmpty (vars, body) ->
        let check_empty nm =
          match RelEnv.find nm env with
-           | Buffer handle -> Buf.is_empty handle
-           | Table _    -> failwith "emptiness test on an indexed table"
+           | Buffer handle ->
+              Buf.is_empty handle
+           | Table _ ->
+              failwith "internal error: [codegen] emptiness test on a table"
        in
        IA.while_ (IA.Bool.not (and_list (List.map check_empty vars)))
          ~do_:(translate_comms env body)
@@ -175,7 +182,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
          | Buffer buf ->
             Buf.swap buf
          | Table _ ->
-            failwith "attempt to swap a table")
+            failwith "internal error: [codegen] attempt to swap a table")
 
   and translate_comms env comms =
     map_seq (translate_comm env) comms
@@ -193,12 +200,13 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       let indexes = indexes
     end in
     let module IT = Codegen_indexed_table.Make (IA) (P) () in
-    let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
     IT.declare
       ~name:relvar.Syntax.ident
       begin fun handle ->
         begin%monoid.IA
-          k (RelEnv.add relvar (Table (m, handle)) env);
+          k (RelEnv.add relvar (Table ((module IT), handle)) env);
+          (* FIXME: dump to a CSV file (if this relation is marked as
+             'output') *)
           print_strln relvar.Syntax.ident;
           IT.iterate_all handle print_exps
         end
