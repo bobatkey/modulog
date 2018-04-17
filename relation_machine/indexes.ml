@@ -96,18 +96,19 @@ let rec search_patterns_of_expr pats = function
      let pat  = PatternSet.Pattern.of_list (List.map fst conditions) in
      let pats = PredicatePats.add relation pat pats in
      search_patterns_of_expr pats cont
-  | Return { guard_relation = None } ->
+  | Return _ ->
      pats
-  | Return { guard_relation = Some relation; values } ->
-     let pat = PatternSet.Pattern.complete (List.length values) in
-     PredicatePats.add relation pat pats
+  | Guard_NotIn { relation; values; cont } ->
+     let pat  = PatternSet.Pattern.complete (Array.length values) in
+     let pats = PredicatePats.add relation pat pats in
+     search_patterns_of_expr pats cont
 
 let rec search_patterns_of_command pats = function
-  | Syntax.WhileNotEmpty (_, comms) | Declare (_, comms) ->
+  | Syntax.WhileNotEmpty (_, comms) | DeclareBuffers (_, comms) ->
      search_patterns_of_commands pats comms
   | Insert (_, expr) ->
      search_patterns_of_expr pats expr
-  | Move _ ->
+  | Swap _ ->
      pats
 
 and search_patterns_of_commands pats commands =

@@ -31,6 +31,7 @@ let expr_of_rule guard_relation head atoms =
   let rec transl_rhs env = function
     | [] ->
        (* FIXME: assert that all the variables are in scope. *)
+       (* FIXME: move to arrays earlier *)
        let values = List.map scalar_of_expr head in
        let reqd   =
          List.fold_left
@@ -39,7 +40,13 @@ let expr_of_rule guard_relation head atoms =
            values
        in
        assert (AttrSet.subset reqd env);
-       Return { guard_relation; values }, reqd
+       let values = Array.of_list values in
+       let expr = Return { values } in
+       let expr = match guard_relation with
+         | Some relation -> Guard_NotIn { relation; values; cont = expr }
+         | None          -> expr
+       in
+       expr, reqd
 
     | Ruleset.Atom {pred=relation; args} :: atoms ->
        let _, projections, conditions =
@@ -97,27 +104,22 @@ let predicates_of_rules =
     (fun set rule -> RelvarSet.add (relvar_of_rule rule) set)
     RelvarSet.empty
 
-let delta_ relvar =
-  { relvar with ident = "delta:" ^ relvar.ident }
-
-let new_ relvar =
-  { relvar with ident = "new:" ^ relvar.ident }
-
-let select_all guard_relation src =
-  let projections =
-    Array.to_list (Array.init src.arity (fun i -> (i, Printf.sprintf "X%d" i)))
-  in
-  let values =
-    List.map (fun (_, nm) -> Attr nm) projections
-  in
+let select_all src =
+  let projections = Array.init src.arity (fun i -> (i, Printf.sprintf "X%d" i)) in
+  let values      = Array.map (fun (_, nm) -> Attr nm) projections in
   Select { relation = src
          ; conditions = []
-         ; projections
-         ; cont = Return { guard_relation; values }
+         ; projections = Array.to_list projections
+         ; cont = Return { values }
          }
 
-let mk_merge ?(distinct=false) src tgt =
-  Insert (tgt, if distinct then select_all (Some tgt) src else select_all None src)
+let mk_merge src tgt =
+  (* FIXME: these insertions don't need to check for duplicates. Could
+     have a flag that says 'dispense with the membership test'. *)
+  Insert (tgt, select_all src)
+
+let buf_ relvar =
+  { relvar with ident = "buf:" ^ relvar.ident }
 
 let extract_predicate dpred rhs =
   let rec loop before = function
@@ -126,7 +128,7 @@ let extract_predicate dpred rhs =
     | (Ruleset.Atom { pred; args } as atom) :: after ->
        let rest = loop (atom :: before) after in
        if relvar_of_predname pred = dpred then
-         let hatom = Ruleset.Atom { pred = predname_of_relvar (delta_ dpred)
+         let hatom = Ruleset.Atom { pred = predname_of_relvar (buf_ dpred)
                                   ; args } in
          (hatom :: List.rev_append before after) :: rest
        else
@@ -136,16 +138,11 @@ let extract_predicate dpred rhs =
 
 let translate_recursive ruleset rules =
   let predicates = predicates_of_rules rules in
-  let delta_predicates = RelvarSet.map_to_list delta_ predicates in
-  let declarations =
-    RelvarSet.concat_map_to_list
-      (fun pred_nm -> [new_ pred_nm; delta_ pred_nm])
-      predicates
-  and initialisations =
-    RelvarSet.map_to_list
-      (fun pred_nm -> mk_merge pred_nm (delta_ pred_nm))
-      predicates
-  in
+  let buf_predicates = RelvarSet.map_to_list buf_ predicates in
+  let initialisations =
+    RelvarSet.map_to_list (fun pred_nm -> mk_merge pred_nm (buf_ pred_nm))
+      predicates in
+  let swaps = List.map (fun nm -> Swap nm) buf_predicates in
   let updates =
     List.concat @@
     List.map
@@ -154,22 +151,21 @@ let translate_recursive ruleset rules =
         RelvarSet.concat_map_to_list
           (fun delta'd_predicate ->
              List.map
-               (fun rhs -> Insert (new_ pred, expr_of_rule (Some pred) args rhs))
+               (fun rhs -> Insert (buf_ pred, expr_of_rule (Some pred) args rhs))
                (extract_predicate delta'd_predicate rhs))
           predicates
       end
       rules
   and merges =
     RelvarSet.map_to_list
-      (fun nm -> mk_merge ~distinct:true (new_ nm) nm)
-      predicates
-  and moves =
-    RelvarSet.map_to_list
-      (fun nm -> Move {tgt=delta_ nm; src=new_ nm})
+      (fun nm -> mk_merge (buf_ nm) nm)
       predicates
   in
-  Declare
-    (declarations, initialisations @ [ WhileNotEmpty (delta_predicates, updates @ merges @ moves) ])
+  DeclareBuffers
+    (buf_predicates,
+     initialisations @
+     swaps @
+     [ WhileNotEmpty (buf_predicates, updates @ swaps @ merges) ])
 
 let translate_component ruleset = function
   | `Direct rule ->

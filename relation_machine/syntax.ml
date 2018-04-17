@@ -21,8 +21,12 @@ type scalar =
 
 type expr =
   | Return of
-      { guard_relation : relvar option
-      ; values         : scalar list
+      { values      : scalar array
+      }
+  | Guard_NotIn of
+      { relation    : relvar
+      ; values      : scalar array
+      ; cont        : expr
       }
   | Select of
       { relation    : relvar
@@ -32,10 +36,10 @@ type expr =
       }
 
 type comm =
-  | WhileNotEmpty of relvar list * comms
-  | Insert of relvar * expr
-  | Move of { tgt : relvar; src : relvar }
-  | Declare of relvar list * comms
+  | WhileNotEmpty  of relvar list * comms
+  | Insert         of relvar * expr
+  | Swap           of relvar
+  | DeclareBuffers of relvar list * comms
 
 and comms = comm list
 
@@ -79,14 +83,14 @@ let pp_relvar fmt { ident; arity } =
   Format.fprintf fmt "%s/%d" ident arity
 
 let rec pp_expr fmt = function
-  | Return {guard_relation=None; values} ->
+  | Return {values} ->
      Format.fprintf fmt "(@[<h>%a@])"
-       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
-  | Return {guard_relation=Some rel; values} ->
-     Format.fprintf fmt "where (@[<h>%a@]) not in %a;@ (@[<h>%a@])"
-       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
-       pp_relvar                                rel
-       Fmt.(list ~sep:(always ",@ ") pp_scalar) values
+       Fmt.(array ~sep:(always ",@ ") pp_scalar) values
+  | Guard_NotIn { relation; values; cont } ->
+     Format.fprintf fmt "where (@[<h>%a@]) not in %a;@ %a"
+       Fmt.(array ~sep:(always ",@ ") pp_scalar) values
+       pp_relvar                                 relation
+       pp_expr                                   cont
   | Select { relation; conditions; projections; cont } ->
      Format.fprintf fmt
        "@[<hv 0>select @[<hv 0>%a from %a@];@]@ %a"
@@ -106,11 +110,10 @@ let rec pp_comm fmt = function
      Format.fprintf fmt "@[<hv 4>%a +=@ { @[<v>%a@] };@]"
        pp_relvar rel
        pp_expr   expr
-  | Move {tgt; src} ->
-     Format.fprintf fmt "%a <- %a;"
-       pp_relvar tgt
-       pp_relvar src
-  | Declare (initialisers, body) ->
+  | Swap relvar ->
+     Format.fprintf fmt "swap %a;"
+       pp_relvar relvar
+  | DeclareBuffers (initialisers, body) ->
      Format.fprintf fmt "declare (@[<hv>%a@])@ {@[<v 4>@,%a@]@,}"
        Fmt.(list ~sep:(always ",@ ") pp_relvar) initialisers
        pp_comms body

@@ -21,8 +21,12 @@ type scalar =
 
 type expr =
   | Return of
-      { guard_relation : relvar option
-      ; values         : scalar list
+      { values      : scalar array
+      }
+  | Guard_NotIn of
+      { relation    : relvar
+      ; values      : scalar array
+      ; cont        : expr
       }
   | Select of
       { relation    : relvar
@@ -40,10 +44,10 @@ type comm =
   (** Insert the results of the expression into the named
       variable. *)
 
-  | Move of { tgt : relvar; src : relvar }
-  (** Move the contents of 'src' into 'tgt', leaving 'src' empty. *)
+  | Swap of relvar
+  (** Swap the named read/write buffer. *)
 
-  | Declare of relvar list * comms
+  | DeclareBuffers of relvar list * comms
 
 and comms =
   comm list

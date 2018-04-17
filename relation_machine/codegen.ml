@@ -3,16 +3,39 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
   let map_seq f =
     List.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
 
-  let array_map_seq f =
-    Array.fold_left (fun code x -> IA.(^^) code (f x)) IA.empty
+  module Buf = struct
+    module type S = Codegen_double_buf.S with module Syn = IA
 
-  module BL = Idealised_algol.Block_list.Make (IA) ()
+    type t = Buf : (module S with type handle = 'h) * 'h -> t
 
+    let declare arity k =
+      let module Config = struct let arity = arity end in
+      let module B = Codegen_double_buf.Make (IA) (Config) () in
+      B.declare (fun h -> k (Buf ((module B), h)))
+
+    let insert (Buf (m, h)) vals =
+      let module B = (val m) in
+      B.insert h vals
+
+    let iterate_all (Buf (m, h)) k =
+      let module B = (val m) in
+      B.iterate_all h k
+
+    let swap (Buf (m, h)) =
+      let module B = (val m) in
+      B.swap h
+
+    let is_empty (Buf (m, h)) =
+      let module B = (val m) in
+      B.is_empty h
+  end
+
+  (* FIXME: do the same thing for Tables as for Buffers *)
   module type INDEXED_TABLE = Codegen_indexed_table.S with module S = IA
 
   type value =
-    | Plain   : BL.handle -> value
-    | Indexed : (module INDEXED_TABLE with type handle = 'h) * 'h -> value
+    | Buffer : Buf.t -> value
+    | Table  : (module INDEXED_TABLE with type handle = 'h) * 'h -> value
 
   module RelEnv = Map.Make (Syntax.RelVar)
 
@@ -65,33 +88,34 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
       | conditions -> IA.ifthen (and_list conditions) ~then_
 
   let rec translate_expr expr env lenv k = match expr with
-    | Syntax.Return { guard_relation=None; values } ->
-       let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
-       k vals
+    | Syntax.Return { values } ->
+       k (Array.map (exp_of_scalar lenv) values)
 
-    | Syntax.Return { guard_relation=Some guard; values } ->
+    | Syntax.Guard_NotIn { relation; values; cont } ->
        begin
-         match RelEnv.find guard env with
-           | Plain _ ->
+         match RelEnv.find relation env with
+           | Buffer _ ->
               failwith "plain relation used as a guard"
-           | Indexed (m, handle) ->
+           | Table (m, handle) ->
               let module IT = (val m) in
-              let vals = Array.of_list (List.map (exp_of_scalar lenv) values) in
-              IT.ifmember handle vals ~then_:IA.empty ~else_:(k vals)
+              let vals = Array.map (exp_of_scalar lenv) values in
+              IT.ifmember handle vals
+                ~then_:IA.empty
+                ~else_:(translate_expr cont env lenv k)
        end
 
     | Syntax.Select { relation; conditions; projections; cont } ->
        begin match RelEnv.find relation env with
-         | Plain handle ->
+         | Buffer handle ->
             begin
               (* FIXME: emit a warning if conditions contains anything,
                  or if projections is empty. *)
-              BL.iterate handle @@ fun attrs ->
+              Buf.iterate_all handle @@ fun attrs ->
               if_conj (List.map (condition lenv attrs) conditions)
                 (let lenv = projections_to_lenv projections attrs lenv in
                  translate_expr cont env lenv k)
             end
-         | Indexed (m, handle) ->
+         | Table (m, handle) ->
             begin
               let module IT = (val m) in
               match conditions, projections with
@@ -118,8 +142,8 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Syntax.WhileNotEmpty (vars, body) ->
        let check_empty nm =
          match RelEnv.find nm env with
-           | Plain handle -> BL.is_empty handle
-           | Indexed _    -> failwith "emptiness test on an indexed table"
+           | Buffer handle -> Buf.is_empty handle
+           | Table _    -> failwith "emptiness test on an indexed table"
        in
        IA.while_ (IA.Bool.not (and_list (List.map check_empty vars)))
          ~do_:(translate_comms env body)
@@ -127,59 +151,58 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     | Insert (relvar, expr) ->
        (translate_expr expr env AttrEnv.empty @@ fun vals ->
         match RelEnv.find relvar env with
-          | Plain handle ->
-             BL.insert handle vals
-          | Indexed (m, handle) ->
-             let module IT = (val m) in IT.insert handle vals)
+          | Buffer handle ->
+             Buf.insert handle vals
+          | Table (m, handle) ->
+             (* FIXME: the membership check is not always required if
+                doing a merge from a buffer. *)
+             let module IT = (val m) in
+             IT.ifmember handle vals
+               ~then_:IA.empty
+               ~else_:(IT.insert handle vals))
 
-    | Declare (vars, body) ->
+    | DeclareBuffers (vars, body) ->
        List.fold_right
          (fun (Syntax.{ident;arity} as varnm) k env ->
-            BL.declare ~name:ident ~arity
-              (fun handle -> k (RelEnv.add varnm (Plain handle) env)))
+            Buf.declare (* ~name:ident ~ *)arity
+              (fun handle -> k (RelEnv.add varnm (Buffer handle) env)))
          vars
          (fun env -> translate_comms env body)
          env
 
-    | Move { src; tgt } ->
-       (match RelEnv.find src env, RelEnv.find tgt env with
-         | Plain src, Plain tgt ->
-            BL.move ~src ~tgt
-         | _ ->
-            failwith "Attempted move between indexed relations")
+    | Swap relvar ->
+       (match RelEnv.find relvar env with
+         | Buffer buf ->
+            Buf.swap buf
+         | Table _ ->
+            failwith "attempt to swap a table")
 
   and translate_comms env comms =
     map_seq (translate_comm env) comms
 
   let translate_idb_predicate indexes relvar k env =
-    match List.assoc relvar indexes with
-      | exception Not_found ->
-         BL.declare
-           ~name:relvar.Syntax.ident
-           ~arity:relvar.Syntax.arity
-           begin fun handle ->
-             begin%monoid.IA
-               k (RelEnv.add relvar (Plain handle) env);
-               print_strln relvar.Syntax.ident;
-               BL.iterate handle print_exps
-             end
-           end
-      | indexes ->
-         let module P = struct
-           let arity = relvar.Syntax.arity
-           let indexes = indexes
-         end in
-         let module IT = Codegen_indexed_table.Make (IA) (P) () in
-         let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
-         IT.declare
-           ~name:relvar.Syntax.ident
-           begin fun handle ->
-             begin%monoid.IA
-               k (RelEnv.add relvar (Indexed (m, handle)) env);
-               print_strln relvar.Syntax.ident;
-               IT.iterate_all handle print_exps
-             end
-           end
+    let indexes =
+      match List.assoc relvar indexes with
+        | exception Not_found ->
+           [|Array.init relvar.Syntax.arity (fun i -> i)|]
+        | indexes ->
+           indexes
+    in
+    let module P = struct
+      let arity = relvar.Syntax.arity
+      let indexes = indexes
+    end in
+    let module IT = Codegen_indexed_table.Make (IA) (P) () in
+    let m = (module IT : INDEXED_TABLE with type handle = IT.handle) in
+    IT.declare
+      ~name:relvar.Syntax.ident
+      begin fun handle ->
+        begin%monoid.IA
+          k (RelEnv.add relvar (Table (m, handle)) env);
+          print_strln relvar.Syntax.ident;
+          IT.iterate_all handle print_exps
+        end
+      end
 
   (* FIXME: do this properly, adding code to load the data from CSV files *)
   let translate_edb_predicate =

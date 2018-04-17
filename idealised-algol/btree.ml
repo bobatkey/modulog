@@ -1,3 +1,13 @@
+(* FIXME: add 'next' pointers to avoid the use of a stack for
+   iteration? I think this requires putting all keys at the leaves as
+   well as in the internal nodes. As it stands, this implementation is
+   good for membership queries, but requires an auxillary stack for
+   iteration.
+
+   An intermediate solution would be to maintain parent pointers so
+   the stack needn't store the parent pointers. *)
+
+
 module type PARAMETERS = sig
   val min_children : int32
 end
@@ -46,6 +56,10 @@ module type S = sig
     handle ->
     (key Syn.exp -> Syn.comm) ->
     Syn.comm
+
+  val move : src:handle -> tgt:handle -> Syn.comm
+
+  val is_empty : handle -> bool Syn.exp
 end
 
 module Make
@@ -370,4 +384,59 @@ struct
           insert_nonfull (to_exp root) key
         end
       end
+
+  let free tree =
+    with_nodeptr ~name:"cursor" tree @@ fun cursor ->
+    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@ fun stk ->
+    begin%monoid
+      while_ (Bool.not cursor#->leaf)
+        ~do_:begin%monoid
+          stk.push cursor (int32 0l);
+          cursor := cursor#->children#@(int32 0l)
+        end;
+
+      loop begin%monoid
+        free cursor;
+
+        ifthen stk.is_empty ~then_:break;
+
+        cursor := fst stk.top;
+
+        let open! Syn.Int32 in
+
+        if_ (snd stk.top == cursor#->nkeys - int32 1l)
+          ~then_:begin%monoid
+            stk.pop;
+            with_nodeptr ~name:"old_cursor" cursor @@ fun old_cursor ->
+            begin%monoid
+              cursor := cursor#->children#@(cursor#->nkeys);
+              free old_cursor
+            end
+          end
+          ~else_:begin%monoid
+            incr (snd stk.top);
+            cursor := cursor#->children#@(snd stk.top)
+          end;
+
+        while_ (Syn.Bool.not cursor#->leaf)
+          ~do_:begin%monoid
+            stk.push cursor (int32 0l);
+            cursor := cursor#->children#@(int32 0l)
+          end
+      end
+    end
+
+  let move ~src ~tgt =
+    begin%monoid
+      free tgt;
+      tgt := src;
+      malloc src node;
+      src#->leaf := Bool.true_;
+      src#->nkeys := int32 0l;
+    end
+
+  let is_empty tree =
+    let open! Syn.Bool in
+    let open! Syn.Int32 in
+    tree#->leaf && tree#->nkeys == const 0l
 end

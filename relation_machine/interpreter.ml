@@ -69,14 +69,14 @@ let check_condition attr_env values (i, scalar) =
   values.(i) = eval_scalar attr_env scalar
 
 let rec eval_expr rel_env attr_env f = function
-  | Return { guard_relation = Some rel; values } ->
-     let values = Array.of_list (List.map (eval_scalar attr_env) values) in
-     let guard_relation = Env.find rel rel_env in
-     if not (Relation.mem guard_relation values) then
-       f values
-  | Return { guard_relation = None; values } ->
-     let values = Array.of_list (List.map (eval_scalar attr_env) values) in
+  | Return { values } ->
+     let values = Array.map (eval_scalar attr_env) values in
      f values
+  | Guard_NotIn { relation; values; cont } ->
+     let values = Array.map (eval_scalar attr_env) values in
+     let guard_relation = Env.find relation rel_env in
+     if not (Relation.mem guard_relation values) then
+       eval_expr rel_env attr_env f cont
   | Select { relation; conditions; projections; cont } ->
      let relation = Env.find relation rel_env in
      relation |> Relation.iter begin fun values ->
@@ -104,6 +104,9 @@ let rec eval_comm rel_env = function
      let rel = Env.find rel rel_env in
      eval_expr rel_env AttrEnv.empty (Relation.add rel) expr
 
+  | Swap rel ->
+     failwith "FIXME: impement buffers in the interpreter"
+(*
   | Move { tgt; src } ->
      let src = Env.find src rel_env
      and tgt = Env.find tgt rel_env
@@ -111,8 +114,8 @@ let rec eval_comm rel_env = function
      Relation.clear tgt;
      Relation.iter (Relation.add tgt) src;
      Relation.clear src
-
-  | Declare (inits, comms) ->
+*)
+  | DeclareBuffers (inits, comms) ->
      let initialise rel_env rel =
        Env.add rel (Relation.create 128) rel_env
      in
