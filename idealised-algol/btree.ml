@@ -131,6 +131,53 @@ struct
   let loop body =
     while_ Bool.true_ ~do_:body
 
+  module Stk = Stack.Make (Syn)
+
+  (* FIXME: compute this from the min_children and a reasonable
+     estimate of the maximum size of any tree. *)
+  let max_stack_depth = 40l
+
+
+  let free tree =
+    with_nodeptr ~name:"cursor" tree @@ fun cursor ->
+    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@ fun stk ->
+    begin%monoid
+      while_ (Bool.not cursor#->leaf)
+        ~do_:begin%monoid
+          stk#push cursor (int32 0l);
+          cursor := cursor#->children#@(int32 0l)
+        end;
+
+      loop begin%monoid
+        free cursor;
+
+        ifthen stk#is_empty ~then_:break;
+
+        cursor := fst stk#top;
+
+        let open! Syn.Int32 in
+
+        if_ (snd stk#top == cursor#->nkeys - int32 1l)
+          ~then_:begin%monoid
+            stk#pop;
+            with_nodeptr ~name:"old_cursor" cursor @@ fun old_cursor ->
+            begin%monoid
+              cursor := cursor#->children#@(cursor#->nkeys);
+              free old_cursor
+            end
+          end
+          ~else_:begin%monoid
+            incr (snd stk#top);
+            cursor := cursor#->children#@(snd stk#top)
+          end;
+
+        while_ (Syn.Bool.not cursor#->leaf)
+          ~do_:begin%monoid
+            stk#push cursor (int32 0l);
+            cursor := cursor#->children#@(int32 0l)
+          end
+      end
+    end
 
   let declare body =
     alloc_node @@ fun x -> begin%monoid
@@ -170,16 +217,9 @@ struct
     end
 
   (************************************************************)
-  module Stk = Stack.Make (Syn)
-
-  (* FIXME: compute this from the min_children and a reasonable
-     estimate of the maximum size of any tree. *)
-  let max_stack_depth = 40l
-
   let iterate_range from upto (tree : handle) body =
     with_nodeptr ~name:"cursor" tree @@ fun x ->
-    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@
-    fun Stk.{push;pop;top;is_empty} ->
+    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@ fun stk ->
     with_int @@ fun i ->
     begin%monoid
       let open! Syn.Int32 in
@@ -187,7 +227,7 @@ struct
       loop begin%monoid
         find_key i (to_exp x) from;
         ifthen x#->leaf ~then_:break;
-        ifthen (i < x#->nkeys) ~then_:(push x i);
+        ifthen (i < x#->nkeys) ~then_:(stk#push x i);
         x := x#->children#@i
       end;
       loop begin%monoid
@@ -198,11 +238,11 @@ struct
             incr i
           end;
 
-        ifthen (i != x#->nkeys || is_empty)
+        ifthen (i != x#->nkeys || stk#is_empty)
           ~then_:break;
 
-        x := fst top;
-        i := snd top;
+        x := fst stk#top;
+        i := snd stk#top;
 
         ifthen (not (K.le x#->keys#@i upto))
           ~then_:break;
@@ -210,14 +250,14 @@ struct
         body x#->keys#@i;
 
         if_ (i == x#->nkeys - int32 1l)
-          ~then_:pop
-          ~else_:(incr (snd top));
+          ~then_:stk#pop
+          ~else_:(incr (snd stk#top));
 
         x := x#->children#@(i + int32 1l);
 
         while_ (not x#->leaf)
           ~do_:begin%monoid
-            push x (int32 0l);
+            stk#push x (int32 0l);
             x := x#-> children#@(int32 0l)
           end;
 
@@ -228,11 +268,11 @@ struct
   (************************************************************)
   let iterate_all tree body =
     with_nodeptr ~name:"cursor" tree @@ fun x ->
-    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@
-    fun Stk.{push;pop;top;is_empty} -> begin%monoid
+    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@ fun stk ->
+    begin%monoid
       while_ (Bool.not x#->leaf)
         ~do_:begin%monoid
-          push x (int32 0l);
+          stk#push x (int32 0l);
           x := x#->children#@(int32 0l)
         end;
       loop begin%monoid
@@ -244,23 +284,23 @@ struct
               incr i
             end;
 
-          ifthen is_empty
+          ifthen stk#is_empty
             ~then_:break;
 
-          x := fst top;
-          i := snd top;
+          x := fst stk#top;
+          i := snd stk#top;
 
           body x#->keys#@i;
 
           if_ (i == x#->nkeys - int32 1l)
-            ~then_:pop
-            ~else_:(incr (snd top));
+            ~then_:stk#pop
+            ~else_:(incr (snd stk#top));
 
           x := x#->children#@(i + const 1l);
 
           while_ (Syn.Bool.not x#->leaf)
             ~do_:begin%monoid
-              push x (int32 0l);
+              stk#push x (int32 0l);
               x := x#->children#@(int32 0l)
             end;
         end
@@ -384,47 +424,6 @@ struct
           insert_nonfull (to_exp root) key
         end
       end
-
-  let free tree =
-    with_nodeptr ~name:"cursor" tree @@ fun cursor ->
-    Stk.with_stack max_stack_depth (ptr node) Syn.Int32.t @@ fun stk ->
-    begin%monoid
-      while_ (Bool.not cursor#->leaf)
-        ~do_:begin%monoid
-          stk.push cursor (int32 0l);
-          cursor := cursor#->children#@(int32 0l)
-        end;
-
-      loop begin%monoid
-        free cursor;
-
-        ifthen stk.is_empty ~then_:break;
-
-        cursor := fst stk.top;
-
-        let open! Syn.Int32 in
-
-        if_ (snd stk.top == cursor#->nkeys - int32 1l)
-          ~then_:begin%monoid
-            stk.pop;
-            with_nodeptr ~name:"old_cursor" cursor @@ fun old_cursor ->
-            begin%monoid
-              cursor := cursor#->children#@(cursor#->nkeys);
-              free old_cursor
-            end
-          end
-          ~else_:begin%monoid
-            incr (snd stk.top);
-            cursor := cursor#->children#@(snd stk.top)
-          end;
-
-        while_ (Syn.Bool.not cursor#->leaf)
-          ~do_:begin%monoid
-            stk.push cursor (int32 0l);
-            cursor := cursor#->children#@(int32 0l)
-          end
-      end
-    end
 
   let move ~src ~tgt =
     begin%monoid
