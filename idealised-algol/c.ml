@@ -337,13 +337,13 @@ module PP = struct
        Format.fprintf fmt "break;"
     | Malloc (l_value, typ, None) ->
        (* FIXME: abort if allocation fails *)
-       Format.fprintf fmt "@[<hv>%a =@ malloc (sizeof (%a))@];"
+       Format.fprintf fmt "@[<hv 2>%a =@ malloc (sizeof (%a))@];"
          pp_expr     l_value
          pp_typename typ
     | Malloc (l_value, typ, Some (num, typ')) ->
        (* FIXME: abort if allocation fails *)
        Format.fprintf fmt
-         "@[<hv>%a =@ malloc (sizeof (%a) + %a * sizeof(%a))@];"
+         "@[<hv 2>%a =@ malloc (sizeof (%a) + %a * sizeof(%a))@];"
          pp_expr     l_value
          pp_typename typ
          pp_expr     num
