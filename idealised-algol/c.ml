@@ -661,7 +661,7 @@ let compile outputname program x =
   let ch  = Unix.open_process_out cmd in
   let fmt = Format.formatter_of_out_channel ch in
   output program x fmt;
-  Format.pp_flush_formatter fmt;
+  Format.pp_print_flush fmt ();
   flush ch;
   let status = Unix.close_process_out ch in
   match status with
