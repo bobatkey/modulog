@@ -117,7 +117,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 
   let pp_val_decl fmt = function
     | (id, Predicate {predty_data=tys}) ->
-       Format.fprintf fmt "%a : @[<hv 1>%a@]"
+       Format.fprintf fmt "pred %a : @[<hv 1>%a@]"
          Names.pp_ident id
          pp_domaintypes tys
     | (id, Value domty) ->

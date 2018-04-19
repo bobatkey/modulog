@@ -199,7 +199,7 @@ struct
     | {modtype_data = Modtype_longident lid} ->
        Core.Names.pp_longident fmt lid
     | {modtype_data = Modtype_signature sg} ->
-       Format.fprintf fmt "@[<v 2>sig@ %a@]@ end"
+       Format.fprintf fmt "@[<v>@[<v 2>sig@ %a@]@ end@]"
          pp_signature sg
     | {modtype_data = Modtype_withtype (mty, path, kind, deftype)} ->
        Format.fprintf fmt "%a with type %a = %a"
@@ -224,7 +224,7 @@ struct
     | { sigitem_data = Sig_type (id, decl) } ->
        pp_type_decl fmt (id, decl)
     | { sigitem_data = Sig_module (id, mty) } ->
-       Format.fprintf fmt "@[<hv 2>module %a :@ %a@]"
+       Format.fprintf fmt "@[<v 2>module %a :@ %a@]"
          Core.Names.pp_ident id
          pp_modtype mty
     | { sigitem_data = Sig_modty (id, mty) } ->
