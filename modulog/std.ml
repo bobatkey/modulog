@@ -8,7 +8,7 @@ let read_structure_from_file filename =
       ; pos_cnum = 0
       ; pos_bol = 0
       };
-    let result = Parser_driver.parse filename lexbuf in
+    let result = Parser_driver.parse lexbuf in
     close_in ch;
     result
   with e ->

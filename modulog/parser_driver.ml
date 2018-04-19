@@ -12,7 +12,11 @@ let shorten s =
      ^ "....."
      ^ String.sub s (String.length s - 15) 15)
 
-let extract filename spos epos =
+let extract spos epos =
+  assert (spos.Lexing.pos_fname = epos.Lexing.pos_fname);
+  let filename = spos.Lexing.pos_fname in
+  let spos = spos.Lexing.pos_cnum in
+  let epos = epos.Lexing.pos_cnum in
   assert (spos >= 0);
   assert (spos <= epos);
   let ch = open_in filename in
@@ -30,7 +34,7 @@ let digit_of_char c =
 
 (* Expand out references of the form $i to the piece of the input that
    is referred to by that element of the current parse stack. *)
-let expand_message filename env message =
+let expand_message env message =
   let buf = Buffer.create (String.length message) in
   let add_extract sidx eidx =
     if sidx < eidx then
@@ -40,7 +44,7 @@ let expand_message filename env message =
          Buffer.add_string buf "\"???\""
       | Some (MI.Element (_, _, spos, _)),
         Some (MI.Element (_, _, _, epos)) ->
-         let text = extract filename spos.Lexing.pos_cnum epos.Lexing.pos_cnum in
+         let text = extract spos epos in
          Printf.bprintf buf "%S" text
   in
   let rec loop i =
@@ -97,7 +101,7 @@ let expand_message filename env message =
   loop 0;
   Buffer.contents buf
 
-let parse source lexbuf =
+let parse lexbuf =
   let rec loop cp = match cp with
     | MI.Accepted a ->
        Ok a
@@ -116,7 +120,7 @@ let parse source lexbuf =
          try Parser_messages.message state
          with Not_found -> "unknown parse error"
        in
-       let message = expand_message source env message in
+       let message = expand_message env message in
        Error (pos, message, lexeme)
     | MI.Rejected ->
        assert false
