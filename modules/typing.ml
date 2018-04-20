@@ -767,7 +767,8 @@ struct
        lift_safety_error modty.modtype_loc
          (modtype_is_safe env modty) >>= fun modty ->
        (* FIXME: mark these bindings as recursive, information that
-          can be used by the core type checker. *)
+          can be used by the core type checker. Additional FIXME: what
+          about uses through functor arguments? Will I need tonicity? *)
        let ident, new_env = Env.add_module ident modty new_env in
        check_rec_module_types env new_env
          ((ident, modty, modl) :: rev_acc)
