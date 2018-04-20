@@ -10,6 +10,7 @@ type 'a ocaml_array = 'a array
 type _ ptr = Ptr
 type _ array = Array
 type _ structure = Structure
+type _ typedef = Typedef
 
 type 'a typ =
   | Void    : unit typ
@@ -18,6 +19,7 @@ type 'a typ =
   | Pointer : 'a typ -> 'a ptr typ
   | Array   : 'a typ * int32 -> 'a array typ
   | Struct  : string -> 'a structure typ
+  | Typedef : string -> 'a typedef typ
 
 type c_type =
   | Some_type : 'a typ -> c_type
@@ -52,6 +54,7 @@ module AST = struct
 
   type exp =
     | Var       of string
+    | Const     of string
     | Null
     | BoolLit   of bool
     | IntLit    of int32
@@ -91,7 +94,7 @@ end
 
 module PP = struct
   let rec pp_typ :
-    type a. (bool -> Format.formatter -> unit) -> Format.formatter -> a typ -> unit =
+    type a. (bool -> Format.formatter -> unit) -> a typ Fmt.t =
     fun f fmt -> function
       | Void ->
          Format.fprintf fmt "void%t" (f true)
@@ -113,6 +116,8 @@ module PP = struct
            (fun top fmt -> Format.fprintf fmt "%t[%ld]" (f false) n)
            fmt
            typ
+      | Typedef nm ->
+         Format.fprintf fmt "%s%t" nm (f true)
 
   let pp_decl fmt (typ, ident) =
     pp_typ
@@ -223,7 +228,10 @@ module PP = struct
          Format.fprintf fmt "!%a" (pp_expr 2) expr
     | Null ->
        Format.pp_print_string fmt "NULL"
+    | Const s ->
+       Format.pp_print_string fmt s
     | StrLit s ->
+       (* FIXME: not sure this is the right escaping strategy *)
        Format.fprintf fmt "%S" s
     | ECall (nm, exps) ->
        Format.fprintf fmt "@[<hov>%s@,(@[<hv>%a)@]@]"
@@ -560,6 +568,7 @@ end = struct
 
     let t = Int32
     let const i = Expr (IntLit i)
+    let const_ i = Expr (IntLit (Int32.of_int i))
     let ( <  ) e1 e2 = Expr (Binop (un_expr e1, Lt, un_expr e2))
     let ( >  ) e1 e2 = Expr (Binop (un_expr e1, Gt, un_expr e2))
     let ( >= ) e1 e2 = Expr (Binop (un_expr e1, Ge, un_expr e2))
@@ -616,15 +625,75 @@ end = struct
 
   end
 
+  module Stdio = struct
+
   (* FIXME: https://stackoverflow.com/questions/9225567/how-to-print-a-int64-t-type-in-c *)
-  let print_int e ng =
-    ng, [Statement (Call ("printf", [StrLit "%d"; un_expr e]))]
 
-  let print_newline ng =
-    ng, [Statement (Call ("printf", [StrLit "\n"]))]
+    type out_ch
+    type in_ch
 
-  let print_str str ng =
-    ng, [Statement (Call ("fputs", [StrLit str; Var "stdout"]))]
+    (* FIXME: need a special set of unshadowable special variables *)
+    let stdout = Expr (Var "stdout")
+    let with_file_output filename k =
+      declare ~name:"f" (Pointer (Typedef "FILE"))
+        ~init:(Expr (ECall ("fopen", [StrLit filename; StrLit "w"])))
+        k
+
+    let stdin = Expr (Var "stdin")
+    let with_file_input filename k =
+      declare ~name:"f" (Pointer (Typedef "FILE"))
+        ~init:(Expr (ECall ("fopen", [StrLit filename; StrLit "r"])))
+        k
+
+    type 'a fmt =
+      | Stop  : comm fmt
+      | Int32 : 'a fmt -> ((int32, [`exp]) expr -> 'a) fmt
+      | Lit   : string * 'a fmt -> 'a fmt
+
+    let stop = Stop
+    let int32 x = Int32 x
+    let lit s x = Lit (s,x)
+
+    let printf out_ch fmt =
+      let rec build : type a. a fmt -> string -> AST.exp list -> a =
+        function
+          | Stop -> fun fmtstr exps ng ->
+            let args = un_expr out_ch :: StrLit fmtstr :: List.rev exps in
+            ng, [Statement (Call ("fprintf", args))]
+          | Int32 fmt -> fun fmtstr exps exp ->
+            build fmt (fmtstr ^ "%d") (un_expr exp::exps)
+          | Lit (s, fmt) -> fun fmtstr exps ->
+            (* FIXME: escape '%'s *)
+            build fmt (fmtstr ^ s) exps
+      in
+      build fmt "" []
+
+    let scanf in_ch fmt ~parsed ~eof =
+      let rec build : type a. a fmt -> string -> AST.exp list -> a -> comm =
+        function
+          | Stop -> fun fmtstr refs k ->
+            let args = un_expr in_ch :: StrLit fmtstr :: List.rev refs in
+            declare ~name:"rv" Int32
+              ~init:(Expr (ECall ("fscanf", args)))
+              begin fun rv ->
+                let open! Int32 in
+                if_ (rv == const_ (List.length args))
+                  ~then_:k
+                  ~else_:begin
+                    if_ (rv == Expr (Const "EOF"))
+                      ~then_:eof
+                      ~else_:empty
+                  end
+              end
+          | Int32 fmt -> fun fmtstr refs k ->
+            declare Int32 begin fun x ->
+              build fmt (fmtstr ^ "%d") (AddrOf (un_expr x) :: refs) (k x)
+            end
+          | Lit (s, fmt) -> fun fmtstr refs k ->
+            build fmt (fmtstr ^ s) refs k
+      in
+      build fmt "" [] parsed
+  end
 end
 
 let output f x fmt =

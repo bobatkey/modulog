@@ -10,6 +10,9 @@ module type S = sig
   type 'a exp = ('a,[`exp]) expr
   type 'a var = ('a,[`var|`exp]) expr
 
+  (** Every variable can be used as an expression. *)
+  val to_exp : 'a var -> 'a exp
+
   (** Representation of a command. A command represents some process
       for altering the current state. *)
   type comm
@@ -81,11 +84,11 @@ module type S = sig
     val const : 's t typ -> exp_box array -> 's t exp
   end
 
-  (** {2 Commands} *)
 
-  
-  val to_exp : 'a var -> 'a exp
-  
+  (** {2 Commands}
+
+      Commands can update the state in some way. *)
+
   (** The command that does nothing. *)
   val empty : comm
 
@@ -111,16 +114,27 @@ module type S = sig
       value. *)
   val declare : ?name:string -> 'a typ -> ?init:('a,[>`exp]) expr -> ('a var -> comm) -> comm
 
-  (** {3 Printing} *)
-  
-  (** Print an integer to standard out. *)
-  val print_int : (int32, [>`exp]) expr -> comm
+  module Stdio : sig
 
-  (** Print a newline to standard out. *)
-  val print_newline : comm
+    type out_ch
+    type in_ch
 
-  (** Print a (static) string to standard out. *)
-  val print_str : string -> comm
+    val stdout : out_ch exp
+    val with_file_output : string -> (out_ch exp -> comm) -> comm
+
+    val stdin : in_ch exp
+    val with_file_input : string -> (in_ch exp -> comm) -> comm
+
+    type 'a fmt
+
+    val stop  : comm fmt
+    val int32 : 'a fmt -> (int32 exp -> 'a) fmt
+    val lit   : string -> 'a fmt -> 'a fmt
+
+    val printf : out_ch exp -> 'a fmt -> 'a
+    val scanf  : in_ch exp -> 'a fmt -> parsed:'a -> eof:comm -> comm
+
+  end
 
   (** {2 Raw arrays} *)
 
@@ -174,7 +188,7 @@ module type S = sig
   end
 
   (** {3 Function declarations} *)
-  
+
   type 'a arg_spec
 
   val return_void : comm arg_spec

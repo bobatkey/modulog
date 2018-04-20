@@ -64,18 +64,17 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
     pat
 
   let print_strln s =
-    begin%monoid.IA
-      IA.print_str s;
-      IA.print_newline
-    end
+    let open! IA.Stdio in
+    printf stdout (lit s @@ lit "\n" @@ stop)
 
   let print_exps exps =
+    let open! IA.Stdio in
     begin%monoid.IA
       for i = 0 to Array.length exps - 1 do
-        if i > 0 then IA.print_str ",";
-        IA.print_int exps.(i);
+        if i > 0 then printf stdout (lit "," @@ stop);
+        printf stdout (int32 @@ stop) exps.(i)
       done;
-      IA.print_newline
+      printf stdout (lit "\n" @@ stop)
     end
 
   let projections_to_lenv projections attrs lenv =
