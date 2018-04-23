@@ -632,18 +632,28 @@ end = struct
     type out_ch
     type in_ch
 
+    (* FIXME: handle failure to open by checking the handle for NULL *)
+
     (* FIXME: need a special set of unshadowable special variables *)
     let stdout = Expr (Var "stdout")
+
     let with_file_output filename k =
       declare ~name:"f" (Pointer (Typedef "FILE"))
         ~init:(Expr (ECall ("fopen", [StrLit filename; StrLit "w"])))
-        k
+        (fun h -> begin%monoid
+             k h;
+             (fun ng -> ng, [Statement (Call ("fclose", [un_expr h]))])
+           end)
 
     let stdin = Expr (Var "stdin")
+
     let with_file_input filename k =
       declare ~name:"f" (Pointer (Typedef "FILE"))
         ~init:(Expr (ECall ("fopen", [StrLit filename; StrLit "r"])))
-        k
+        (fun h -> begin%monoid
+             k h;
+             (fun ng -> ng, [Statement (Call ("fclose", [un_expr h]))])
+           end)
 
     type 'a fmt =
       | Stop  : comm fmt
@@ -669,30 +679,30 @@ end = struct
       build fmt "" []
 
     let scanf in_ch fmt ~parsed ~eof =
-      let rec build : type a. a fmt -> string -> AST.exp list -> a -> comm =
+      let rec build : type a. a fmt -> string -> int -> AST.exp list -> a -> comm =
         function
-          | Stop -> fun fmtstr refs k ->
+          | Stop -> fun fmtstr n refs k ->
             let args = un_expr in_ch :: StrLit fmtstr :: List.rev refs in
             declare ~name:"rv" Int32
               ~init:(Expr (ECall ("fscanf", args)))
               begin fun rv ->
                 let open! Int32 in
-                if_ (rv == const_ (List.length args))
+                if_ (rv == const_ n)
                   ~then_:k
                   ~else_:begin
                     if_ (rv == Expr (Const "EOF"))
                       ~then_:eof
-                      ~else_:empty
+                      ~else_:empty (* FIXME: handle errors *)
                   end
               end
-          | Int32 fmt -> fun fmtstr refs k ->
+          | Int32 fmt -> fun fmtstr n refs k ->
             declare Int32 begin fun x ->
-              build fmt (fmtstr ^ "%d") (AddrOf (un_expr x) :: refs) (k x)
+              build fmt (fmtstr ^ "%d") (n+1) (AddrOf (un_expr x) :: refs) (k x)
             end
-          | Lit (s, fmt) -> fun fmtstr refs k ->
-            build fmt (fmtstr ^ s) refs k
+          | Lit (s, fmt) -> fun fmtstr n refs k ->
+            build fmt (fmtstr ^ s) n refs k
       in
-      build fmt "" [] parsed
+      build fmt "" 0 [] parsed
   end
 end
 
