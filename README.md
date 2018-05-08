@@ -24,7 +24,7 @@ Example:
 module type Edges = sig
   type vertex
 
-  edge : vertex * vertex
+  pred edge : vertex * vertex
 end
 
 module MyEdges = struct
