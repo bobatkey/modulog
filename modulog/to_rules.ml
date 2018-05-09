@@ -164,9 +164,10 @@ module Eval = struct
       return (decl_name, Val_predicate (name, decl_type))
 
     let eval_predicate env path defs =
+      let info = Ruleset.{ kind = `Intensional; output = None } in
       builder_map
         Core.(fun decl ->
-            declare_pred env path decl.decl_name `Intensional decl.decl_type)
+            declare_pred env path decl.decl_name info decl.decl_type)
         defs
       >>= fun bindings ->
       let env = Env.add_values bindings env in
@@ -180,7 +181,13 @@ module Eval = struct
       return bindings
 
     let eval_external env path Core.{ external_name; external_type } =
-      declare_pred env path external_name `Extensional external_type
+      let info =
+        let filename = Modules.Ident.name external_name ^ ".csv" in
+        Ruleset.{ kind   = `Extensional filename
+                ; output = None
+                }
+      in
+      declare_pred env path external_name info external_type
       >>= fun binding ->
       return [binding]
 
@@ -196,7 +203,8 @@ module Eval = struct
     let eval_decl env path ident val_type =
       match val_type with
         | Core.Predicate predty ->
-           declare_pred env path ident `Intensional predty >>= fun (_, typ) ->
+           let info = Ruleset.{ kind = `Intensional; output = None } in
+           declare_pred env path ident info predty >>= fun (_, typ) ->
            return typ
         | Core.Value _ ->
            failwith "internal error: unsafe recursive constant defn"

@@ -36,6 +36,14 @@ type expr =
       }
 
 type comm =
+  | ReadRelation   of relvar * string
+  (** Read a csv file and insert all the tuples into the named
+      relation variable. *)
+
+  | WriteRelation  of relvar * string
+  (** Write all the tuples in the named relation to the file in CSV
+      format, overwriting what was there before. *)
+
   | WhileNotEmpty of relvar list * comms
   (** Loop until all the relations in the named variables are
       empty. *)
@@ -53,9 +61,8 @@ and comms =
   comm list
 
 type program =
-  { edb_relvars : relvar list
-  ; idb_relvars : relvar list
-  ; commands    : comms
+  { relvars  : relvar list
+  ; commands : comms
   }
 
 val pp_relvar : Format.formatter -> relvar -> unit

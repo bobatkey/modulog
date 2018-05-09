@@ -144,6 +144,30 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
        end
 
   let rec translate_comm env = function
+    | Syntax.ReadRelation (nm, filename) ->
+       (match RelEnv.find nm env with
+         | Buffer _ -> failwith "internal error: [codegen] loading into buffer"
+         | Table (m, h) ->
+            let module IT = (val m) in
+            IA.Stdio.with_file_input filename begin fun ch ->
+              IA.while_ IA.Bool.true_ begin
+                CSV.read_tuple ch ~width:nm.arity
+                  ~eof:IA.break
+                  ~parsed:(IT.insert h)
+              end
+            end)
+
+    | Syntax.WriteRelation (nm, filename) ->
+       (match RelEnv.find nm env with
+         | Buffer _ -> failwith "internal error: [codegen] writing from buffer"
+         | Table (m, h) ->
+            let module IT = (val m) in
+            IA.Stdio.with_file_output filename begin fun ch ->
+              IT.iterate_all h begin fun exps ->
+                CSV.write_tuple ch exps
+              end
+            end)
+
     | Syntax.WhileNotEmpty (vars, body) ->
        let check_empty nm =
          match RelEnv.find nm env with
@@ -187,7 +211,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
   and translate_comms env comms =
     map_seq (translate_comm env) comms
 
-  let translate_idb_predicate indexes filename_opt relvar k env =
+  let translate_predicate indexes relvar k env =
     let indexes =
       match List.assoc relvar indexes with
         | exception Not_found ->
@@ -196,45 +220,18 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
            indexes
     in
     let module P = struct
-      let arity = relvar.Syntax.arity
-      let indexes = indexes
+      let arity = relvar.Syntax.arity and indexes = indexes
     end in
     let module IT = Codegen_indexed_table.Make (IA) (P) () in
-    IT.declare ~name:relvar.Syntax.ident @@ fun handle ->
-    begin%monoid.IA
-      (match filename_opt with
-        | None -> IA.empty
-        | Some filename -> begin%monoid.IA
-            IA.Stdio.with_file_input filename begin fun ch ->
-              IA.while_ IA.Bool.true_ begin
-                CSV.read_tuple ch ~width:P.arity
-                  ~eof:IA.break
-                  ~parsed:(IT.insert handle)
-              end
-            end
-          end);
-      k (RelEnv.add relvar (Table ((module IT), handle)) env);
-      (* FIXME: dump to a CSV file (if this relation is marked as
-         'output') *)
-      print_strln relvar.Syntax.ident;
-      IT.iterate_all handle begin fun exps ->
-        CSV.write_tuple IA.Stdio.stdout exps
-      end
+    IT.declare ~name:relvar.Syntax.ident begin fun handle ->
+      k (RelEnv.add relvar (Table ((module IT), handle)) env)
     end
 
-  (* FIXME: do this properly, adding code to load the data from CSV files *)
-  let translate_edb_predicate indexes relvar k env =
-    let filename = Some (relvar.Syntax.ident ^ ".csv") in
-    translate_idb_predicate indexes filename relvar k env
-
-  let translate_prog (Syntax.{ idb_relvars; edb_relvars; commands } as code) =
+  let translate_prog (Syntax.{ relvars; commands } as code) =
     let indexes = Indexes.indexes code in
-    let prog =
+    List.fold_right (translate_predicate indexes) relvars
       (fun env -> translate_comms env commands)
-      |> List.fold_right (translate_idb_predicate indexes None) idb_relvars
-      |> List.fold_right (translate_edb_predicate indexes) edb_relvars
-    in
-    prog RelEnv.empty
+      RelEnv.empty
 end
 
 let generator (type comm)

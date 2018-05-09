@@ -92,6 +92,12 @@ let rec eval_expr rel_env attr_env f = function
      end
 
 let rec eval_comm rel_env = function
+  | ReadRelation (relvar, filename) ->
+     failwith "interpreter: FIXME: implement LoadRelation"
+
+  | WriteRelation (relvar, filename) ->
+     failwith "interpreter: FIXME: implement WriteRelation"
+
   | WhileNotEmpty (rels, body) ->
      let rels = List.map (fun rel -> Env.find rel rel_env) rels in
      let rec loop () =
@@ -159,8 +165,9 @@ let load_csv_file filename arity =
   try loop (); close_in ch; rel
   with e -> close_in ch; raise e
 
-let eval {edb_relvars; idb_relvars; commands} =
+let eval {relvars; commands} =
   let rel_env = Env.empty in
+(*
   let rel_env =
     List.fold_left
       (fun rel_env nm ->
@@ -169,11 +176,12 @@ let eval {edb_relvars; idb_relvars; commands} =
       rel_env
       edb_relvars
   in
+*)
   let rel_env =
     List.fold_left
       (fun rel_env nm -> Env.add nm (Relation.create 128) rel_env)
       rel_env
-      idb_relvars
+      relvars
   in
   eval_comms rel_env commands;
   rel_env

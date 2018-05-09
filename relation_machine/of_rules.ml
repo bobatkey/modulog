@@ -178,16 +178,28 @@ let translate_rules ruleset =
 
 
 let translate ruleset =
-  let edb_relvars, idb_relvars =
-    List.fold_left
-      (fun (edb, idb) (pred_name, Ruleset.{intensional}) ->
-         let decl = relvar_of_predname pred_name in
-         if intensional then
-           (edb, decl :: idb)
-         else
-           (decl :: edb, idb))
-      ([], [])
-      (Ruleset.predicates ruleset)
-  in
-  let commands = translate_rules ruleset in
-  { edb_relvars; idb_relvars; commands }
+  (* FIXME: restrict the scope of each predicate to only the rule
+     evaluations it is needed for. *)
+  List.fold_right
+    (fun (pred_name, info) {relvars; commands} ->
+       let relvar = relvar_of_predname pred_name in
+       let prefix =
+         match info.Ruleset.kind with
+           | `Intensional ->
+              []
+           | `Extensional filename ->
+              [ReadRelation (relvar, filename)]
+       in
+       let suffix =
+         match info.Ruleset.output with
+           | None ->
+              []
+           | Some filename ->
+              [WriteRelation (relvar, filename)]
+       in
+       { relvars  = relvar :: relvars
+       ; commands = prefix @ commands @ suffix
+       })
+    (Ruleset.predicates ruleset)
+    { relvars = []
+    ; commands = translate_rules ruleset }

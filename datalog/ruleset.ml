@@ -64,7 +64,8 @@ let pp_rule fmt = function
 module PredicateNameMap = Map.Make (PredicateName)
 
 type predicate_info =
-  { intensional : bool
+  { kind   : [`Intensional | `Extensional of string]
+  ; output : string option
   }
 
 type ruleset =
@@ -73,12 +74,26 @@ type ruleset =
   ; pred_info     : predicate_info PredicateNameMap.t 
   }
 
-let pp_pred_info fmt (name, {intensional}) =
-  Format.fprintf fmt
-    "%s %s/%d"
-    (if intensional then "int" else "ext")
-    name.ident
-    name.arity
+let pp_output fmt = function
+  | None -> ()
+  | Some filename ->
+     Format.fprintf fmt " output %S" filename
+
+let pp_pred_info fmt (name, {kind; output}) =
+  match kind with
+    | `Intensional ->
+       Format.fprintf fmt
+         "int %s/%d%a"
+         name.ident
+         name.arity
+         pp_output output
+    | `Extensional filename ->
+       Format.fprintf fmt
+         "ext %s/%d from %S%a"
+         name.ident
+         name.arity
+         filename
+         pp_output output
 
 let pp fmt set =
   Format.fprintf fmt "@[<v>%a@]"
@@ -152,7 +167,7 @@ module Builder = struct
          match PredicateNameMap.find pred t.predicates_so_far with
            | exception Not_found ->
               Error (Undeclared_predicate pred)
-           | {intensional=false} ->
+           | {kind=`Extensional _} ->
               Error (Definition_of_extensional_predicate pred)
            | _ ->
               let used_arity = List.length args in
@@ -166,23 +181,17 @@ module Builder = struct
                               update_index pred (List.cons id) t.index_so_far
                    }
 
-  let add_predicate name intensional t =
+  let add_predicate name info t =
     match PredicateNameMap.find name t.predicates_so_far with
       | exception Not_found ->
-         let info = { intensional } in
          Ok { t with predicates_so_far =
                        PredicateNameMap.add name info t.predicates_so_far
             }
-      | { intensional = previous_intensionality } ->
-         if previous_intensionality = intensional then
+      | info' ->
+         if info = info' then
            Ok t
          else
            Error (Predicate_already_declared name)
-
-  let add_predicate name int t =
-    match int with
-      | `Extensional -> add_predicate name false t
-      | `Intensional -> add_predicate name true t
 
   let finish { rules_so_far; next_rule_id; index_so_far; predicates_so_far } =
     let rules_of_pred = index_so_far

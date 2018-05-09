@@ -36,6 +36,8 @@ type expr =
       }
 
 type comm =
+  | ReadRelation   of relvar * string
+  | WriteRelation  of relvar * string
   | WhileNotEmpty  of relvar list * comms
   | Insert         of relvar * expr
   | Swap           of relvar
@@ -44,9 +46,8 @@ type comm =
 and comms = comm list
 
 type program =
-  { edb_relvars : relvar list
-  ; idb_relvars : relvar list
-  ; commands    : comms
+  { relvars  : relvar list
+  ; commands : comms
   }
 
 (**********************************************************************)
@@ -102,6 +103,14 @@ let rec pp_expr fmt = function
        pp_expr          cont
 
 let rec pp_comm fmt = function
+  | ReadRelation (relvar, filename) ->
+     Format.fprintf fmt "load %S into %a;"
+       filename
+       pp_relvar relvar
+  | WriteRelation (relvar, filename) ->
+     Format.fprintf fmt "save %a to %S;"
+       pp_relvar relvar
+       filename
   | WhileNotEmpty (rels, body) ->
      Format.fprintf fmt "while_not_empty (@[<hov>%a@])@ {@[<v 4>@,%a@]@,}"
        Fmt.(list ~sep:(always ",@ ") pp_relvar) rels
@@ -114,24 +123,17 @@ let rec pp_comm fmt = function
      Format.fprintf fmt "swap %a;"
        pp_relvar relvar
   | DeclareBuffers (initialisers, body) ->
-     Format.fprintf fmt "declare (@[<hv>%a@])@ {@[<v 4>@,%a@]@,}"
+     Format.fprintf fmt "with_buffers (@[<hv>%a@])@ {@[<v 4>@,%a@]@,}"
        Fmt.(list ~sep:(always ",@ ") pp_relvar) initialisers
        pp_comms body
 
-and pp_comms fmt = function
-  | [] -> ()
-  | [c] -> pp_comm fmt c
-  | c::cs ->
-     pp_comm fmt c;
-     Format.pp_print_cut fmt ();
-     Format.pp_print_cut fmt ();
-     pp_comms fmt cs
+and pp_comms fmt =
+  Fmt.(list ~sep:(always "@,@,") pp_comm) fmt
 
-let pp_program fmt {edb_relvars; idb_relvars; commands} =
-  let pp_relvar_decl typ fmt nm =
-    Format.fprintf fmt "%s %a@," typ pp_relvar nm
+let pp_program fmt {relvars; commands} =
+  let pp_relvar_decl fmt nm =
+    Format.fprintf fmt "var %a;@," pp_relvar nm
   in
-  Format.fprintf fmt "@[<v>%a%a@,%a@]"
-    Fmt.(list ~sep:(always "") (pp_relvar_decl "ext")) edb_relvars
-    Fmt.(list ~sep:(always "") (pp_relvar_decl "int")) idb_relvars
-    pp_comms                                           commands
+  Format.fprintf fmt "@[<v>%a@,%a@]"
+    Fmt.(list ~sep:(always "") pp_relvar_decl) relvars
+    pp_comms                                   commands

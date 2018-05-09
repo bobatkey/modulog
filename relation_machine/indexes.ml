@@ -120,7 +120,7 @@ let rec search_patterns_of_command pats = function
      let pat  = PatternSet.Pattern.complete relvar.Syntax.arity in
      let pats = PredicatePats.add relvar pat pats in
      search_patterns_of_expr pats expr
-  | Swap _ ->
+  | Swap _ | ReadRelation _ | WriteRelation _ ->
      pats
 
 and search_patterns_of_commands pats commands =
