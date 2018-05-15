@@ -1,0 +1,32 @@
+(* Demonstration that we can use functors to turn predicates on types
+   into proper types. Combined with inlining, this would mean that we
+   don't need a special facility for this. It would be nice to have a
+   shorter syntax for functor application.
+
+   This would work well with dependent types too: if the 'acceptable'
+   predicate is binary, then the resulting abstract type could depend
+   on the argument type. *)
+
+module type NEW_TYPE_SPEC = sig
+  type t
+
+  pred acceptable : t
+end
+
+module type NEW_TYPE = sig
+  type concrete
+  type t
+
+  (* Under the assumption that there is at most one 't' for every 'concrete'. Could this be stated? *)
+  pred repr : t * concrete
+end
+
+module New_type (T : NEW_TYPE_SPEC) =
+  (struct
+    type concrete = T.t
+    type t = T.t
+
+    define repr : t * concrete
+           repr(?x, ?x) :- T.acceptable(?x)
+  end : NEW_TYPE with type concrete = T.t)
+
