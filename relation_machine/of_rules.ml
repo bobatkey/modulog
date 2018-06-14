@@ -191,11 +191,9 @@ let translate ruleset =
               [ReadRelation (relvar, filename)]
        in
        let suffix =
-         match info.Ruleset.output with
-           | None ->
-              []
-           | Some filename ->
-              [WriteRelation (relvar, filename)]
+         List.map
+           (fun filename -> WriteRelation (relvar, filename))
+           info.Ruleset.output
        in
        { relvars  = relvar :: relvars
        ; commands = prefix @ commands @ suffix

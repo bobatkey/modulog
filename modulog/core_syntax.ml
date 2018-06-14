@@ -98,10 +98,17 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     ; external_type : predicate_type
     }
 
+  type output_decl =
+    { output_loc      : Location.t
+    ; output_rel      : Names.longident
+    ; output_filename : string
+    }
+
   type term =
     | External      of external_decl
     | PredicateDefs of declaration list
     | ConstantDef   of constant_def
+    | Output        of output_decl
 
   let pp_kind =
     None
@@ -180,10 +187,17 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       Names.pp_ident external_name
       pp_domaintypes external_type.predty_data
 
+  let pp_output_decl fmt { output_rel; output_filename } =
+    (* FIXME: is this the right escaping strategy? *)
+    Format.fprintf fmt "output %a %S@,"
+      Names.pp_longident output_rel
+      output_filename
+
   let pp_term fmt = function
     | External ext_decl  -> pp_ext_decl fmt ext_decl
     | PredicateDefs defs -> pp_pred_defs fmt defs
     | ConstantDef c      -> pp_constant_def fmt c
+    | Output decl        -> pp_output_decl fmt decl
 
   let pp_type_constraint fmt (path, (), dty) =
     Format.fprintf fmt "%a = %a"

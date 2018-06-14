@@ -365,6 +365,18 @@ module Core_typing = struct
             , [ Modules.Ident.create const_name, Core.Value typ ]
             )
 
+      | Src.(Output { output_loc; output_rel; output_filename }) ->
+         (* FIXME: check that the filename is ok looking? *)
+         begin
+           lift_lookup_error output_loc (Env.find_value output_rel env) >>=
+           function
+           | output_rel, Predicate _ ->
+              Ok ( Core.(Output { output_loc; output_rel; output_filename })
+                 , [] )
+           | _ ->
+              failwith "FIXME: proper error"
+         end
+
     let check_kind env () =
       Ok ()
 

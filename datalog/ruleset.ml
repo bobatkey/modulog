@@ -65,7 +65,7 @@ module PredicateNameMap = Map.Make (PredicateName)
 
 type predicate_info =
   { kind   : [`Intensional | `Extensional of string]
-  ; output : string option
+  ; output : string list
   }
 
 type ruleset =
@@ -74,38 +74,33 @@ type ruleset =
   ; pred_info     : predicate_info PredicateNameMap.t 
   }
 
-let pp_output fmt = function
-  | None -> ()
-  | Some filename ->
-     Format.fprintf fmt " output %S" filename
+let pp_output =
+  Fmt.(list (fmt "@ output %S"))
 
 let pp_pred_info fmt (name, {kind; output}) =
   match kind with
     | `Intensional ->
        Format.fprintf fmt
-         "int %s/%d%a"
+         "@[<v 5>int %s/%d%a@]"
          name.ident
          name.arity
          pp_output output
     | `Extensional filename ->
        Format.fprintf fmt
-         "ext %s/%d from %S%a"
+         "@[<v 5>ext %s/%d from %S%a@]"
          name.ident
          name.arity
          filename
          pp_output output
 
 let pp fmt set =
-  Format.fprintf fmt "@[<v>%a@]"
+  Format.fprintf fmt "@[<v>%a@]@,@,@[<v 0>"
     Fmt.(iter_bindings PredicateNameMap.iter pp_pred_info) set.pred_info;
-  Format.pp_print_cut fmt ();
-  Format.pp_print_cut fmt ();
-  Format.pp_open_vbox fmt 0;
-  for i = 0 to Array.length set.rules - 1 do
-    pp_rule fmt set.rules.(i);
+  set.rules |> Array.iteri begin fun i rule ->
+    pp_rule fmt rule;
     if i < Array.length set.rules - 1 then
       Format.pp_print_cut fmt ()
-  done;
+  end;
   Format.pp_close_box fmt ()
 
 type rule_id = int
@@ -192,6 +187,18 @@ module Builder = struct
            Ok t
          else
            Error (Predicate_already_declared name)
+
+  let add_output name filename t =
+    match PredicateNameMap.find name t.predicates_so_far with
+      | exception Not_found ->
+         (* FIXME: is silently ignoring it the right thing to do? *)
+         t
+      | info ->
+         { t with
+             predicates_so_far =
+               PredicateNameMap.add name
+                 { info with output = filename :: info.output }
+                 t.predicates_so_far }
 
   let finish { rules_so_far; next_rule_id; index_so_far; predicates_so_far } =
     let rules_of_pred = index_so_far

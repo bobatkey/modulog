@@ -164,7 +164,7 @@ module Eval = struct
       return (decl_name, Val_predicate (name, decl_type))
 
     let eval_predicate env path defs =
-      let info = Ruleset.{ kind = `Intensional; output = None } in
+      let info = Ruleset.{ kind = `Intensional; output = [] } in
       builder_map
         Core.(fun decl ->
             declare_pred env path decl.decl_name info decl.decl_type)
@@ -184,7 +184,7 @@ module Eval = struct
       let info =
         let filename = Modules.Ident.name external_name ^ ".csv" in
         Ruleset.{ kind   = `Extensional filename
-                ; output = None
+                ; output = []
                 }
       in
       declare_pred env path external_name info external_type
@@ -199,11 +199,18 @@ module Eval = struct
            eval_external env path ext
         | Core.ConstantDef {const_name;const_expr} ->
            return [ (const_name, Val_const const_expr) ]
+        | Core.Output { output_rel; output_filename } ->
+           (match Env.find output_rel env with
+             | Some (`Value (Val_predicate (name, _))) ->
+                fun b ->
+                  [], Ruleset.Builder.add_output name output_filename b
+             | _ ->
+               failwith "internal error: attempting output a non relation")
 
     let eval_decl env path ident val_type =
       match val_type with
         | Core.Predicate predty ->
-           let info = Ruleset.{ kind = `Intensional; output = None } in
+           let info = Ruleset.{ kind = `Intensional; output = [] } in
            declare_pred env path ident info predty >>= fun (_, typ) ->
            return typ
         | Core.Value _ ->

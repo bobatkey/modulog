@@ -31,7 +31,7 @@ val rule_of_id : rule_id -> ruleset -> rule
 
 type predicate_info =
   { kind   : [`Intensional | `Extensional of string]
-  ; output : string option
+  ; output : string list
   }
 
 val predicates : ruleset -> (predicate_name * predicate_info) list
@@ -65,6 +65,8 @@ module Builder : sig
   val add_predicate : predicate_name -> predicate_info -> t -> (t, error) result
 
   val add_rule : rule -> t -> (t, error) result
+
+  val add_output : predicate_name -> string -> t -> t
 
   val finish : t -> ruleset
 end

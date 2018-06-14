@@ -6,3 +6,5 @@ define
   path : vertex * vertex
   path(?X,?Y) :- edge(?X,?Y)
   path(?X,?Z) :- path(?X,?Y), edge(?Y, ?Z)
+
+output path "path.csv"

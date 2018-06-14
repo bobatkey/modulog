@@ -29,6 +29,7 @@ rule token = parse
 | "with"           { WITH }
 | "rec"            { REC }
 | "pred"           { PRED }
+| "output"         { OUTPUT }
 | '('              { LPAREN }
 | ')'              { RPAREN }
 | '{'              { LBRACE }
@@ -38,6 +39,7 @@ rule token = parse
 | ident as x       { IDENT x }
 | '`'(ident as x)  { ENUM_IDENT x }
 | '?'(ident as x)  { MV_IDENT x }
+| '\"'([^'\"']* as s)'\"' { STRINGLIT s } (* FIXME: handle escaping *)
 | '_'              { UNDERSCORE }
 | _                { UNKNOWN }
 | eof              { EOF }

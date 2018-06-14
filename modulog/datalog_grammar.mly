@@ -6,11 +6,11 @@ open Syntax.Mod
 %token COMMA
 %token COLON_DASH
 %token COLON
-%token STAR DOT ARROW EQUALS BAR UNDERSCORE PRED
+%token STAR DOT ARROW EQUALS BAR UNDERSCORE PRED OUTPUT
 %token MODULE TYPE STRUCT SIG END FUNCTOR INT AND DEFINE CONSTANT WITH EXTERNAL REC
 %token LPAREN RPAREN LBRACE RBRACE
 %token<int32> INT_LITERAL
-%token<string> IDENT ENUM_IDENT MV_IDENT
+%token<string> IDENT ENUM_IDENT MV_IDENT STRINGLIT
 %token EOF
 %token UNKNOWN
 
@@ -101,6 +101,11 @@ str_value:
                ; external_name = name
                ; external_type = types
                } }
+| OUTPUT; name=longident; filename=STRINGLIT
+    { Output { output_loc      = Location.mk $startpos $endpos
+             ; output_rel      = name
+             ; output_filename = filename
+             } }
 
 /* types */
 
