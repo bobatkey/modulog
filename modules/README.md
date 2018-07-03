@@ -31,3 +31,5 @@ Still to do (no particular order):
 
  - Multi-file programs (like OCaml's separate compilation support).
  - `include` and `open` support.
+ - Copy the proposed `private` entries from OCaml 4.08 [see Leo's blog
+   post](https://blog.janestreet.com/plans-for-ocaml-408/).
