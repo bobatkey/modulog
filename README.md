@@ -54,12 +54,16 @@ Still to do:
 
  - Finish the C output to be able to read in initial data from CSV
    files.
- - Recursive modules, which turned out to be more important than I
-   thought.
  - More expressive datatype language.
 
 ## Related work
 
-- [*A calculus for the construction of modular prolog programs*](https://www.sciencedirect.com/science/article/pii/0743106692900422) by Donald
-  T. Sannella and Lincoln A. Wallen, J. Logic Programming, vol 12,
-  issues 1-2, January 1992, pages 147-177.
+- [*A calculus for the construction of modular prolog
+  programs*](https://www.sciencedirect.com/science/article/pii/0743106692900422)
+  by Donald T. Sannella and Lincoln A. Wallen, J. Logic Programming,
+  vol 12, issues 1-2, January 1992, pages 147-177.
+
+- [*QL: Object-oriented Queries on Relational
+  Data*](https://doi.org/10.4230/LIPIcs.ECOOP.2016.2) by Pavel
+  Avgustinov, Oege de Moor, Michael Peyton Jones, and Max Schäfer,
+  ECOOP 2016: 2:1-2:25. DOI: 10.4230/LIPIcs.ECOOP.2016.2
