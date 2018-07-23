@@ -1,0 +1,6 @@
+(library
+ (name        datalog)
+ (public_name datalog)
+ (libraries   ocamlgraph fmt display_names)
+ (flags (:standard -w -49+44-9-27-34-32)))
+

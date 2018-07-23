@@ -1,0 +1,6 @@
+(executable
+ (name        driver)
+ (public_name modulog)
+ (package     modulog-bin)
+ (flags       (:standard -w -49-44-9-27))
+ (libraries   cmdliner datalog modulog relation_machine))

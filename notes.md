@@ -1,6 +1,5 @@
 # Notes
 
-
 - On fast large-scale program analysis in Datalog
   http://dl.acm.org/citation.cfm?id=2892226
 
@@ -9,6 +8,14 @@
   https://github.com/oracle/souffle
 
 - https://blog.acolyer.org/2018/03/27/anna-a-kvs-for-any-scale/
+
+- http://categoricaldata.net/aql.html
+
+- "Modules for Prolog Revisited" -- not sure how related this is.
+
+- "A Theory of Modules for Logic Programming" -- similar
+
+- https://semmle.com/publications
 
 ## Code generation
 
@@ -31,14 +38,19 @@
 
     https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/43287.pdf
 
+- Recursive with in SQL:
 
-## B-Trees
+  https://lagunita.stanford.edu/c4x/DB/Recursion/asset/OtherRecursion.pdf
+
+## B-Trees, and related
 
 - https://github.com/tomjridge/tjr_btree
   A B-Tree implementation in OCaml, extracted from Isabelle/HOL. By Tom Ridge.
 
 - https://github.com/spacejam/rsdb/blob/master/README.md
   A Rust implementation of something called "BW-Trees", which apparently work better on SSDs
+
+- https://github.com/datacrypt-project/hitchhiker-tree
 
 # Compilation
 

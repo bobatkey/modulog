@@ -1,0 +1,25 @@
+(library
+ (name        modulog)
+ (public_name modulog)
+ (libraries   modules datalog fmt menhirLib)
+ (flags (:standard -w -49+44-9-27 -safe-string)))
+
+(menhir
+ (flags      --table)
+ (merge_into parser)
+ (modules    datalog_grammar ../modules/modules_grammar))
+
+(rule
+ (targets parser_messages.ml)
+ (deps    datalog_grammar.mly parser.messages)
+ (action  (with-stdout-to parser_messages.ml
+                         (run %{bin:menhir} --table
+                                --base modulog/parser
+                                %{dep:datalog_grammar.mly}
+                                ../modules/modules_grammar.mly
+                              ;  %{lib:modules:modules_grammar.mly}
+                                --compile-errors %{dep:parser.messages}))))
+
+
+(ocamllex
+ lexer)

@@ -1,0 +1,9 @@
+(library
+ (name modules)
+ (public_name modules)
+ (flags (:standard -w -49+44-9-27)))
+
+(install
+ (section lib)
+ (package modules)
+ (files   modules_grammar.mly))

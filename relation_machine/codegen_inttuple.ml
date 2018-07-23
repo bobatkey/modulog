@@ -38,7 +38,7 @@ struct
             loop (i+1)
               (let open! Syn.Bool in let open! Syn.Int32 in
                let open! Syn.Struct in
-               Syn.(acc && x#.val_fields.(i) == y#.val_fields.(i)))
+               acc && x#.val_fields.(i) == y#.val_fields.(i))
         in
         loop 1
           (let open! Syn in let open! Syn.Bool in let open! Syn.Int32 in

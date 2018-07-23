@@ -632,7 +632,9 @@ end = struct
     type out_ch
     type in_ch
 
-    (* FIXME: handle failure to open by checking the handle for NULL *)
+    (* FIXME: handle failure to open by checking the handle for NULL: just abort? *)
+    (* FIXME: 'break' safety:
+       need a kind of 'defer' and tracking of scopes. *)
 
     (* FIXME: need a special set of unshadowable special variables *)
     let stdout = Expr (Var "stdout")
@@ -678,6 +680,8 @@ end = struct
       in
       build fmt "" []
 
+    (* FIXME: alter this to not use fscanf: read from the input
+       directly. *)
     let scanf in_ch fmt ~parsed ~eof =
       let rec build : type a. a fmt -> string -> int -> AST.exp list -> a -> comm =
         function

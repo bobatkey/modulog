@@ -1,8 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name        display_names)
-  (public_name display_names)
-  (synopsis "Library for computing nice names for display.")
-  (libraries ())))
-

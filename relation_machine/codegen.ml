@@ -150,7 +150,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
          | Table (m, h) ->
             let module IT = (val m) in
             IA.Stdio.with_file_input filename begin fun ch ->
-              IA.while_ IA.Bool.true_ begin
+              IA.while_ IA.Bool.true_ ~do_:begin
                 CSV.read_tuple ch ~width:nm.arity
                   ~eof:IA.break
                   ~parsed:(IT.insert h)
@@ -163,7 +163,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
          | Table (m, h) ->
             let module IT = (val m) in
             IA.Stdio.with_file_output filename begin fun ch ->
-              IT.iterate_all h begin fun exps ->
+              IT.iterate_all h ~do_:begin fun exps ->
                 CSV.write_tuple ch exps
               end
             end)
@@ -194,7 +194,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
 
     | DeclareBuffers (vars, body) ->
        List.fold_right
-         (fun (Syntax.{ident;arity} as varnm) k env ->
+         (fun (Syntax.{ident=_;arity} as varnm) k env ->
             Buf.declare (* ~name:ident ~ *)arity
               (fun handle -> k (RelEnv.add varnm (Buffer handle) env)))
          vars

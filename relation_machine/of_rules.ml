@@ -91,10 +91,10 @@ let expr_of_rule guard_relation head atoms =
   assert (AttrSet.is_empty reqd);
   expr
 
-let relvar_of_rule { Ruleset.pred } =
+let relvar_of_rule { Ruleset.pred; _ } =
   relvar_of_predname pred
 
-let translate_rule ruleset (Ruleset.{pred; args; rhs} as rule) =
+let translate_rule (Ruleset.{args; rhs; _} as rule) =
   let expr = expr_of_rule None args rhs in
   let rel  = relvar_of_rule rule in
   Insert (rel, expr)
@@ -136,7 +136,7 @@ let extract_predicate dpred rhs =
   in
   loop [] rhs
 
-let translate_recursive ruleset rules =
+let translate_recursive rules =
   let predicates = predicates_of_rules rules in
   let buf_predicates = RelvarSet.map_to_list buf_ predicates in
   let initialisations =
@@ -167,14 +167,14 @@ let translate_recursive ruleset rules =
      swaps @
      [ WhileNotEmpty (buf_predicates, updates @ swaps @ merges) ])
 
-let translate_component ruleset = function
+let translate_component = function
   | `Direct rule ->
-     translate_rule ruleset rule
+     translate_rule rule
   | `Recursive rules ->
-     translate_recursive ruleset rules
+     translate_recursive rules
 
 let translate_rules ruleset =
-  List.map (translate_component ruleset) (Ruleset.components ruleset)
+  List.map translate_component (Ruleset.components ruleset)
 
 
 let translate ruleset =

@@ -211,7 +211,7 @@ struct
       let open! Syn.Int32 in
       find_key i (to_exp x) from;
       ifthen (i < x#->nkeys && K.le x#->keys#@i upto)
-        begin%monoid yes; break end;
+        ~then_:begin%monoid yes; break end;
       ifthen x#->leaf ~then_:begin%monoid no; break end;
       x := x#->children#@i
     end
@@ -345,7 +345,7 @@ struct
             ~dst:(fun j -> z#->keys#@j);
 
           (* copy the children over (if not a leaf node) *)
-          ifthen (Bool.not y#->leaf) begin
+          ifthen (Bool.not y#->leaf) ~then_:begin
             copy ~n:(const P.min_children)
               ~src:(fun j -> y#->children#@(j + const P.min_children))
               ~dst:(fun j -> z#->children#@j)
@@ -384,7 +384,7 @@ struct
         with_nodeptr ~name:"insert_cursor" x' @@ fun x ->
         with_int @@ fun i ->
         begin%monoid
-          while_ (Bool.not x#->leaf) begin%monoid
+          while_ (Bool.not x#->leaf) ~do_:begin%monoid
             find_key i (to_exp x) key;
             ifthen (node_is_full x#->children#@i)
               ~then_:begin%monoid
@@ -410,7 +410,7 @@ struct
         begin%monoid
           (* if the root is full, then split it by making a new root
              node with a single child, and using split_child *)
-          ifthen (node_is_full root) begin
+          ifthen (node_is_full root) ~then_:begin
             alloc_node @@ fun s ->
             begin%monoid
               s#->leaf := Bool.false_;

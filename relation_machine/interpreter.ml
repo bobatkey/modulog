@@ -25,8 +25,8 @@ module Relation : sig
   val mem : t -> int32 array -> bool
   val iter : (int32 array -> unit) -> t -> unit
   val is_empty : t -> bool
-  val clear : t -> unit
-  val copy : t -> t
+  (* val clear : t -> unit *)
+  (* val copy : t -> t *)
 end = struct
   module H = Hashtbl.Make
       (struct
@@ -40,8 +40,8 @@ end = struct
   let mem rel tuple = H.mem rel tuple
   let iter f rel = H.iter (fun tuple () -> f tuple) rel
   let is_empty r = H.length r = 0
-  let clear = H.clear
-  let copy = H.copy
+  (* let clear = H.clear *)
+  (* let copy = H.copy *)
 end
 
 let pp_rel =
@@ -92,10 +92,10 @@ let rec eval_expr rel_env attr_env f = function
      end
 
 let rec eval_comm rel_env = function
-  | ReadRelation (relvar, filename) ->
+  | ReadRelation (_relvar, _filename) ->
      failwith "interpreter: FIXME: implement LoadRelation"
 
-  | WriteRelation (relvar, filename) ->
+  | WriteRelation (_relvar, _filename) ->
      failwith "interpreter: FIXME: implement WriteRelation"
 
   | WhileNotEmpty (rels, body) ->
@@ -110,7 +110,7 @@ let rec eval_comm rel_env = function
      let rel = Env.find rel rel_env in
      eval_expr rel_env AttrEnv.empty (Relation.add rel) expr
 
-  | Swap rel ->
+  | Swap _rel ->
      failwith "FIXME: impement buffers in the interpreter"
 (*
   | Move { tgt; src } ->
@@ -131,6 +131,7 @@ let rec eval_comm rel_env = function
 and eval_comms rel_env comms =
   List.iter (eval_comm rel_env) comms
 
+(*
 let read_line arity line =
   let attrs = Array.make arity 0l in
   let rec read field_idx acc i =
@@ -146,7 +147,7 @@ let read_line arity line =
       | '0' .. '9' as c ->
          let d = Int32.of_int (Char.code c - Char.code '0') in
          read field_idx Int32.(add (mul acc 10l) d) (i+1)
-      | c ->
+      | _ ->
          failwith "Unrecognised character"
   in
   read 0 0l 0
@@ -164,6 +165,7 @@ let load_csv_file filename arity =
   in
   try loop (); close_in ch; rel
   with e -> close_in ch; raise e
+*)
 
 let eval {relvars; commands} =
   let rel_env = Env.empty in

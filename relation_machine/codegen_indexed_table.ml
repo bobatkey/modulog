@@ -76,7 +76,7 @@ struct
 
   type handle = BT.handle array
 
-  let declare ~name k =
+  let declare ~name:_ k =
     let rec loop i l =
       if i = Array.length A.indexes then
         k (Array.of_list (List.rev l))

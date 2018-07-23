@@ -1,6 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name datalog)
-  (public_name datalog)
-  (libraries (ocamlgraph fmt display_names))))

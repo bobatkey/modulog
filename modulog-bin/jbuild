@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(executable
- ((name        driver)
-  (public_name modulog)
-  (package modulog-bin)
-  (libraries (cmdliner datalog modulog relation_machine))))
