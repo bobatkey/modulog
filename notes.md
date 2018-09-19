@@ -17,6 +17,13 @@
 
 - https://semmle.com/publications
 
+## Joins
+
+- https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md
+  Stores relations as sorted lists, and uses some clever tricks to do
+  joins. Especially when there is one big source relation followed by
+  several filters. We could re-order the filters based on selectivity?
+
 ## Code generation
 
 - A C++ library for generating machine code:
