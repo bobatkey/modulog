@@ -1,7 +1,7 @@
 (library
  (name modules)
  (public_name modules)
- (flags (:standard -w -49+44-9-27)))
+ (flags (:standard -w -49+44-9-27-67)))
 
 (install
  (section lib)

@@ -7,7 +7,7 @@
 
 (package
  (name modulog-bin)
- (depends cmdliner))
+ (depends cmdliner fmt ppx_monoid ocamlgraph menhir menhirLib))
 
 (package
  (name datalog)
