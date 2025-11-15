@@ -1,4 +1,5 @@
 (lang dune 3.14)
+(using menhir 2.1)
 
 (name modulog)
 
@@ -18,7 +19,7 @@
 
 (package
  (name modulog)
- (depends menhirLib fmt))
+ (depends menhirLib fmt menhir))
 
 (package
  (name relation_machine)
