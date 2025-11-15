@@ -4,23 +4,23 @@ module type IFDS_PROGRAM = sig
   type entry_fact
   type fact
 
-  edge : point * fact * point * fact
+  pred edge : point * fact * point * fact
 
-  start_edge : procedure * entry_fact * point * fact
+  pred start_edge : procedure * entry_fact * point * fact
 
-  call : point * fact * procedure * entry_fact
+  pred call : point * fact * procedure * entry_fact
 
-  return : point * fact * point * fact * point * fact
+  pred return : point * fact * point * fact * point * fact
 
-  initial : procedure * entry_fact
+  pred initial : procedure * entry_fact
 end
 
 module type IFDS = sig
   module P : IFDS_PROGRAM
 
-  intra : P.procedure * P.entry_fact * P.point * P.fact
+  pred intra : P.procedure * P.entry_fact * P.point * P.fact
 
-  callsite : P.point * P.fact * P.procedure * P.entry_fact
+  pred callsite : P.point * P.fact * P.procedure * P.entry_fact
 end
 
 (* How to implement merging of internal_facts? Identify 'type internal_fact' as

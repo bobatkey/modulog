@@ -46,15 +46,15 @@ end
 
 let pp_rel =
   Fmt.(braces
-         (iter ~sep:(always ",@ ") Relation.iter
-            (brackets (array ~sep:(always ",") int32))))
+         (iter ~sep:(any ",@ ") Relation.iter
+            (brackets (array ~sep:(any ",") int32))))
 
 module Env = struct
   include MakeEnv (struct type t = Syntax.relvar let compare = compare end) (Relation)
 
   let pp =
-    Fmt.iter_bindings ~sep:(Fmt.always ",@ ") iter
-      (Fmt.pair ~sep:(Fmt.always " = ") Syntax.pp_relvar pp_rel)  
+    Fmt.iter_bindings ~sep:(Fmt.any ",@ ") iter
+      (Fmt.pair ~sep:(Fmt.any " = ") Syntax.pp_relvar pp_rel)  
 end
 
 module AttrEnv = MakeEnv (String) (struct type t = int32 end)

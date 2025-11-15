@@ -7,8 +7,8 @@ module PredicateName = struct
   type t = predicate_name
 
   let compare x y =
-    match Pervasives.compare x.ident y.ident with
-      | 0 -> Pervasives.compare x.arity y.arity
+    match Stdlib.compare x.ident y.ident with
+      | 0 -> Stdlib.compare x.arity y.arity
       | c -> c
 end
 
@@ -36,7 +36,7 @@ let pp_expr fmt = function
      Format.fprintf fmt "_"
 
 let pp_exprs =
-  Fmt.list ~sep:(Fmt.always ", ") pp_expr
+  Fmt.list ~sep:(Fmt.any ", ") pp_expr
 
 let pp_atom fmt = function
   | Atom { pred; args } ->
@@ -45,7 +45,7 @@ let pp_atom fmt = function
        pp_exprs args
 
 let pp_rhs =
-  Fmt.list ~sep:(Fmt.always ",@ ") pp_atom
+  Fmt.list ~sep:(Fmt.any ",@ ") pp_atom
 
 let pp_rule fmt = function
   | { pred; args; rhs=[] } ->
@@ -224,7 +224,7 @@ module As_graph = struct
 
   module V = struct
     type t = rule_id
-    let compare (x : t) (y : t) = Pervasives.compare x y
+    let compare (x : t) (y : t) = Stdlib.compare x y
     let hash (x : t) = x
     let equal (x : t) y = x = y
   end

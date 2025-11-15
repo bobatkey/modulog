@@ -197,7 +197,7 @@ module PP = struct
        Format.fprintf fmt
          "(struct %s){ @[<hv>%a@] }"
          name
-         Fmt.(array ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
+         Fmt.(array ~sep:(Fmt.any ",@ ") (pp_expr 20)) exps
     | Var vnm ->
        Format.pp_print_string fmt vnm
     | Field (Deref expr, fnm) ->
@@ -236,7 +236,7 @@ module PP = struct
     | ECall (nm, exps) ->
        Format.fprintf fmt "@[<hov>%s@,(@[<hv>%a)@]@]"
          nm
-         Fmt.(list ~sep:(Fmt.always ",@ ") (pp_expr 20)) exps
+         Fmt.(list ~sep:(Fmt.any ",@ ") (pp_expr 20)) exps
 
   let pp_expr fmt e =
     Format.fprintf fmt "@[<hv>%a@]" (pp_expr 20) e
@@ -364,13 +364,13 @@ module PP = struct
     | Call (nm, exps) ->
        Format.fprintf fmt "@[<hov 2>%s@,(@[<hv>%a)@]@];"
          nm
-         Fmt.(list ~sep:(Fmt.always ",@ ") pp_expr) exps
+         Fmt.(list ~sep:(Fmt.any ",@ ") pp_expr) exps
 
   let pp_arg_decls =
     let pp_arg_decl fmt (Some_type ty, ident) =
       pp_decl fmt (ty, ident)
     in
-    Fmt.(list ~sep:(Fmt.always ", ") pp_arg_decl)
+    Fmt.(list ~sep:(Fmt.any ", ") pp_arg_decl)
 
   let pp_fundecl fmt { return_type; name; arg_decls; body } =
     let Some_type return_type = return_type in

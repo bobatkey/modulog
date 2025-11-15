@@ -42,10 +42,10 @@ module Make (Names : Modules.Syntax.NAMES) = struct
        Format.fprintf pp "(@[<hov>%a@])" pp_domaintypes tys
     | { domtype_data = Type_enum syms } ->
        Format.fprintf pp "@[<2>[ %a ]@]"
-         (Fmt.list ~sep:(Fmt.always " |@ ") pp_enum_sym) syms
+         (Fmt.list ~sep:(Fmt.any " |@ ") pp_enum_sym) syms
 
   and pp_domaintypes pp tys =
-    Fmt.(list ~sep:(always " *@ ") pp_domaintype) pp tys
+    Fmt.(list ~sep:(any " *@ ") pp_domaintype) pp tys
 
   type predicate_type =
     { predty_loc  : Location.t
@@ -141,7 +141,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | {expr_data = Expr_lid lid}    -> Names.pp_longident fmt lid
 
   and pp_exprs pp =
-    Fmt.(list ~sep:(always ", ") pp_expr) pp
+    Fmt.(list ~sep:(any ", ") pp_expr) pp
 
   let pp_atom pp = function
     | {atom_data = Atom_predicate {pred; args}} ->
@@ -158,14 +158,14 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       | [] -> ()
       | atoms ->
          Format.fprintf pp " :- %a"
-           Fmt.(list ~sep:(always ",@ ") pp_atom) atoms);
+           Fmt.(list ~sep:(any ",@ ") pp_atom) atoms);
     Format.pp_close_box pp ()
 
   let pp_decl pp {decl_name; decl_type; decl_rules} =
     Format.fprintf pp "@[<v 0>%a : @[<h>%a@]@,%a@]"
       Names.pp_ident                        decl_name
       pp_domaintypes                        decl_type.predty_data
-      Fmt.(list ~sep:(always "@ ") pp_rule) decl_rules
+      Fmt.(list ~sep:(any "@ ") pp_rule) decl_rules
 
   let pp_pred_defs pp = function
     | [] -> ()

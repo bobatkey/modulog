@@ -5,14 +5,14 @@ type relvar =
 
 module RelVar = struct
   type t = relvar
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end
 
 type attr = string
 
 module Attr = struct
   type t = attr
-  let compare = Pervasives.compare
+  let compare = Stdlib.compare
 end
 
 type scalar =
@@ -78,7 +78,7 @@ let pp_matcher fmt = function
   | `Ignore  -> Format.fprintf fmt "?_"
 
 let pp_matching_spec =
-  Fmt.(parens (list ~sep:(always ", ") pp_matcher))
+  Fmt.(parens (list ~sep:(any ", ") pp_matcher))
 
 let pp_relvar fmt { ident; arity } =
   Format.fprintf fmt "%s/%d" ident arity
@@ -86,10 +86,10 @@ let pp_relvar fmt { ident; arity } =
 let rec pp_expr fmt = function
   | Return {values} ->
      Format.fprintf fmt "(@[<h>%a@])"
-       Fmt.(array ~sep:(always ",@ ") pp_scalar) values
+       Fmt.(array ~sep:(any ",@ ") pp_scalar) values
   | Guard_NotIn { relation; values; cont } ->
      Format.fprintf fmt "where (@[<h>%a@]) not in %a;@ %a"
-       Fmt.(array ~sep:(always ",@ ") pp_scalar) values
+       Fmt.(array ~sep:(any ",@ ") pp_scalar) values
        pp_relvar                                 relation
        pp_expr                                   cont
   | Select { relation; conditions; projections; cont } ->
@@ -113,7 +113,7 @@ let rec pp_comm fmt = function
        filename
   | WhileNotEmpty (rels, body) ->
      Format.fprintf fmt "while_not_empty (@[<hov>%a@])@ {@[<v 4>@,%a@]@,}"
-       Fmt.(list ~sep:(always ",@ ") pp_relvar) rels
+       Fmt.(list ~sep:(any ",@ ") pp_relvar) rels
        pp_comms body
   | Insert (rel, expr) ->
      Format.fprintf fmt "@[<hv 4>%a +=@ { @[<v>%a@] };@]"
@@ -124,16 +124,16 @@ let rec pp_comm fmt = function
        pp_relvar relvar
   | DeclareBuffers (initialisers, body) ->
      Format.fprintf fmt "with_buffers (@[<hv>%a@])@ {@[<v 4>@,%a@]@,}"
-       Fmt.(list ~sep:(always ",@ ") pp_relvar) initialisers
+       Fmt.(list ~sep:(any ",@ ") pp_relvar) initialisers
        pp_comms body
 
 and pp_comms fmt =
-  Fmt.(list ~sep:(always "@,@,") pp_comm) fmt
+  Fmt.(list ~sep:(any "@,@,") pp_comm) fmt
 
 let pp_program fmt {relvars; commands} =
   let pp_relvar_decl fmt nm =
     Format.fprintf fmt "var %a;@," pp_relvar nm
   in
   Format.fprintf fmt "@[<v>%a@,%a@]"
-    Fmt.(list ~sep:(always "") pp_relvar_decl) relvars
+    Fmt.(list ~sep:(any "") pp_relvar_decl) relvars
     pp_comms                                   commands

@@ -75,7 +75,7 @@ end = struct
     let add = (+)
     let sub = (-)
     let zero = 0
-    let compare = Pervasives.compare
+    let compare = Stdlib.compare
   end
 
   module F = Graph.Flow.Ford_Fulkerson (Bipartite) (Flow)

@@ -8,20 +8,24 @@ let (>>!) x f = match x with
   | Error e -> f e
 
 let report_parse_error (pos, message, lexeme) =
-  Format.printf
-    "@[<v 2>Parse error at %a:@ @[%s:@ %a@]@]\n"
-    Modulog.Location.pp pos
-    (match lexeme with
-      | "" -> "At the end of the input"
-      | lexeme -> Printf.sprintf "On the input '%s'" lexeme)
-    Fmt.text message;
-  Error ()
+  let msg =
+    Fmt.str
+      "@[<v 2>Parse error at %a:@ @[%s:@ %a@]@]\n"
+      Modulog.Location.pp pos
+      (match lexeme with
+       | "" -> "At the end of the input"
+       | lexeme -> Printf.sprintf "On the input '%s'" lexeme)
+      Fmt.text message
+  in
+  Error msg
 
 let report_check_error err =
-  Format.printf
-    "@[<v>%a@]\n"
-    Modulog.Checker.pp_error err;
-  Error ()
+  let msg =
+    Fmt.str
+      "@[<v>%a@]\n"
+      Modulog.Checker.pp_error err
+  in
+  Error msg
 
 let parse_and_check filename =
   read_structure_from_file filename >>! report_parse_error
@@ -125,52 +129,65 @@ let output_file_arg =
 
 let typecheck_cmd =
   let doc = "Typecheck a Modular Datalog program and print the signature" in
-  Term.(const typecheck $ filename_arg),
-  Term.info "typecheck" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "typecheck" ~doc)
+    Term.(term_result' (const typecheck $ filename_arg))
 
 let relmachine_cmd =
   let doc = "Compile a Modular Datalog program to the RelMachine" in
-  Term.(const relmachine $ filename_arg $ with_indexes_opt),
-  Term.info "relmachine" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "relmachine" ~doc)
+    Term.(term_result' (const relmachine $ filename_arg $ with_indexes_opt))
 
 let gen_c_cmd =
   let doc = "Compile a Modular Datalog program to C" in
-  Term.(const gen_c $ filename_arg),
-  Term.info "gen_c" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "gen_c" ~doc)
+    Term.(term_result' (const gen_c $ filename_arg))
 
 let compile_cmd =
   let doc = "Compile a Modular Datalog program to an executable via C" in
-  Term.(const compile $ filename_arg $ output_file_arg),
-  Term.info "compile" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "compile" ~doc)
+    Term.(term_result' (const compile $ filename_arg $ output_file_arg))
 
 let rules_cmd =
   let doc = "Compile a Modular Datalog program to flat datalog rules" in
-  Term.(const rules $ filename_arg),
-  Term.info "rules" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "rules" ~doc)
+    Term.(term_result' (const rules $ filename_arg))
 
 let rules_graph_cmd =
   let doc = "Compile a Modular Datalog program to a graph of datalog rules" in
-  Term.(const rules_graph $ filename_arg),
-  Term.info "rules-graph" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "rules-graph" ~doc)
+    Term.(term_result' (const rules_graph $ filename_arg))
 
 let exec_cmd =
   let doc = "Execute a Modular Datalog program" in
-  Term.(const exec $ filename_arg),
-  Term.info "exec" ~doc ~exits:Term.default_exits
+  Cmd.v
+    Cmd.(info "exec" ~doc)
+    Term.(term_result' (const exec $ filename_arg))
 
 let default_cmd =
   let doc = "a Modular Datalog compiler" in
   let sdocs = Manpage.s_common_options in
-  let exits = Term.default_exits in
   (*let man = help_secs in*)
-  Term.(ret (const (`Help (`Pager, None)))),
-  Term.info "modulog" ~version:"v1.0.0" ~doc ~sdocs ~exits (*~man*)
+  Cmd.group
+    ~default:Term.(ret (const (`Help (`Pager, None))))
+    Cmd.(info "modulog" ~version:"v1.0.0" ~doc ~sdocs)
+    [ typecheck_cmd
+    ; relmachine_cmd
+    ; gen_c_cmd
+    ; rules_cmd
+    ; rules_graph_cmd
+    ; exec_cmd
+    ; compile_cmd ]
 
 let () =
-  Term.(exit (eval_choice default_cmd [ typecheck_cmd
-                                      ; relmachine_cmd
-                                      ; gen_c_cmd
-                                      ; rules_cmd
-                                      ; rules_graph_cmd
-                                      ; exec_cmd
-                                      ; compile_cmd ]))
+  let r = Cmd.eval default_cmd in
+  exit r
+
+(*
+  Term.(exit (eval_choice default_cmd [ ))
+ *)

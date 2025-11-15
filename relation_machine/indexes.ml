@@ -33,7 +33,7 @@ end = struct
       loop empty 0
 (*
     let pp =
-      Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Fmt.int)
+      Fmt.braces (Fmt.iter ~sep:(Fmt.any ",@ ") iter Fmt.int)
 *)
   end
 
@@ -41,7 +41,7 @@ end = struct
 
   (*
   let pp =
-    Fmt.braces (Fmt.iter ~sep:(Fmt.always ",@ ") iter Pattern.pp)
+    Fmt.braces (Fmt.iter ~sep:(Fmt.any ",@ ") iter Pattern.pp)
   *)
       
   module V = struct
@@ -97,7 +97,7 @@ end = struct
   (*
   let pp =
     Fmt.iter_bindings VarMap.iter
-      (Fmt.pair ~sep:(Fmt.always " => ")
+      (Fmt.pair ~sep:(Fmt.any " => ")
          Syntax.pp_relvar
          PatternSet.pp)
   *)
@@ -168,28 +168,28 @@ let indexes program : (Syntax.relvar * int array array) list =
 (*
 let pp_indexes =
   Fmt.(brackets
-         (list ~sep:(always ";@ ")
+         (list ~sep:(any ";@ ")
             (brackets
-               (list ~sep:(always ";@ ")
+               (list ~sep:(any ";@ ")
                   PatternSet.Pattern.pp))))
 
 let pp_all_indexes =
   Fmt.(braces
-         (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ")
+         (list ~sep:(any ";@ ")
+            (pair ~sep:(any " =>@ ")
                Syntax.pp_relvar
                pp_indexes)))
 *)
 
 let pp_orderings =
   Fmt.(brackets
-         (array ~sep:(always ";@ ")
+         (array ~sep:(any ";@ ")
             (brackets
-              (array ~sep:(always ";@ ") int))))
+              (array ~sep:(any ";@ ") int))))
 
 let pp_all_orderings =
   Fmt.(braces
-         (list ~sep:(always ";@ ")
-            (pair ~sep:(always " =>@ ")
+         (list ~sep:(any ";@ ")
+            (pair ~sep:(any " =>@ ")
                Syntax.pp_relvar
                pp_orderings)))

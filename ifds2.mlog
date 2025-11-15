@@ -4,19 +4,19 @@ module type IFDS_PROGRAM = sig
   type point
 
   (* intra-procedural edges *)
-  edge : point * point
+  pred edge : point * point
 
   (* edge from a procedure call to first node in procedure *)
-  start_edge : procedure * point
+  pred start_edge : procedure * point
 
   (* call edge from one procedure to another *)
-  call : point * procedure
+  pred call : point * procedure
 
   (* return (callsite, exitnode, returnnode) *)
-  return : point * point * point
+  pred return : point * point * point
 
   (* set of procedures that are called initially *)
-  initial : procedure
+  pred initial : procedure
 end
 
 module type IFDS_PROGRAM_EXT = sig
@@ -25,15 +25,15 @@ module type IFDS_PROGRAM_EXT = sig
   type entry_fact
   type fact
 
-  edge : point * fact * point * fact
+  pred edge : point * fact * point * fact
 
-  start_edge : procedure * entry_fact * point * fact
+  pred start_edge : procedure * entry_fact * point * fact
 
-  call : point * fact * procedure * entry_fact
+  pred call : point * fact * procedure * entry_fact
 
-  return : point * fact * point * fact * point * fact
+  pred return : point * fact * point * fact * point * fact
 
-  initial : procedure * entry_fact
+  pred initial : procedure * entry_fact
 end
 
 module IFDS_of_Extended (P : IFDS_PROGRAM_EXT) = struct

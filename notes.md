@@ -17,6 +17,8 @@
 
 - https://semmle.com/publications
 
+- https://github.com/google/mangle
+
 ## Joins
 
 - https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md

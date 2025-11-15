@@ -334,7 +334,7 @@ struct
         with_nodeptr ~name:"child" x#->children#@i @@ fun y ->
         alloc_node @@ fun z ->
         begin%monoid
-          let open Syn.Int32 in
+          let open! Syn.Int32 in
           z#->leaf := y#->leaf;
           z#->nkeys := const min_keys;
 

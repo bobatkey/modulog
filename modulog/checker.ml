@@ -52,7 +52,7 @@ module Core_typing = struct
          Format.fprintf pp
            "Symbol %a is not a member of the enumerated type @[<1>[%a]@]"
            Src.pp_enum_sym sym
-           (Fmt.list ~sep:(Fmt.always "|@ ") Src.pp_enum_sym) syms
+           (Fmt.list ~sep:(Fmt.any "|@ ") Src.pp_enum_sym) syms
       | Expr_is_enum { expected } ->
          Format.fprintf pp
            "@[<v 4>Expression is a symbol, but the expected type is@,%a@]@;"
