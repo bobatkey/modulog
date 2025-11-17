@@ -53,7 +53,7 @@
           ## - or force ocamlfind to be a certain version:
           # ocamlfind = "1.9.2";
         };
-        scope = on.buildDuneProject { repos = [opam-repository]; } "modulog-bin" ./. query;
+        scope = on.buildOpamProject' { repos = [opam-repository]; } ./. query;
         overlay = final: prev:
           {
             # You can add overrides here
@@ -69,7 +69,7 @@
       in rec {
 #        legacyPackages = scope';
 
-        packages.default = scope'.modulog-bin;
+        packages = opam_packages // { default = opam_packages.modulog-bin; };
 
 #        packages.default = packages.modulog-bin;
 

@@ -3,7 +3,7 @@
 
 (name modulog)
 
-(generate_opam_files true)
+; (generate_opam_files true)
 
 (package
  (name modulog-bin)
