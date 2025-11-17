@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-25.05;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
     opam-nix.url = "github:tweag/opam-nix";
     opam-nix.inputs.nixpkgs.follows = "nixpkgs";
     opam-repository = {
@@ -31,8 +31,12 @@
         # };
 
         on = opam-nix.lib.${system};
-        localPackagesQuery = builtins.mapAttrs (_: pkgs.lib.last)
-          (on.listRepo (on.makeOpamRepo ./.));
+
+        localPackagesQuery = { modulog-bin = "*"; };
+          # builtins.mapAttrs
+          #   (_: pkgs.lib.last)
+          #   (on.listRepo (on.makeOpamRepo ./.));
+
         devPackagesQuery = {
           # You can add "development" packages here. They will get
           # added to the devShell automatically.
@@ -63,15 +67,15 @@
         opam_packages =
           pkgs.lib.getAttrs (builtins.attrNames localPackagesQuery) scope';
       in rec {
-        # legacyPackages = scope';
+#        legacyPackages = scope';
 
-        packages = opam_packages;
+        packages.default = scope'.modulog-bin;
+
+#        packages.default = packages.modulog-bin;
 
         devShells.default = pkgs.mkShell {
           inputsFrom = builtins.attrValues packages;
-          buildInputs = devPackages ++ [
-            pkgs.rsync
-          ];
+          buildInputs = devPackages;
         };
       });
 }

@@ -38,7 +38,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
 
   type handle =
     { arity : int32
-    ; name  : string
+    (* ; name  : string *)
     ; var   : list_node Struct.t ptr var
     }
 
@@ -131,7 +131,7 @@ module Make (S : Syntax.S) () : S with module S = S = struct
     let arity = int32_of_int arity in
     declare ~name (ptr list_node) ~init:null @@ fun var ->
     begin%monoid
-      k { arity; name; var };
+      k { arity; (* name; *) var };
       free_list var
     end
 end
