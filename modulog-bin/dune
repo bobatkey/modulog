@@ -3,4 +3,4 @@
  (public_name modulog)
  (package     modulog-bin)
  (flags       (:standard -w -49-44-9-27))
- (libraries   cmdliner modulog datalog relation_machine))
+ (libraries   cmdliner relation_machine modulog datalog))
