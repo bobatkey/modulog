@@ -1,13 +1,13 @@
-(lang dune 3.14)
+(lang dune 3.20)
 (using menhir 2.1)
 
 (name modulog)
 
-; (generate_opam_files true)
+(generate_opam_files true)
 
 (package
  (name modulog-bin)
- (depends cmdliner fmt ppx_monoid ocamlgraph menhir menhirLib))
+ (depends cmdliner fmt ppx_monoid ocamlgraph menhir menhirLib datalog))
 
 (package
  (name datalog)
