@@ -3,7 +3,7 @@ define edge : int * int
        edge(0,1)
 
 module type PATH = sig
-  path : int * int
+  pred path : int * int
 end
 
 module rec P : PATH = struct

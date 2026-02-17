@@ -3,7 +3,8 @@ define edge : int * int
        edge(0,1)
 
 module type PATH = sig
-  path : int * int
+  pred path : int * int
+
   constant foo : int
 end
 
@@ -12,7 +13,7 @@ module rec P : PATH = struct
          path(?x,?y) :- edge(?x,?y)
          path(?x,?z) :- P.path(?x,?y), edge(?y,?z)
 
-   constant foo : int = P.foo
+  constant foo : int = P.foo
 end
 
 
