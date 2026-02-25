@@ -175,7 +175,7 @@ module PP = struct
           mixed &&, || expressions *)
        let level = prec_of_binop op in
        Format.fprintf fmt
-         "(%a@ %s %a)"
+         "@[<hov1>(%a@ %s %a)@]"
          (pp_expr (level-1)) e1
          (str_of_binop op)
          (pp_expr level) e2
@@ -183,7 +183,7 @@ module PP = struct
        let level = prec_of_binop op in
        let s     = str_of_binop op in
        Format.fprintf fmt
-         (if level > prec then "(%a %s@ %a)" else "%a %s@ %a")
+         (if level > prec then "(@[<hov1>%a@ %s %a)@]" else "%a %s %a")
          (pp_expr (level-1)) e1
          s
          (pp_expr level) e2
