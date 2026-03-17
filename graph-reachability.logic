@@ -1,0 +1,41 @@
+module type graph = sig
+  sort node
+  pred edge : node * node
+end
+
+module my_graph = struct
+  sort node = { Q0, Q1, Q2 }
+  pred edge : node * node = (src, tgt).
+    (src = Q0 & tgt = Q1) | (src = Q1 & tgt = Q2)
+end
+
+module type graph_with_reachability = sig
+  sort node
+  pred edge : node * node
+  pred reachable : node * node
+
+  axiom reachable1 :
+    forall x : node -> forall y : node -> edge(x,y) -> reachable(x,y)
+
+  axiom reachable2 :
+    forall x : node -> forall y : node -> forall z : node ->
+      reachable(x,y) -> reachable(y,z) -> reachable(x,z)
+end
+
+module my_reachable_graph = struct
+  (* FIXME: this ought to be 'include my_graph' *)
+  sort node = { Q0, Q1, Q2 }
+  pred edge : node * node = (src, tgt).
+    (src = Q0 & tgt = Q1) | (src = Q1 & tgt = Q2)
+  (* to here *)
+
+  pred reachable : node * node = (src, tgt).
+    edge(src, tgt) | (src = Q0 & tgt = Q2)
+
+  check reachable1 :
+    forall x : node -> forall y : node -> edge(x,y) -> reachable(x,y)
+
+  check reachable2 :
+    forall x : node -> forall y : node -> forall z : node ->
+      reachable(x,y) -> reachable(y,z) -> reachable(x,z)
+end

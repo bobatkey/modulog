@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (public_name logical)
+ (package logical_cmd)
+ (libraries logical cmdliner))

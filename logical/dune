@@ -1,0 +1,26 @@
+(library
+ (name logical)
+ (libraries modules menhirLib))
+
+(rule
+ (targets parser.ml parser.mli)
+ (deps    parser.mly)
+ (action  (chdir %{workspace_root}
+           (run %{bin:menhir} --table
+                --base logical/parser
+                --explain
+                              %{dep:parser.mly}
+                              %{lib:modules:modules_grammar.mly}))))
+
+; (rule
+;  (targets parser_messages.ml)
+;  (deps    datalog_grammar.mly parser.messages)
+;  (action  (with-stdout-to parser_messages.ml
+;                          (run %{bin:menhir}
+;                               --table
+;                               --base modulog/parser
+;                               %{dep:datalog_grammar.mly}
+;                               %{lib:modules:modules_grammar.mly}
+;                               --compile-errors %{dep:parser.messages}))))
+
+(ocamllex lexer)
