@@ -1,6 +1,7 @@
 %{
     open Core_syntax.SurfaceInnerSyntax
     open Core_syntax.SurfaceSyntax
+    open Core_syntax
 %}
 
 %token MODULE TYPE SIG FUNCTOR STRUCT EQUALS WITH
@@ -14,15 +15,29 @@
 %token PRED AXIOM SORT CHECK
 %token TRUE FALSE
 
+%token SYNTH DISPLAY
+
 %token EOF UNKNOWN
 
-%start<Core_syntax.SurfaceSyntax.structure> program
+%start<Core_syntax.toplevel_item list> program
 
 %%
 
 program:
-  | d=list(str_item); EOF
+  | d=list(toplevel_item); EOF
     { d }
+
+toplevel_item:
+  | decl=str_item
+    { Declaration decl }
+  | c=command
+    { Command c }
+
+command:
+  | SYNTH; nm=IDENT; COLON; mty=mod_type
+    { Synth (nm, mty) }
+  | DISPLAY; nm=longident
+    { Display nm }
 
 /* Long identifiers */
 

@@ -100,10 +100,10 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   (* Or function, defined by pattern matching on the input sort *)
 
   let pp_comma fmt () =
-    Format.pp_print_string fmt ",@ "
+    Format.fprintf fmt ",@ "
 
   let pp_symbol fmt =
-    Format.fprintf fmt ":%s"
+    Format.fprintf fmt "%s"
 
   let pp_sort fmt = function
     | SVar name ->
@@ -181,7 +181,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | ident, Sort, None ->
       Format.fprintf fmt "sort %a" Names.pp_ident ident
     | ident, Sort, Some def ->
-      Format.fprintf fmt "@[<hov2>]sort %a =@ %a@]"
+      Format.fprintf fmt "@[<hov2>sort %a =@ %a@]"
 	Names.pp_ident ident
 	pp_def def
     | ident, Predicate sorts, None ->
@@ -257,6 +257,8 @@ module SurfaceSyntax = Modules.Syntax.Mod_Syntax_Raw (SurfaceInnerSyntax)
 
 module CheckedSyntax = Modules.Syntax.Mod_Syntax (CheckedInnerSyntax)
 
+let ( let* ) = Result.bind
+
 module InnerTyping = struct
   module Src = SurfaceInnerSyntax
   module Core = CheckedInnerSyntax
@@ -270,8 +272,6 @@ module InnerTyping = struct
       Modules.Typing_environment.pp_lookup_error fmt err
 
   module Checker (Env : Modules.Typing.TYPING_ENV with type val_type = Core.val_type and type def_type = Core.def_type and type kind = Core.kind) = struct
-
-    let ( let* ) = Result.bind
 
     module Ctxt = Map.Make (String)
 
@@ -585,6 +585,63 @@ module InnerTyping = struct
 end
 
 module TypeChecker = Modules.Typing.Mod_typing (SurfaceSyntax) (CheckedSyntax) (InnerTyping)
+
+type command =
+  | Synth of Modules.Syntax.String_names.ident * SurfaceSyntax.mod_type
+  | Display of Modules.Syntax.String_names.longident
+
+type toplevel_item =
+  | Declaration of SurfaceSyntax.str_item
+  | Command     of command
+
+type script = toplevel_item list
+
+module Env = TypeChecker.Env
+
+let display env longident =
+  match Env.find_module longident env with
+  | Ok (path, mod_ty) ->
+    Format.printf "@[<v2>module %a :@ %a@]\n"
+      Modules.Syntax.Bound_names.pp_longident path
+      CheckedSyntax.pp_modtype mod_ty
+  | Error lookup_error ->
+    Format.eprintf "Lookup error %a\n"
+      Modules.Typing_environment.pp_lookup_error lookup_error
+
+let synthesise env _ident mod_ty =
+  let* mod_ty = TypeChecker.check_modtype env mod_ty in
+  (* 1. Expand out modtype to a canonical form: sorts, predicates, axioms *)
+  (* 2. check that all the sorts are defined *)
+  (* 3. generate a SAT problem for the given axioms, unfolding the
+        predicate definitions. *)
+  (* 4. attempt to solve the SAT problem *)
+  (* 5. If possible, translate it back into a module value that matches the
+  given type. Type check it to be sure. *)
+  Format.printf "@[<v2>Synthesising for@ %a@]\n"
+    CheckedSyntax.pp_modtype mod_ty;
+  Ok ()
+
+let execute_script script =
+  let rec loop env = function
+    | [] ->
+      Ok ()
+    | Declaration str_item :: items ->
+      (match TypeChecker.type_str_item env str_item with
+      | Ok env ->
+	loop env items
+      | Error err ->
+	Format.eprintf "%a" TypeChecker.pp_error err; Error "err")
+    | Command (Display longident) :: items ->
+      display env longident;
+      loop env items
+    | Command (Synth (ident, modty)) :: items ->
+      (match synthesise env ident modty with
+      | Ok () ->
+	loop env items
+      | Error err ->
+	Format.eprintf "%a" TypeChecker.pp_error err; Error "err")
+  in
+  loop Env.empty script
 
 (* Synthesis:
 

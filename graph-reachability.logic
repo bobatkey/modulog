@@ -34,10 +34,14 @@ module type graph_with_reachability = sig
       reachable(x,y) -> reachable(y,z) -> reachable(x,z)
 end
 
-module type test = graph_with_reachability
+module type my_graph_with_reachability = graph_with_reachability
   with sort node = my_graph.node
   with pred edge : my_graph.node * my_graph.node =
     (src, tgt). my_graph.edge(src,tgt)
+
+display my_graph
+
+synth test : my_graph_with_reachability
 
 module my_reachable_graph = struct
   (* FIXME: this ought to be 'include my_graph' *)

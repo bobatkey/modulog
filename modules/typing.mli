@@ -69,11 +69,16 @@ module type MOD_TYPING = sig
 
   val pp_error : Format.formatter -> error -> unit
 
+  val check_modtype :
+    Env.t -> Src.mod_type -> (Tgt.mod_type, error) result
+
   val type_modterm :
     Env.t -> Src.mod_term -> (Tgt.mod_term * Tgt.mod_type, error) result
 
   val type_structure :
     Env.t -> Src.structure -> (Tgt.structure * Tgt.signature, error) result
+
+  val type_str_item : Env.t -> Src.str_item -> (Env.t, error) result
 end
 
 module Mod_typing

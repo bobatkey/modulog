@@ -10,7 +10,7 @@ let format_to_string formatter x =
 
 
 let typecheck filename =
-  let* structure =
+  let* script =
     In_channel.with_open_text filename
       (fun ch ->
 	let lexbuf = Lexing.from_channel ch in
@@ -24,13 +24,7 @@ let typecheck filename =
 	  in
 	  Error (format_to_string (fun fmt -> Format.fprintf fmt "Parse error at %a" Logical.Location.pp) location))
   in
-  let* _x, _y =
-    Result.map_error (format_to_string Logical.Core_syntax.TypeChecker.pp_error)
-      (Logical.Core_syntax.TypeChecker.type_structure
-	Logical.Core_syntax.TypeChecker.Env.empty
-	structure)
-  in
-  Ok ()
+  Logical.Core_syntax.execute_script script
 
   (******************************************************************************)
   open Cmdliner

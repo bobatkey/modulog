@@ -76,11 +76,17 @@ module type MOD_TYPING = sig
 
   val pp_error : Format.formatter -> error -> unit
 
+  val check_modtype :
+    Env.t -> Src.mod_type -> (Tgt.mod_type, error) result
+
   val type_modterm :
     Env.t -> Src.mod_term -> (Tgt.mod_term * Tgt.mod_type, error) result
 
   val type_structure :
     Env.t -> Src.structure -> (Tgt.structure * Tgt.signature, error) result
+
+  val type_str_item : Env.t -> Src.str_item -> (Env.t, error) result
+
 end
 
 module Mod_typing
@@ -98,6 +104,8 @@ struct
   module Tgt = Tgt
   module Env = Typing_environment.Make (Tgt)
   module Location = Src.Core.Location
+
+  let ( let* ) c f = match c with Ok a -> f a | Error _ as e -> e
 
   let (>>=) c f = match c with Ok a -> f a | Error e -> Error e
   let (>>|) c f = match c with Ok a -> Ok (f a) | Error e -> Error e
@@ -661,112 +669,96 @@ struct
        , mty
        )
 
+  and type_str_item env seen = function
+    | Src.{stritem_loc; stritem_data=Str_value term} ->
+      let* term, val_items = lift_core_error stritem_loc (CTC.type_term env term) in
+      (* FIXME: also do 'seen' *)
+      let rec collect env rev_sigitems = function
+        | [] -> env, rev_sigitems
+        | (ident, ty) :: items ->
+          let env = Env.bind_value ident ty env in
+          let item = Tgt.{ sigitem_loc  = Location.generated
+            ; sigitem_data = Tgt.Sig_value (ident, ty)
+          }
+          in
+          collect env (item :: rev_sigitems) items
+      in
+      let env, rev_sigitems = collect env [] val_items in
+      let stritem  =
+        Tgt.{ stritem_loc; stritem_data = Str_value term }
+      in
+      Ok (env, rev_sigitems, stritem, seen)
+
+    | Src.{stritem_loc; stritem_data=Str_module (id, modl)} ->
+      if SeenSet.mem id seen then
+	Error (stritem_loc, Repeated_name id)
+      else
+	let seen = SeenSet.add id seen in
+	let* modl, modty = type_modterm env modl in
+	let id, env = Env.add_module id modty env in
+	let sigitem =
+          Tgt.{ sigitem_loc  = Location.generated
+            ; sigitem_data = Sig_module (id, modty) }
+         and stritem =
+           Tgt.{ stritem_loc; stritem_data = Str_module (id, modl) }
+	in
+	Ok (env, [sigitem], stritem, seen)
+
+    | Src.{stritem_loc; stritem_data=Str_type (id, kind, typ)} ->
+      if SeenSet.mem id seen then
+	Error (stritem_loc, Repeated_name id)
+      else
+	let seen = SeenSet.add id seen in
+	let* kind = lift_core_error stritem_loc (CTC.check_kind env kind) in
+	let* typ = lift_core_error stritem_loc (CTC.check_deftype env kind typ) in
+	let tydecl = {Tgt.kind = kind; manifest = Some typ} in
+	let id, env = Env.add_type id tydecl env in
+	let sigitem =
+          { Tgt.sigitem_loc = Location.generated
+            ; sigitem_data = Sig_type (id, tydecl) }
+         and stritem =
+           Tgt.{ stritem_loc; stritem_data = Str_type (id, kind, typ) }
+	in
+	Ok (env, [sigitem], stritem, seen)
+
+    | Src.{stritem_loc; stritem_data=Str_modty (id, mty)} ->
+      let* mty = check_modtype env mty in
+      let id, env = Env.add_modty id mty env in
+      let sigitem = Tgt.{
+	sigitem_loc  = Location.generated;
+	sigitem_data = Sig_modty (id, mty)
+      }
+       and stritem = Tgt.{ stritem_loc; stritem_data = Str_modty (id, mty) }
+      in
+      Ok (env, [sigitem], stritem, seen)
+
+    | Src.{stritem_loc; stritem_data=Str_modrec bindings} ->
+      (* Plan:
+      1. Check all the module types in the current environment
+      (no recursive module types yet)
+      (additionally, all the module types must be signatures,
+      which only contain structures and values. This is because
+      we can't evaluate recursively defined functors, which would cause
+      looping in the evaluator. This is a slightly different safety
+      condition to the OCaml one)
+      2. Add the module types to the environment (tagged as recursive?)
+      3. Check the module bodies in turn in the extended environment
+      4. Add the module types to the environment again, this time not tagged as
+      recursive.
+      *)
+      let* rec_env, bindings = check_rec_module_types env env [] bindings in
+      let* new_env, bindings, rev_sig =
+	check_rec_module_terms rec_env env [] [] bindings in
+      let stritem = Tgt.{ stritem_loc; stritem_data = Str_modrec bindings } in
+      Ok (new_env, rev_sig, stritem, seen)
+
   and type_structure env rev_sig rev_str seen = function
     | [] ->
-       Ok ( List.rev rev_str
-          , List.rev rev_sig
-          )
+       Ok ( List.rev rev_str, List.rev rev_sig)
 
-    | Src.{stritem_loc; stritem_data=Str_value term} :: items ->
-       lift_core_error stritem_loc (CTC.type_term env term)
-       >>= fun (term, val_items) ->
-       (* FIXME: also do 'seen' *)
-       let rec collect env rev_sigitems = function
-         | [] -> env, rev_sigitems
-         | (ident, ty) :: items ->
-            let env = Env.bind_value ident ty env in
-            let item = Tgt.{ sigitem_loc  = Location.generated
-                           ; sigitem_data = Tgt.Sig_value (ident, ty)
-                           }
-            in
-            collect env (item :: rev_sigitems) items
-       in
-       let env, rev_sigitems = collect env [] val_items in
-       let stritem  =
-         Tgt.{ stritem_loc
-             ; stritem_data = Str_value term
-             }
-       in
-       type_structure
-         env
-         (rev_sigitems @ rev_sig)
-         (stritem :: rev_str)
-         seen
-         items
-
-    | Src.{stritem_loc; stritem_data=Str_module (id, modl)} :: items ->
-       if SeenSet.mem id seen then
-         Error (stritem_loc, Repeated_name id)
-       else
-         let seen = SeenSet.add id seen in
-         type_modterm env modl >>= fun (modl, modty) ->
-         let id, env = Env.add_module id modty env in
-         let sigitem =
-           Tgt.{ sigitem_loc  = Location.generated
-               ; sigitem_data = Sig_module (id, modty)
-               }
-         and stritem =
-           Tgt.{ stritem_loc
-               ; stritem_data = Str_module (id, modl)
-               }
-         in
-         type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
-
-    | Src.{stritem_loc; stritem_data=Str_type (id, kind, typ)} :: items ->
-       if SeenSet.mem id seen then
-         Error (stritem_loc, Repeated_name id)
-       else
-         let seen = SeenSet.add id seen in
-         lift_core_error stritem_loc (CTC.check_kind env kind) >>= fun kind ->
-         lift_core_error stritem_loc (CTC.check_deftype env kind typ)
-         >>= fun typ ->
-         let tydecl = {Tgt.kind = kind; manifest = Some typ} in
-         let id, env = Env.add_type id tydecl env in
-         let sigitem =
-           Tgt.{ sigitem_loc = Location.generated
-               ; sigitem_data = Sig_type (id, tydecl)
-               }
-         and stritem =
-           Tgt.{ stritem_loc
-               ; stritem_data = Str_type (id, kind, typ)
-               }
-         in
-         type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
-
-    | Src.{stritem_loc; stritem_data=Str_modty (id, mty)} :: items ->
-       check_modtype env mty >>= fun mty ->
-       let id, env = Env.add_modty id mty env in
-       let sigitem =
-         Tgt.{ sigitem_loc  = Location.generated
-             ; sigitem_data = Sig_modty (id, mty)
-             }
-       and stritem =
-         Tgt.{ stritem_loc
-             ; stritem_data = Str_modty (id, mty)
-             }
-       in
-       type_structure env (sigitem :: rev_sig) (stritem :: rev_str) seen items
-
-    | Src.{stritem_loc; stritem_data=Str_modrec bindings} :: items ->
-       (* Plan:
-          1. Check all the module types in the current environment
-             (no recursive module types yet)
-             (additionally, all the module types must be signatures, 
-              which only contain structures and values. This is because
-              we can't evaluate recursively defined functors, which would cause
-              looping in the evaluator. This is a slightly different safety
-              condition to the OCaml one)
-          2. Add the module types to the environment (tagged as recursive?)
-          3. Check the module bodies in turn in the extended environment
-          4. Add the module types to the environment again, this time not tagged as
-             recursive.
-       *)
-       check_rec_module_types env env [] bindings
-       >>= fun (rec_env, bindings) ->
-       check_rec_module_terms rec_env env [] rev_sig bindings
-       >>= fun (new_env, bindings, rev_sig) ->
-       let stritem = Tgt.{ stritem_loc; stritem_data = Str_modrec bindings } in
-       type_structure new_env rev_sig (stritem :: rev_str) seen items
+  | item :: items ->
+    let* env, rev_sig_items, str_item, seen = type_str_item env seen item in
+    type_structure env (rev_sig_items @ rev_sig) (str_item :: rev_str) seen items
 
   (* FIXME: thread the seen set through to check for repeated names *)
   and check_rec_module_types env new_env rev_acc = function
@@ -803,5 +795,9 @@ struct
 
   let type_structure env str =
     type_structure env [] [] SeenSet.empty str
+
+  let type_str_item env str_item =
+  let* env, _, _, _ = type_str_item env SeenSet.empty str_item in
+  Ok env
 
 end

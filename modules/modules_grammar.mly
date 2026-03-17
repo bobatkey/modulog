@@ -14,6 +14,7 @@ Provides:
 
 (* the module language *)
 
+%public
 mod_type:
 | FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
     { { modtype_loc  = Location.mk $startpos $endpos
@@ -84,20 +85,20 @@ mod_term2:
 
 %public
 str_item:
-| d=str_value
+  | d=str_value
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_value d } }
-| t=str_type(IDENT)
+  | t=str_type(IDENT)
     { let (id, kind, ty) = t in
       { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_type (id, kind, ty) } }
-| MODULE; id=IDENT; modl=functor_decls
+  | MODULE; id=IDENT; modl=functor_decls
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_module (id, modl) } }
-| MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
+  | MODULE; TYPE; id=IDENT; EQUALS; mty=mod_type
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_modty (id, mty) } }
-| MODULE; REC; bindings=separated_nonempty_list(AND, rec_module_binding)
+  | MODULE; REC; bindings=separated_nonempty_list(AND, rec_module_binding)
     { { stritem_loc  = Location.mk $startpos $endpos
       ; stritem_data = Str_modrec bindings } }
 

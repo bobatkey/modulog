@@ -15,6 +15,11 @@ rule token = parse
 | "."              { DOT }
 | "->"             { ARROW }
 | "="              { EQUALS }
+| '('              { LPAREN }
+| ')'              { RPAREN }
+| '{'              { LBRACE }
+| '}'              { RBRACE }
+
 | "module"         { MODULE }
 | "type"           { TYPE }
 | "struct"         { STRUCT }
@@ -38,10 +43,9 @@ rule token = parse
 | "forall"         { FORALL }
 | "exists"         { EXISTS }
 
-| '('              { LPAREN }
-| ')'              { RPAREN }
-| '{'              { LBRACE }
-| '}'              { RBRACE }
+| "synth"          { SYNTH }
+| "display"        { DISPLAY }
+
 | ident as x       { IDENT x }
 | symbol as x      { SYMBOL x }
 | _                { UNKNOWN }
