@@ -1,0 +1,9 @@
+module type graph = sig
+  sort node
+  pred edge : node * node
+end
+
+module rec mygraph : graph with sort node = { Q } = struct
+  sort node = { Q }
+  pred edge : node * node = (x,y). mygraph.edge(x,y)
+end
