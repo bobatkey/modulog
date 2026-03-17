@@ -3,6 +3,18 @@ module type graph = sig
   pred edge : node * node
 end
 
+(*
+module type multi_graph = sig
+  sort node
+  sort edge
+  func src : edge -> node
+  func tgt : edge -> node
+
+  sort label
+  func edge-label : edge -> label
+end
+*)
+
 module my_graph = struct
   sort node = { Q0, Q1, Q2 }
   pred edge : node * node = (src, tgt).
@@ -21,6 +33,11 @@ module type graph_with_reachability = sig
     forall x : node -> forall y : node -> forall z : node ->
       reachable(x,y) -> reachable(y,z) -> reachable(x,z)
 end
+
+module type test = graph_with_reachability
+  with sort node = my_graph.node
+  with pred edge : my_graph.node * my_graph.node =
+    (src, tgt). my_graph.edge(src,tgt)
 
 module my_reachable_graph = struct
   (* FIXME: this ought to be 'include my_graph' *)

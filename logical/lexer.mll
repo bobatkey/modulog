@@ -30,6 +30,8 @@ rule token = parse
 | "sort"           { SORT }
 | "check"          { CHECK }
 
+| "true"           { TRUE }
+| "false"          { FALSE }
 | "&"              { CONJ }
 | "|"              { DISJ }
 | "¬"              { NEGATE }

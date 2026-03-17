@@ -152,8 +152,8 @@ struct
   let rec find path env = match path with
     | Path.Pident id ->
        (match Ident.Table.find id env with
-         | None ->
-            failwith "internal error: path unresolvable"
+       | None ->
+         failwith (Printf.sprintf "internal error: path unresolvable '%s'" (Ident.name id))
          | Some binding ->
             Ok binding)
     | Path.Pdot (root, field) ->
