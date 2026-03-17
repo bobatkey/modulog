@@ -46,6 +46,7 @@ module my_reachable_graph = struct
     (src = Q0 & tgt = Q1) | (src = Q1 & tgt = Q2)
   (* to here *)
 
+  (* FIXME: would like to have least fixed points of predicates here *)
   pred reachable : node * node = (src, tgt).
     edge(src, tgt) | (src = Q0 & tgt = Q2)
 
@@ -55,4 +56,21 @@ module my_reachable_graph = struct
   check reachable2 :
     forall x : node -> forall y : node -> forall z : node ->
       reachable(x,y) -> reachable(y,z) -> reachable(x,z)
+end
+
+module add_reachability (g : graph) = struct
+  sort node = g.node
+  pred edge : node * node = (src, tgt). g.edge(src, tgt)
+  pred reachable : g.node * g.node = (src, tgt). true
+
+(* The following cannot be checked, because we don't know what g.node
+is or g.edge is
+
+  check reachable1 :
+    forall x : node -> forall y : node -> edge(x,y) -> reachable(x,y)
+
+  check reachable2 :
+    forall x : node -> forall y : node -> forall z : node ->
+      reachable(x,y) -> reachable(y,z) -> reachable(x,z)
+*)
 end
