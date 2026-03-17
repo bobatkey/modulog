@@ -73,4 +73,13 @@ is or g.edge is
     forall x : node -> forall y : node -> forall z : node ->
       reachable(x,y) -> reachable(y,z) -> reachable(x,z)
 *)
+
+(*
+  prove reachable1 : forall x : node -> forall y : node -> edge(x,y) -> reachable(x,y)
+  by introduce x; introduce y; introduce edge-x-y; true.
+
+  prove reachable2 : forall x:node -> forall y:node -> forall z:node -> reachable(x,y) -> reachable(y,z) -> reachable(x,z)
+  by introduce x; introduce y; introduce z; introduce x-y; introduce y-z; true.
+*)
+
 end
