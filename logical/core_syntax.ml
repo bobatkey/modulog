@@ -102,6 +102,9 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   let pp_comma fmt () =
     Format.fprintf fmt ",@ "
 
+  let pp_star fmt () =
+    Format.fprintf fmt " *@ "
+
   let pp_symbol fmt =
     Format.fprintf fmt "%s"
 
@@ -116,42 +119,57 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | LocalVar varname -> Format.fprintf fmt "%s" varname
     | Symbol symbol    -> pp_symbol fmt symbol
 
-  let rec pp_formula fmt = function
-    | True -> Format.fprintf fmt "true"
-    | False -> Format.fprintf fmt "false"
-    | Atom (relname, exprs) ->
-      Format.fprintf fmt "%a@[<hv2>(%a)@]"
-	Names.pp_longident relname
-	(Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
-    | Eq (e1, e2) ->
-      Format.fprintf fmt "(%a = %a)"
-	pp_expr e1
-	pp_expr e2
-    | Conj (p, q) ->
-      Format.fprintf fmt "(%a & %a)"
-	pp_formula p
-	pp_formula q
-    | Disj (p, q) ->
-      Format.fprintf fmt "(%a | %a)"
-	pp_formula p
-	pp_formula q
-    | Impl (p, q) ->
-      Format.fprintf fmt "(%a -> %a)"
-	pp_formula p
-	pp_formula q
-    | Not p ->
-      Format.fprintf fmt "(¬ %a)"
-	pp_formula p
-    | Forall (var, sort, p) ->
-      Format.fprintf fmt "@[<hv2>(forall %s : %a ->@ %a)@]"
-        var
-        pp_sort sort
-        pp_formula p
-    | Exists (var, sort, p) ->
-      Format.fprintf fmt "@[<hv2>(exists %s : %a ->@ %a)@]"
-        var
-        pp_sort sort
-        pp_formula p
+  let pp_formula =
+    let rec formula fmt = function
+      | Forall _ | Exists _ as f ->
+	Format.fprintf fmt "@[<hov2>%a@]" quantifiers f
+      | f ->
+	propositional fmt f
+    and quantifiers fmt = function
+      | Forall (x, sort, p) ->
+	Format.fprintf fmt "forall %s : %a -> %a"
+	  x
+	  pp_sort sort
+	  quantifiers p
+      | Exists (x, sort, p) ->
+	Format.fprintf fmt "exists %s : %a -> %a"
+	  x
+	  pp_sort sort
+	  quantifiers p
+      | p ->
+	Format.fprintf fmt "@,%a" propositional p
+    and propositional fmt = function
+      | Impl _ as f -> Format.fprintf fmt "@[<hov>%a@]" imps f
+      | Conj _ as f -> Format.fprintf fmt "@[<hov>%a@]" conj f
+      | Disj _ as f -> Format.fprintf fmt "@[<hov>%a@]" disj f
+      | f -> base fmt f
+    and imps fmt = function
+      | Impl (p, q) -> Format.fprintf fmt "%a ->@ %a" base p imps q
+      | p          -> base fmt p
+    and conj fmt = function
+      | Conj (p, q) -> Format.fprintf fmt "%a &@ %a" base p conj q
+      | p -> base fmt p
+    and disj fmt = function
+      | Disj (p, q) -> Format.fprintf fmt "%a |@ %a" base p disj q
+      | p -> base fmt p
+    and base fmt = function
+      | True -> Format.fprintf fmt "true"
+      | False -> Format.fprintf fmt "false"
+      | Atom (relname, exprs) ->
+	Format.fprintf fmt "%a@[<hv2>(%a)@]"
+	  Names.pp_longident relname
+	  (Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
+      | Eq (e1, e2) ->
+	Format.fprintf fmt "%a = %a"
+	  pp_expr e1
+	  pp_expr e2
+      | Not p ->
+	Format.fprintf fmt "¬%a"
+	  base p
+      | (Forall _ | Exists _ | Impl _ | Conj _ | Disj _) as f ->
+	Format.fprintf fmt "(%a)" formula f
+    in
+    formula
 
   (* Terms are proofs of additional formulas *)
   let pp_term fmt (Check { name; property }) =
@@ -191,7 +209,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | ident, Predicate sorts, Some def ->
       Format.fprintf fmt "@[<hov2>pred %a : (%a) =@ %a@]"
         Names.pp_ident ident
-        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+        (Format.pp_print_list ~pp_sep:pp_star pp_sort) sorts
         pp_def def
 
   let pp_type_constraint fmt (path, kind, def) =
@@ -601,6 +619,7 @@ module Env = TypeChecker.Env
 let display env longident =
   match Env.find_module longident env with
   | Ok (path, mod_ty) ->
+    Format.print_flush ();
     Format.printf "@[<v2>module %a :@ %a@]\n"
       Modules.Syntax.Bound_names.pp_longident path
       CheckedSyntax.pp_modtype mod_ty
