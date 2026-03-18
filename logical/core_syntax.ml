@@ -143,15 +143,15 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       Format.fprintf fmt "(¬ %a)"
 	pp_formula p
     | Forall (var, sort, p) ->
-      Format.fprintf fmt "@[<hv2>(all %s : %a.@ %a)@]"
-	var
-	pp_sort sort
-	pp_formula p
+      Format.fprintf fmt "@[<hv2>(forall %s : %a ->@ %a)@]"
+        var
+        pp_sort sort
+        pp_formula p
     | Exists (var, sort, p) ->
-      Format.fprintf fmt "@[<hv2>(ex %s : %a.@ %a)@]"
-	var
-	pp_sort sort
-	pp_formula p
+      Format.fprintf fmt "@[<hv2>(exists %s : %a ->@ %a)@]"
+        var
+        pp_sort sort
+        pp_formula p
 
   (* Terms are proofs of additional formulas *)
   let pp_term fmt (Check { name; property }) =
@@ -163,7 +163,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   (* Value declarations: which are declarations that certain properties
      hold. *)
   let pp_val_decl fmt (ident, formula) =
-    Format.fprintf fmt "%a : %a"
+    Format.fprintf fmt "@[<hov2>axiom %a :@ %a@]"
       Names.pp_ident ident
       pp_formula     formula
 
@@ -174,37 +174,37 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | SortDefn sort_expr -> pp_sort fmt sort_expr
     | PredDefn { args; predicate } ->
       Format.fprintf fmt "@[<hov2>(%a) ->@ %a@]"
-	(Format.pp_print_list ~pp_sep:pp_comma pp_var) args
-	pp_formula predicate
+        (Format.pp_print_list ~pp_sep:pp_comma pp_var) args
+        pp_formula predicate
 
   let pp_def_decl fmt = function
     | ident, Sort, None ->
       Format.fprintf fmt "sort %a" Names.pp_ident ident
     | ident, Sort, Some def ->
       Format.fprintf fmt "@[<hov2>sort %a =@ %a@]"
-	Names.pp_ident ident
-	pp_def def
+        Names.pp_ident ident
+        pp_def def
     | ident, Predicate sorts, None ->
       Format.fprintf fmt "pred %a : (%a)"
-	Names.pp_ident ident
-	(Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+        Names.pp_ident ident
+        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
     | ident, Predicate sorts, Some def ->
       Format.fprintf fmt "@[<hov2>pred %a : (%a) =@ %a@]"
-	Names.pp_ident ident
-	(Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
-	pp_def def
+        Names.pp_ident ident
+        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+        pp_def def
 
   let pp_type_constraint fmt (path, kind, def) =
     match kind with
     | Sort ->
       Format.fprintf fmt "sort %s = %a"
-	(String.concat "." path)
-	pp_def def
+        (String.concat "." path)
+        pp_def def
     | Predicate sorts ->
       Format.fprintf fmt "@[<hov2>pred %s : (%a) =@ %a@]"
-	(String.concat "." path)
-	(Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
-	pp_def def
+        (String.concat "." path)
+        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+        pp_def def
 end
 
 module SurfaceInnerSyntax = struct
