@@ -142,7 +142,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   let pp_def fmt = function
     | SortDefn sort_expr -> pp_sort fmt sort_expr
     | PredDefn { args; predicate } ->
-      Format.fprintf fmt "@[<hov2>(%a) ->@ %a@]"
+      Format.fprintf fmt "@[<hov2>(%a).@ %a@]"
         (Format.pp_print_list ~pp_sep:pp_comma pp_var) args
         pp_formula predicate
 
