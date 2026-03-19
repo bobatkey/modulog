@@ -17,6 +17,9 @@ let full_name id = Printf.sprintf "%s/%d" id.name id.stamp
 let equal id1 id2 =
   id1.stamp = id2.stamp
 
+let hash id =
+  Int.hash id.stamp
+
 module OT = struct
   type nonrec t = t
   let compare x y =

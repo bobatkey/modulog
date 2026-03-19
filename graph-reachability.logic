@@ -62,7 +62,9 @@ module my_reachable_graph = struct
       reachable(x,y) -> reachable(y,z) -> reachable(x,z)
 end
 
+(*
 display my_reachable_graph
+*)
 
 module add_reachability (g : graph) = struct
   sort node = g.node

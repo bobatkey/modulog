@@ -10,7 +10,7 @@
  (depends cmdliner fmt ppx_monoid ocamlgraph menhir menhirLib datalog))
 
 (package (name logical_cmd)
-  (depends cmdliner menhir))
+  (depends cmdliner menhir msat))
 
 
 (package

@@ -132,6 +132,7 @@
               ocamlgraph
               menhir
               menhirLib
+              msat
             ];
           };
 

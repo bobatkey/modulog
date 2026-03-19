@@ -27,6 +27,8 @@ val pp : Format.formatter -> t -> unit
    be equal. *)
 val equal : t -> t -> bool
 
+val hash : t -> int
+
 (** Immutable tables that bind identifiers to arbitrary data. *)
 module Table : sig
   type key = t
