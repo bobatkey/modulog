@@ -651,7 +651,7 @@ module Synthesis = struct
     | True ->
       Solver.add_conj clauses []
     | False ->
-      Solver.add_conj clauses []
+      Solver.add_disj clauses []
     | Atom (rel, exprs) ->
       (match Env.lookup_type rel env with
       | Sort, _ -> failwith "internal error: sort where a relation should be"
@@ -792,7 +792,9 @@ module Synthesis = struct
 	  }
 	  in
 	  build_struct (item :: rev_items) items
-	| {sigitem_loc=_; sigitem_data=Sig_type (ident, {kind=Predicate sorts; manifest=None})} :: items ->
+	| {sigitem_loc=_;
+           sigitem_data=Sig_type (ident, {kind=Predicate sorts; manifest=None})
+	  } :: items ->
 	  let args = generate_names sorts in
 	  let predicate =
 	    RelTable.find table ident |>
@@ -840,9 +842,10 @@ let execute_script script =
       | Ok () ->
 	loop env items
       | Error (`Synth_error (loc, string)) ->
-	Format.eprintf "at %a; %s" Location.pp loc string; Error string
+	Format.eprintf "at %a; %s\n" Location.pp loc string;
+	Error "script failed"
       | Error (`TypeChecker err) ->
-	Format.eprintf "%a" TypeChecker.pp_error err; Error "err")
+	Format.eprintf "%a\n" TypeChecker.pp_error err; Error "err")
   in
   loop Env.empty script
 

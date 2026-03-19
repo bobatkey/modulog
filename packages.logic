@@ -1,0 +1,36 @@
+module type package_installation = sig
+  sort package
+
+  pred dependsOn : package * package
+  pred dependsOnChoice : package * package * package
+  pred conflict : package * package
+  pred required : package
+
+  pred installed : package
+
+  axiom requirements_installed : forall p : package ->
+    required(p) -> installed(p)
+
+  axiom dependencies_installed : forall p : package -> forall q : package ->
+    installed(p) -> dependsOn(p,q) -> installed(q)
+
+  axiom no_conflicts : forall p : package -> forall q : package ->
+    installed(p) -> installed(q) -> ¬conflict(p, q)
+
+end
+
+sort myPackage = { ProgA, ProgB, Lib1, Lib2, Lib3 }
+
+pred myDepends : myPackage * myPackage = (p, q).
+  (p = ProgA & q = Lib1) | (p = ProgB & q = Lib2) | (p = Lib1 & q = Lib3)
+
+pred myConflicts : myPackage * myPackage = (p, q).
+  (p = Lib2 & q = Lib3)
+
+pred myRequirements : myPackage = (p). p = ProgA | p = ProgB
+
+synth solution : package_installation
+  with sort package = myPackage
+  with pred dependsOn : myPackage * myPackage = (p,q). myDepends(p,q)
+  with pred conflict : myPackage * myPackage = (p, q). myConflicts(p,q)
+  with pred required : myPackage = (p). myRequirements(p)
