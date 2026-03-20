@@ -16,24 +16,24 @@ Provides:
 
 %public
 mod_type:
-| FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
+  | FUNCTOR; LPAREN; id=IDENT; COLON; mty1=mod_type; RPAREN; ARROW; mty2=mod_type
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_functor (id, mty1, mty2) } }
-| mty=mod_type2
+  | mty=mod_type2
     { mty }
 
 mod_type2:
-| lid=longident
+  | lid=longident
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_longident lid } }
-| SIG; s=list(sig_item); END
+  | SIG; s=list(sig_item); END
     { { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_signature s } }
-| mty=mod_type2; WITH; ty_constraint=str_type(separated_nonempty_list(DOT, IDENT))
+  | mty=mod_type2; WITH; ty_constraint=str_type(separated_nonempty_list(DOT, IDENT))
     { let path, kind, ty = ty_constraint in
       { modtype_loc  = Location.mk $startpos $endpos
       ; modtype_data = Modtype_withtype (mty, path, kind, ty) } }
-| LPAREN; mty=mod_type; RPAREN
+  | LPAREN; mty=mod_type; RPAREN
     { mty }
 
 %public
@@ -61,26 +61,26 @@ functor_type_decls:
       ; modtype_data = Modtype_functor (id, mty1, mty2) } }
 
 mod_term:
-| FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
+  | FUNCTOR; LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; ARROW; modl=mod_term
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_functor (id, mty, modl) } }
-| m=mod_term2
+  | m=mod_term2
     { m }
 
 mod_term2:
-| mod1=mod_term2; LPAREN; mod2=mod_term; RPAREN
+  | mod1=mod_term2; LPAREN; mod2=mod_term; RPAREN
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_apply (mod1, mod2) } }
-| lid=longident
+  | lid=longident
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_longident lid } }
-| STRUCT; items=list(str_item); END
+  | STRUCT; items=list(str_item); END
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_structure items } }
-| LPAREN; modl=mod_term; COLON; mty=mod_type; RPAREN
+  | LPAREN; modl=mod_term; COLON; mty=mod_type; RPAREN
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_constraint (modl, mty) } }
-| LPAREN; m=mod_term; RPAREN
+  | LPAREN; m=mod_term; RPAREN
     { m }
 
 %public
@@ -103,12 +103,12 @@ str_item:
       ; stritem_data = Str_modrec bindings } }
 
 rec_module_binding:
-| id=IDENT; COLON; mty=mod_type; EQUALS; modl=mod_term2
+  | id=IDENT; COLON; mty=mod_type; EQUALS; modl=mod_term2
     { (id, mty, modl) }
 
 functor_decls:
-| EQUALS; modl=mod_term
+  | EQUALS; modl=mod_term
     { modl }
-| LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; modl=functor_decls
+  | LPAREN; id=IDENT; COLON; mty=mod_type; RPAREN; modl=functor_decls
     { { modterm_loc  = Location.mk $startpos $endpos
       ; modterm_data = Mod_functor (id, mty, modl) } }

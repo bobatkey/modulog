@@ -19,8 +19,6 @@ module type TYPING_ENV = sig
     String_names.longident ->
     t -> (Path.t * kind, Typing_environment.lookup_error) result
 
-  (* FIXME: this is used to get definitions of types during type
-     equality checking. *)
   val lookup_type : Path.t -> t -> kind * def_type option
 end
 
