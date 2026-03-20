@@ -1,13 +1,8 @@
-
-let ( let* ) x f = match x with
-| Ok x -> f x
-| Error _ as e -> e
+open Logical.Result_ext
 
 let format_to_string formatter x =
   formatter Format.str_formatter x;
   Format.flush_str_formatter ()
-
-
 
 let typecheck filename =
   let* script =
@@ -22,12 +17,14 @@ let typecheck filename =
 	      lexbuf.Lexing.lex_start_p
 	      lexbuf.Lexing.lex_curr_p
 	  in
-	  Error (format_to_string (fun fmt -> Format.fprintf fmt "Parse error at %a" Logical.Location.pp) location))
+	  Error (format_to_string
+	    (fun fmt -> Format.fprintf fmt "Parse error at %a" Logical.Location.pp)
+	    location))
   in
-  Logical.Core_syntax.execute_script script
+  Logical.Toplevel.execute_script script
 
-  (******************************************************************************)
-  open Cmdliner
+(******************************************************************************)
+open Cmdliner
 
 let filename_arg =
   let open Arg in
