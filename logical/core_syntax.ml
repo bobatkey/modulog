@@ -227,7 +227,7 @@ module SurfaceSyntax = Modules.Syntax.Mod_Syntax_Raw (SurfaceInnerSyntax)
 module CheckedSyntax = Modules.Syntax.Mod_Syntax (CheckedInnerSyntax)
 
 (**********************************************************************)
-(* The toplevel operations available *)
+(* The toplevel operations *)
 
 type command =
   | Synth of Modules.Syntax.String_names.ident * SurfaceSyntax.mod_type

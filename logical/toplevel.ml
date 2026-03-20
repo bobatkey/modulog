@@ -1,4 +1,3 @@
-open Result_ext
 open Core_syntax
 open Checker
 
