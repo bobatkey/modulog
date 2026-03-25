@@ -1,4 +1,4 @@
-sort setting = { On, Off }
+sort setting = [ On, Off ]
 
 module type planning_scenario = sig
 
@@ -55,7 +55,7 @@ end
 (* FIXME: would be nice to have some syntactic sugar and nicer representation
    for this. *)
 module five_steps = struct
-  sort instant = {T0, T1, T2, T2, T3, T4}
+  sort instant = [ T0, T1, T2, T2, T3, T4 ]
   pred next : instant * instant = (now, then).
       (now = T0 & then = T1)
     | (now = T1 & then = T2)

@@ -20,7 +20,7 @@ end
 
 module null (s : asort) = struct
   sort symbol = s.s
-  sort state = { S }
+  sort state = [ S ]
   pred transition : state * symbol * state =
     (q, s, q'). false
   pred initial : state = (q). q = S
@@ -30,7 +30,7 @@ end
 module sym (p : predicate) = struct
   sort symbol = p.s
 
-  sort state = { Waiting, Got }
+  sort state = [ Waiting, Got ]
 
   pred transition : state * symbol * state =
     (q, s, q'). q = Waiting & p.accepts(s) & q = Got

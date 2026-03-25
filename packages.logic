@@ -19,7 +19,7 @@ module type package_installation = sig
 
 end
 
-sort myPackage = { ProgA, ProgB, Lib1, Lib2, Lib3 }
+sort myPackage = [ ProgA, ProgB, Lib1, Lib2, Lib3 ]
 
 pred myDepends : myPackage * myPackage = (p, q).
   (p = ProgA & q = Lib1) | (p = ProgB & q = Lib2) | (p = Lib1 & q = Lib3)

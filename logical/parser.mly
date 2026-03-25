@@ -54,9 +54,6 @@ longident:
 sort_expr:
   | name=longident
     { SVar name }
-/* FIXME: should probably unify enumerations and sums */
-  | LBRACE; symbols=separated_list(COMMA, SYMBOL); RBRACE
-    { Enumeration symbols }
   | LSQBRACK; variants=separated_list(COMMA, variant); RSQBRACK
     { Sum variants }
   | LPAREN; sorts=separated_list(STAR, sort_expr); RPAREN
@@ -65,6 +62,8 @@ sort_expr:
 variant:
   | lbl=SYMBOL; COLON; sort=sort_expr
     { lbl, sort }
+  | lbl=SYMBOL
+    { lbl, Prod [] }
 
 /* value expressions */
 
@@ -72,7 +71,7 @@ value_expr:
   | var=IDENT
     { LocalVar var }
   | symbol=SYMBOL
-    { Symbol symbol }
+    { Variant (symbol, Tuple []) }
   | symbol=SYMBOL; e=value_expr
     { Variant (symbol, e) }
   | LPAREN; e=separated_list(COMMA, value_expr); RPAREN

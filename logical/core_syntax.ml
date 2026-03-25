@@ -5,14 +5,12 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 
   type sort_expr =
     | SVar of Names.longident
-    | Enumeration of string list (* FIXME: 'string' standing in for 'symbol' *)
     | Sum of (string * sort_expr) list
     | Prod of sort_expr list
   (* FIXME: remove 'Enumeration' in favour of sums with no arguments *)
 
   type value_expr =
     | LocalVar of string
-    | Symbol   of string (* i.e., 'symbol' *)
     | Variant  of string * value_expr
     | Tuple    of value_expr list
   (* FIXME: and function symbols, when we have them. *)
@@ -67,12 +65,12 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   let rec pp_sort fmt = function
     | SVar name ->
       Names.pp_longident fmt name
-    | Enumeration symbols ->
-      Format.fprintf fmt "@[<hv2>{%a}@]"
-	(Format.pp_print_list ~pp_sep:pp_comma pp_symbol) symbols
     | Sum variants ->
-      let pp_variant fmt (lbl, sort_expr) =
-	Format.fprintf fmt "@[<hv2>%s :@ %a@]" lbl pp_sort sort_expr
+      let pp_variant fmt = function
+	| lbl, Prod [] ->
+	  Format.fprintf fmt "%a" pp_symbol lbl
+	| lbl, sort_expr ->
+	  Format.fprintf fmt "@[<hv2>%a :@ %a@]" pp_symbol lbl pp_sort sort_expr
       in
       Format.fprintf fmt "@[<hv2>[%a]@]"
 	(Format.pp_print_list ~pp_sep:pp_comma pp_variant) variants
@@ -81,13 +79,15 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	(Format.pp_print_list ~pp_sep:pp_star pp_sort) sorts
 
   let rec pp_expr fmt = function
-    | LocalVar varname -> Format.fprintf fmt "%s" varname
-    | Symbol symbol    -> pp_symbol fmt symbol
+    | LocalVar varname ->
+      Format.fprintf fmt "%s" varname
+    | Variant (symbol, Tuple []) ->
+      Format.fprintf fmt "%a" pp_symbol symbol
     | Variant (symbol, expr) ->
       Format.fprintf fmt "%a %a" pp_symbol symbol pp_expr expr
-  | Tuple exprs ->
-    Format.fprintf fmt "(%a)"
-      (Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
+    | Tuple exprs ->
+      Format.fprintf fmt "(%a)"
+	(Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
 
   let pp_formula =
     let rec formula fmt = function
@@ -208,8 +208,6 @@ module CheckedInnerSyntax  = struct
   let rec subst_sort subst = function
     | SVar ident ->
       SVar (Subst.path subst ident)
-    | Enumeration symbols ->
-      Enumeration symbols
     | Sum variants ->
       Sum (List.map (fun (lbl, sort) -> lbl, subst_sort subst sort) variants)
     | Prod sorts ->

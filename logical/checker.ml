@@ -46,7 +46,7 @@ module InnerTyping = struct
 
     (* Expand a sort expression down to the next constructor *)
     let rec expand_sort env = function
-      | Enumeration _ | Sum _ | Prod _ as sort -> sort
+      | Sum _ | Prod _ as sort -> sort
       | SVar ident as sort ->
 	(match Env.lookup_type ident env with
 	| _, None -> sort
@@ -57,7 +57,6 @@ module InnerTyping = struct
 
     let rec eval_expr env ctxt = function
       | Core.LocalVar var -> LocalEnv.find var ctxt
-      | Core.Symbol symb  -> Core.Symbol symb
       | Core.Variant (lbl, expr) -> Core.Variant (lbl, eval_expr env ctxt expr)
       | Core.Tuple exprs -> Core.Tuple (List.map (eval_expr env ctxt) exprs)
 
@@ -71,9 +70,6 @@ module InnerTyping = struct
 	| _, None -> fail
 	| _, Some (SortDefn defn) -> enumerate_sort env defn
 	| _, _ -> assert false)
-      | Enumeration symbols ->
-	let* symb = of_list symbols in
-	return (Symbol symb)
       | Sum variants ->
 	let* lbl, sort = of_list variants in
 	let* value = enumerate_sort env sort in
@@ -103,8 +99,6 @@ module InnerTyping = struct
 	    Ok (Core.SVar ident)
 	  | Ok (_ident, Predicate _) ->
 	    Error (`Msg "expecting a sort"))
-	| Src.Enumeration symbols ->
-	  Ok (Core.Enumeration symbols)
 	| Src.Sum variants ->
 	  let* variants =
 	    map_result (fun (lbl, sort) ->
@@ -129,8 +123,6 @@ module InnerTyping = struct
       match expand_sort env sort1, expand_sort env sort2 with
       | Core.SVar ident1, Core.SVar ident2 ->
 	Modules.Path.equal ident1 ident2
-      | Core.Enumeration symbols1, Core.Enumeration symbols2 ->
-	List.sort String.compare symbols1 = List.sort String.compare symbols2
       | Core.Sum variants1, Core.Sum variants2 ->
 	(* FIXME: deal with reordering *)
 	List.length variants1 = List.length variants2
@@ -153,15 +145,6 @@ module InnerTyping = struct
 	    Ok (Core.LocalVar var)
 	  else
 	    Error (`Msg "sorts not equal"))
-      | Src.Symbol symbol ->
-	(match expand_sort env sort with
-	| SVar _ | Sum _ | Prod _ ->
-	  Error (`Msg "symbol not known to be inhabitant of abstract sort")
-	| Enumeration symbols ->
-	  if List.mem symbol symbols then
-	    Ok (Core.Symbol symbol)
-	  else
-	    Error (`Msg "symbol not an element of this type"))
       | Src.Variant (lbl, expr) ->
 	(match expand_sort env sort with
 	| Sum variants ->
@@ -171,14 +154,14 @@ module InnerTyping = struct
 	  | Some sort ->
 	    let* expr = check_expr env ctxt sort expr in
 	    Ok (Core.Variant (lbl, expr)))
-	| SVar _ | Prod _ | Enumeration _ ->
+	| SVar _ | Prod _ ->
 	  Error (`Msg "not a sum sort"))
       | Src.Tuple exprs ->
 	(match expand_sort env sort with
 	| Core.Prod sorts ->
 	  let* exprs = check_exprs env ctxt sorts exprs in
 	  Ok (Core.Tuple exprs)
-	| SVar _ | Sum _ | Enumeration _ ->
+	| SVar _ | Sum _ ->
 	  Error (`Msg "not a tuple sort"))
 
     and check_exprs env ctxt sorts exprs =
@@ -196,7 +179,7 @@ module InnerTyping = struct
 	(match Ctxt.find_opt var ctxt with
 	| None -> Error (`Msg "variable not in scope")
 	| Some sort -> Ok (Some (Core.LocalVar var, sort)))
-      | Src.Symbol _ | Src.Variant _ | Src.Tuple _ -> Ok None
+      | Src.Variant _ | Src.Tuple _ -> Ok None
 
     (* Checks that a formula is well sorted *)
     let rec check_formula env ctxt = function
@@ -372,8 +355,7 @@ module InnerTyping = struct
       match expr1, expr2 with
       | Core.LocalVar x, Core.LocalVar y ->
 	vars_eq x y pairs
-      | Core.Symbol sym1, Core.Symbol sym2 ->
-	String.equal sym1 sym2
+	(* FIXME: sums and products too *)
       | _ -> false
 
     (* FIXME: should use de Bruijn indicies instead *)

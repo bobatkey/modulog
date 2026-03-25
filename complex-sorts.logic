@@ -18,3 +18,5 @@ end
 
 (* This ought to succeed *)
 synth solution : synthesis_problem
+
+sort enum = [ P, Q, R ]

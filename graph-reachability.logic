@@ -16,7 +16,7 @@ end
 *)
 
 module my_graph = struct
-  sort node = { Q0, Q1, Q2 }
+  sort node = [ Q0, Q1, Q2 ]
   pred edge : node * node = (src, tgt).
     (src = Q0 & tgt = Q1) | (src = Q1 & tgt = Q2)
 end
@@ -45,7 +45,7 @@ synth test : my_graph_with_reachability
 
 module my_reachable_graph = struct
   (* FIXME: this ought to be 'include my_graph' *)
-  sort node = { Q0, Q1, Q2 }
+  sort node = [ Q0, Q1, Q2 ]
   pred edge : node * node = (src, tgt).
     (src = Q0 & tgt = Q1) | (src = Q1 & tgt = Q2)
   (* to here *)

@@ -1,4 +1,4 @@
-sort entity = { Socrates, Zeus, Wuffles }
+sort entity = [ Socrates, Zeus, Wuffles ]
 
 pred human : entity =
   (x). x = Socrates
