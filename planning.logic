@@ -1,0 +1,144 @@
+sort setting = { On, Off }
+
+module type planning_scenario = sig
+
+  sort variable
+
+  sort action
+
+  pred requires : action * variable * setting
+
+  pred changesTo : action * variable * setting
+
+end
+
+module type map = sig
+  sort location
+  pred step : location * location
+end
+
+(* Given a map, generate the planning scenario for moving around the map. *)
+module route_finding (m : map) = struct
+
+  sort variable = [ Occupied : m.location ]
+
+  sort action = [ StepTo : (m.location * m.location) ]
+
+  pred requires : action * variable * setting =
+    (act, var, setting).
+      exists to : m.location -> exists from : m.location ->
+        act = StepTo (from, to) ->
+        (var = Occupied from & setting = On & m.step(from,to))
+
+  pred changesTo : action * variable * setting =
+    (act, var, setting).
+      exists to : m.location -> exists from : m.location ->
+        act = StepTo (from, to) ->
+	(  (var = Occupied from -> setting = Off)
+	 & (var = Occupied to -> setting = On))
+end
+
+
+module type time_line = sig
+
+  sort instant
+
+  pred next : instant * instant
+
+  (* FIXME: something to say that instants are linearly ordered? or does it not matter? *)
+
+  pred initial : instant
+  pred final : instant
+
+end
+
+(* FIXME: would be nice to have some syntactic sugar and nicer representation
+   for this. *)
+module five_steps = struct
+  sort instant = {T0, T1, T2, T2, T3, T4}
+  pred next : instant * instant = (now, then).
+      (now = T0 & then = T1)
+    | (now = T1 & then = T2)
+    | (now = T2 & then = T3)
+    | (now = T3 & then = T4)
+  pred initial : instant = (i). i = T0
+  pred final : instant = (i). i = T4
+end
+
+module type plan = sig
+
+  (* the problem *)
+  module scenario : planning_scenario
+
+  module time : time_line
+
+  pred initial : scenario.variable (* which variables ought to be true in the initial state? *)
+  pred final : scenario.variable (* which variables ought to be true in the final state? *)
+
+  (* FIXME: would be useful to have higher-order predicates?
+       pred invariant : (scenario.variable -> Prop) -> Prop
+
+     but they aren't serialisable!
+   *)
+
+  (**********************************************************************)
+  (* The solution *)
+
+  (* At each timestep, what action is performed? *)
+  pred actionAt : time.instant * scenario.action
+
+  (* At each timestep, true if the variable is On at this step and false it is Off *)
+  pred state : time.instant * scenario.variable
+
+  (* Some action is performed at every instant *)
+  axiom action_exists : forall t : time.instant -> exists a : scenario.action -> actionAt(t,a)
+
+  (* Only one action is performed at every timestep *)
+  axiom action_unique :
+    forall t : time.instant ->
+      forall a1 : scenario.action ->
+        forall a2 : scenario.action ->
+	  actionAt(t,a1) -> actionAt(t,a2) ->
+	  a1 = a2
+
+  (* An action's preconditions must hold before firing. *)
+  axiom action_pre :
+    forall t : time.instant ->
+      forall a : scenario.action ->
+        forall v : scenario.variable ->
+        actionAt(t, a) ->
+          ((scenario.requires(a, v, On) -> state(t, v))
+           &
+           (scenario.requires(a, v, Off) -> ¬state(t, v)))
+
+  (* An action's effect is applied to the state. *)
+  axiom action_effect :
+    forall t1 : time.instant -> forall t2 : time.instant ->
+      forall a : scenario.action ->
+        forall v : scenario.variable ->
+          time.next(t1, t2) ->
+          actionAt(t1,a) ->
+          ((scenario.changesTo(a, v, On) -> state(t2, v))
+           &
+           (scenario.changesTo(a, v, Off) -> ¬state(t2, v))
+           &
+           (¬(exists s : setting -> scenario.changesTo(a, v, s)) ->
+             ((state(t1, v) -> state(t2, v)) & (state(t2,v) -> state(t1,v)))) )
+
+end
+
+module of_map (m : map) (t : time_line) = struct
+
+  module scenario = route_finding (m)
+
+  module type an_instance =
+    plan with sort scenario.variable = scenario.variable
+         with sort scenario.action   = scenario.action
+	 with pred scenario.requires : scenario.action * scenario.variable * setting =
+	        (a, v, s). scenario.requires(a, v, s)
+	 with pred scenario.changesTo : scenario.action * scenario.variable * setting =
+	        (a, v, s). scenario.changesTo(a, v, s)
+         with sort time.instant = t.instant
+	 with pred time.next : t.instant * t.instant =
+	        (now, then). t.next(now,then)
+end

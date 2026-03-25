@@ -11,6 +11,7 @@
 
 %token RPAREN LPAREN ARROW COLON STAR COMMA
 %token RBRACE LBRACE
+%token LSQBRACK RSQBRACK
 %token CONJ DISJ FORALL EXISTS NEGATE
 %token PRED AXIOM SORT CHECK
 %token TRUE FALSE
@@ -48,17 +49,34 @@ longident:
   | lid=longident; DOT; f=IDENT
     { Lid_dot (lid, f) }
 
+/* sort expressions */
+
 sort_expr:
   | name=longident
     { SVar name }
+/* FIXME: should probably unify enumerations and sums */
   | LBRACE; symbols=separated_list(COMMA, SYMBOL); RBRACE
     { Enumeration symbols }
+  | LSQBRACK; variants=separated_list(COMMA, variant); RSQBRACK
+    { Sum variants }
+  | LPAREN; sorts=separated_list(STAR, sort_expr); RPAREN
+    { Prod sorts }
+
+variant:
+  | lbl=SYMBOL; COLON; sort=sort_expr
+    { lbl, sort }
+
+/* value expressions */
 
 value_expr:
   | var=IDENT
     { LocalVar var }
   | symbol=SYMBOL
     { Symbol symbol }
+  | symbol=SYMBOL; e=value_expr
+    { Variant (symbol, e) }
+  | LPAREN; e=separated_list(COMMA, value_expr); RPAREN
+    { Tuple e }
 
 formula:
   | p=base_formula; CONJ; ps=separated_nonempty_list(CONJ, base_formula)

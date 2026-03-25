@@ -1,0 +1,11 @@
+sort entity = { Socrates, Zeus, Wuffles }
+
+pred human : entity =
+  (x). x = Socrates
+
+pred mortal : entity =
+  (x). x = Wuffles | x = Socrates
+
+check all_humans_are_mortal : forall x : entity -> human(x) -> mortal(x)
+
+check not_all_mortals_are_human : ¬(forall x : entity -> mortal(x) -> human(x))

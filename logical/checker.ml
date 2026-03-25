@@ -8,6 +8,22 @@ let generate_names sorts =
   in
   make 0 sorts
 
+module Enum = struct
+  type 'a t = 'a list option
+  let return x = Some [x]
+  let fail = None
+  let of_list xs = Some xs
+  let ( let* ) x f = match x with
+  | None -> None
+  | Some xs ->
+    let rec loop collected = function
+      | [] -> Some collected
+      | x::xs -> (match f x with None -> None
+      | Some ys -> loop (ys @ collected) xs)
+    in
+    loop [] xs
+end
+
 module InnerTyping = struct
   module Src = SurfaceInnerSyntax
   module Core = CheckedInnerSyntax
@@ -20,32 +36,86 @@ module InnerTyping = struct
     | `Lookup_error err ->
       Modules.Typing_environment.pp_lookup_error fmt err
 
-  module Checker (Env : Modules.Typing.TYPING_ENV
+  module type ENV = Modules.Typing.TYPING_ENV
                         with type val_type = Core.val_type
                          and type def_type = Core.def_type
-                         and type kind = Core.kind) = struct
+                         and type kind = Core.kind
 
-    module Ctxt = Map.Make (String)
+  module Evaluation (Env : ENV) = struct
+    open Core
 
+    (* Expand a sort expression down to the next constructor *)
     let rec expand_sort env = function
-      | Core.Enumeration _ as sort -> sort
-      | Core.SVar ident as sort ->
+      | Enumeration _ | Sum _ | Prod _ as sort -> sort
+      | SVar ident as sort ->
 	(match Env.lookup_type ident env with
 	| _, None -> sort
 	| _, Some (SortDefn defn) -> expand_sort env defn
 	| _, _ -> assert false)
 
-    let check_sort env = function
+    module LocalEnv = Map.Make (String)
+
+    let rec eval_expr env ctxt = function
+      | Core.LocalVar var -> LocalEnv.find var ctxt
+      | Core.Symbol symb  -> Core.Symbol symb
+      | Core.Variant (lbl, expr) -> Core.Variant (lbl, eval_expr env ctxt expr)
+      | Core.Tuple exprs -> Core.Tuple (List.map (eval_expr env ctxt) exprs)
+
+    open Enum
+
+    (* Enumerate all the values of a sort, returning [None] if this sort is
+    not entirely ground. *)
+    let rec enumerate_sort env = function
+      | SVar ident ->
+	(match Env.lookup_type ident env with
+	| _, None -> fail
+	| _, Some (SortDefn defn) -> enumerate_sort env defn
+	| _, _ -> assert false)
+      | Enumeration symbols ->
+	let* symb = of_list symbols in
+	return (Symbol symb)
+      | Sum variants ->
+	let* lbl, sort = of_list variants in
+	let* value = enumerate_sort env sort in
+	return (Variant (lbl, value))
+      | Prod sorts ->
+	let rec loop values = function
+	  | [] ->
+	    return (Tuple (List.rev values))
+	  | sort::sorts ->
+	    let* value = enumerate_sort env sort in
+	    loop (value::values) sorts
+	in
+	loop [] sorts
+
+  end
+
+  module Checker (Env : ENV) = struct
+
+    include Evaluation (Env)
+
+    let rec check_sort env = function
       | Src.SVar ident ->
-	(match Env.find_type ident env with
-	| Error err ->
-	  Error (`Lookup_error err)
-	| Ok (ident, Sort) ->
-	  Ok (Core.SVar ident)
-	| Ok (_ident, Predicate _) ->
-	  Error (`Msg "expecting a sort"))
-      | Src.Enumeration symbols ->
-	Ok (Core.Enumeration symbols)
+	  (match Env.find_type ident env with
+	  | Error err ->
+	    Error (`Lookup_error err)
+	  | Ok (ident, Sort) ->
+	    Ok (Core.SVar ident)
+	  | Ok (_ident, Predicate _) ->
+	    Error (`Msg "expecting a sort"))
+	| Src.Enumeration symbols ->
+	  Ok (Core.Enumeration symbols)
+	| Src.Sum variants ->
+	  let* variants =
+	    map_result (fun (lbl, sort) ->
+	      let* sort = check_sort env sort in
+	      Ok (lbl, sort))
+	      variants
+	  in
+	  Ok (Core.Sum variants)
+	| Src.Prod sorts ->
+	  let* sorts = map_result (check_sort env) sorts in
+	  Ok (Core.Prod sorts)
 
     let rec check_sorts env = function
       | [] ->
@@ -55,17 +125,26 @@ module InnerTyping = struct
 	let* sorts = check_sorts env sorts in
 	Ok (sort::sorts)
 
-    let eqsort env sort1 sort2 =
+    let rec eqsort env sort1 sort2 =
       match expand_sort env sort1, expand_sort env sort2 with
       | Core.SVar ident1, Core.SVar ident2 ->
 	Modules.Path.equal ident1 ident2
       | Core.Enumeration symbols1, Core.Enumeration symbols2 ->
 	List.sort String.compare symbols1 = List.sort String.compare symbols2
+      | Core.Sum variants1, Core.Sum variants2 ->
+	(* FIXME: deal with reordering *)
+	List.length variants1 = List.length variants2
+        && List.for_all2 (fun (lbl1, s1) (lbl2, s2) -> String.equal lbl1 lbl2 && eqsort env s1 s2) variants1 variants2
+
+      | Core.Prod sorts1, Core.Prod sorts2 ->
+	List.length sorts1 = List.length sorts2
+	&& List.for_all2 (eqsort env) sorts1 sorts2
       | _ ->
 	false
 
-    let check_expr env ctxt sort expr =
-      match expr with
+    module Ctxt = Map.Make (String)
+
+    let rec check_expr env ctxt sort = function
       | Src.LocalVar var ->
 	(match Ctxt.find_opt var ctxt with
 	| None -> Error (`Msg "variable not in scope")
@@ -76,29 +155,48 @@ module InnerTyping = struct
 	    Error (`Msg "sorts not equal"))
       | Src.Symbol symbol ->
 	(match expand_sort env sort with
-	| SVar _ ->
+	| SVar _ | Sum _ | Prod _ ->
 	  Error (`Msg "symbol not known to be inhabitant of abstract sort")
 	| Enumeration symbols ->
 	  if List.mem symbol symbols then
 	    Ok (Core.Symbol symbol)
 	  else
 	    Error (`Msg "symbol not an element of this type"))
+      | Src.Variant (lbl, expr) ->
+	(match expand_sort env sort with
+	| Sum variants ->
+	  (match List.assoc_opt lbl variants with
+	  | None ->
+	    Error (`Msg ("variant " ^ lbl ^ " not an element of this sort"))
+	  | Some sort ->
+	    let* expr = check_expr env ctxt sort expr in
+	    Ok (Core.Variant (lbl, expr)))
+	| SVar _ | Prod _ | Enumeration _ ->
+	  Error (`Msg "not a sum sort"))
+      | Src.Tuple exprs ->
+	(match expand_sort env sort with
+	| Core.Prod sorts ->
+	  let* exprs = check_exprs env ctxt sorts exprs in
+	  Ok (Core.Tuple exprs)
+	| SVar _ | Sum _ | Enumeration _ ->
+	  Error (`Msg "not a tuple sort"))
+
+    and check_exprs env ctxt sorts exprs =
+      match sorts, exprs with
+      | [], [] -> Ok []
+      | [], _::_ | _::_, [] ->
+	Error (`Msg "argument length mismatch")
+      | sort::sorts, expr::exprs ->
+	let* expr  = check_expr env ctxt sort expr in
+	let* exprs = check_exprs env ctxt sorts exprs in
+	Ok (expr::exprs)
 
     let infer_sort_of_expr _env ctxt = function
       | Src.LocalVar var ->
 	(match Ctxt.find_opt var ctxt with
 	| None -> Error (`Msg "variable not in scope")
 	| Some sort -> Ok (Some (Core.LocalVar var, sort)))
-      | Src.Symbol _ -> Ok None
-
-    let rec check_exprs env ctxt sorts exprs =
-      match sorts, exprs with
-      | [], [] -> Ok []
-      | [], _::_ | _::_, [] -> Error (`Msg "argument length mismatch")
-      | sort::sorts, expr::exprs ->
-	let* expr = check_expr env ctxt sort expr in
-	let* exprs = check_exprs env ctxt sorts exprs in
-	Ok (expr::exprs)
+      | Src.Symbol _ | Src.Variant _ | Src.Tuple _ -> Ok None
 
     (* Checks that a formula is well sorted *)
     let rec check_formula env ctxt = function
@@ -157,11 +255,7 @@ module InnerTyping = struct
     (* To check that formulas are true, we assume that all sorts are fully
        defined and so are all the relation symbols. *)
 
-    let eval_expr _env ctxt = function
-      | Core.LocalVar var -> Ctxt.find var ctxt
-      | Core.Symbol symb  -> symb
-
-    let rec model_check env ctxt = function
+    let rec model_check env local_env = function
       | Core.True -> Ok true
       | Core.False -> Ok false
       | Core.Atom (r, exprs) ->
@@ -169,7 +263,7 @@ module InnerTyping = struct
 	| Predicate _, Some (PredDefn { args; predicate }) ->
 	  let ctxt' =
 	    List.fold_left2
-	      (fun ctxt' v e -> Ctxt.add v (eval_expr env ctxt e) ctxt')
+	      (fun ctxt' v e -> Ctxt.add v (eval_expr env local_env e) ctxt')
 	      Ctxt.empty
 	      args exprs
 	  in
@@ -177,55 +271,57 @@ module InnerTyping = struct
 	| Predicate _, None -> Error (`Msg "abstract predicate cannot be checked")
 	| _ -> failwith "internal: type error in model checker")
       | Core.Eq (e1, e2) ->
-	let v1 = eval_expr env ctxt e1 in
-	let v2 = eval_expr env ctxt e2 in
-	Ok (String.equal v1 v2)
+	let v1 = eval_expr env local_env e1 in
+	let v2 = eval_expr env local_env e2 in
+	Ok (v1 = v2) (* FIXME: write a better equality check *)
       | Core.Conj (p, q) ->
-	let* p_value = model_check env ctxt p in
-	let* q_value = model_check env ctxt q in
+	let* p_value = model_check env local_env p in
+	let* q_value = model_check env local_env q in
 	Ok (p_value && q_value)
       | Core.Disj (p, q) ->
-	let* p_value = model_check env ctxt p in
-	let* q_value = model_check env ctxt q in
+	let* p_value = model_check env local_env p in
+	let* q_value = model_check env local_env q in
 	Ok (p_value || q_value)
       | Core.Impl (p, q) ->
-	let* p_value = model_check env ctxt p in
-	let* q_value = model_check env ctxt q in
+	let* p_value = model_check env local_env p in
+	let* q_value = model_check env local_env q in
 	Ok (not p_value || q_value)
       | Core.Not p ->
-	let* p_value = model_check env ctxt p in
+	let* p_value = model_check env local_env p in
 	Ok (not p_value)
       | Core.Forall (x, sort, p) ->
-	(match expand_sort env sort with
-	| Core.Enumeration symbols ->
+	(match enumerate_sort env sort with
+	| Some values ->
 	  let rec check_all = function
 	    | [] -> Ok true
 	    | symb::symbols ->
-	      let* result = model_check env (Ctxt.add x symb ctxt) p in
+	      let* result = model_check env (LocalEnv.add x symb local_env) p in
 	      if result then
 		check_all symbols
 	      else
 		Ok false
 	  in
-	  check_all symbols
-	| Core.SVar _ ->
+	  check_all values
+	| None ->
 	  Error (`Msg "abstract sort cannot be checked"))
       | Core.Exists (x, sort, p) ->
-	(match expand_sort env sort with
-	| Core.Enumeration symbols ->
+	(match enumerate_sort env sort with
+	| Some values ->
 	  let rec check_all = function
 	    | [] -> Ok false
 	    | symb::symbols ->
-	      let* result = model_check env (Ctxt.add x symb ctxt) p in
+	      let* result = model_check env (LocalEnv.add x symb local_env) p in
 	      if result then
 		Ok true
 	      else
 		check_all symbols
 	  in
-	  check_all symbols
-	| Core.SVar _ ->
+	  check_all values
+	| None ->
 	  Error (`Msg "abstract sort cannot be checked"))
 
+    (**********************************************************************)
+    (* The actual core typing interface *)
     let type_term env (Src.Check { name; property }) =
       let name      = Modules.Ident.create name in
       let* property = check_formula env Ctxt.empty property in
@@ -244,7 +340,12 @@ module InnerTyping = struct
 	Error (`Msg "Expecting a sort, got a predicate definition")
       | Core.Predicate sorts, Src.PredDefn { args; predicate } ->
 	if List.length sorts = List.length args then
-	  let ctxt = List.fold_left2 (fun ctxt var sort -> Ctxt.add var sort ctxt) Ctxt.empty args sorts in
+	  let ctxt =
+	    List.fold_left2
+	      (fun ctxt var sort -> Ctxt.add var sort ctxt)
+	      Ctxt.empty
+	      args sorts
+	  in
 	  let* predicate = check_formula env ctxt predicate in
 	  Ok (Core.PredDefn { args; predicate })
 	else
@@ -256,7 +357,8 @@ module InnerTyping = struct
       check_formula env Ctxt.empty formula
 
     let check_kind env = function
-      | Src.Sort -> Ok Core.Sort
+      | Src.Sort ->
+	Ok Core.Sort
       | Src.Predicate sorts ->
 	let* sorts = check_sorts env sorts in
 	Ok (Core.Predicate sorts)
@@ -279,7 +381,8 @@ module InnerTyping = struct
       | Core.True, Core.True -> true
       | Core.False, Core.False -> true
       | Core.Atom (r1, exprs1), Core.Atom (r2, exprs2) ->
-	Modules.Path.equal r1 r2 && (* FIXME: what if they are defined? *)
+	Modules.Path.equal r1 r2 && (* FIXME: what if they are defined? Should probably expand both sides and
+                                       continue to check. *)
 	List.for_all2 (expr_alpha_equal pairs) exprs1 exprs2
       | Core.Conj (p1, q1), Core.Conj (p2, q2)
       | Core.Disj (p1, q1), Core.Disj (p2, q2)

@@ -5,22 +5,9 @@ open Checker
 
 module Env = TypeChecker.Env
 
-module LocalEnv = Map.Make (String)
-
 module RelTable = Hashtbl.Make (Modules.Ident)
 
-(* FIXME: this is duplicated from the type checker in Checker.ml *)
-let rec expand_sort env = function
-  | Enumeration _ as sort -> sort
-  | SVar ident as sort ->
-    (match Env.lookup_type ident env with
-    | _, None -> sort
-    | _, Some (SortDefn defn) -> expand_sort env defn
-    | _, _ -> assert false)
-
-let eval_expr local_env = function
-  | LocalVar v -> LocalEnv.find v local_env
-  | Symbol b   -> b
+open Checker.InnerTyping.Evaluation (TypeChecker.TypingEnv)
 
 let rec constraints_of_formula clauses table env local_env = function
   | True ->
@@ -35,7 +22,7 @@ let rec constraints_of_formula clauses table env local_env = function
       | Modules.Path.Pident ident ->
 	(* FIXME: how to check that 'rel' is local bound locally? In what cases
         would it not be if this is a top-level module signature? *)
-	let tuple = List.map (eval_expr local_env) exprs in
+	let tuple = List.map (eval_expr env local_env) exprs in
 	let reltable =
 	  match RelTable.find table ident with
 	  | exception Not_found ->
@@ -56,7 +43,7 @@ let rec constraints_of_formula clauses table env local_env = function
     | Predicate _, Some (PredDefn { args; predicate }) ->
       let local_env =
 	List.fold_left2
-	  (fun le x e -> LocalEnv.add x (eval_expr local_env e) le)
+	  (fun le x e -> LocalEnv.add x (eval_expr env local_env e) le)
 	  LocalEnv.empty
 	  args exprs
       in
@@ -64,9 +51,9 @@ let rec constraints_of_formula clauses table env local_env = function
     | Predicate _, Some (SortDefn _) ->
       failwith "internal error: predicate with a sort definition")
   | Eq (e1, e2) ->
-    let x1 = eval_expr local_env e1 in
-    let x2 = eval_expr local_env e2 in
-    if String.equal x1 x2 then
+    let x1 = eval_expr env local_env e1 in
+    let x2 = eval_expr env local_env e2 in
+    if x1 = x2 then (* FIXME: proper value equality *)
       Solver.add_conj clauses []
     else
       Solver.add_disj clauses []
@@ -86,22 +73,22 @@ let rec constraints_of_formula clauses table env local_env = function
     let v = constraints_of_formula clauses table env local_env p in
     Solver.add_not clauses v
   | Forall (x, sort, p) ->
-    (match expand_sort env sort with
-    | Enumeration symbols ->
+    (match enumerate_sort env sort with
+    | Some symbols ->
       symbols
 	|> List.map (fun v ->
 	  constraints_of_formula clauses table env (LocalEnv.add x v local_env) p)
 	  |> Solver.add_conj clauses
-    | SVar _ ->
+    | None ->
       failwith "internal error: undefined sort in synthesis")
   | Exists (x, sort, p) ->
-    (match expand_sort env sort with
-    | Enumeration symbols ->
+    (match enumerate_sort env sort with
+    | Some symbols ->
       symbols
 	|> List.map (fun v ->
 	  constraints_of_formula clauses table env (LocalEnv.add x v local_env) p)
 	  |> Solver.add_disj clauses
-    | SVar _ ->
+    | None ->
       failwith "internal error: undefined sort in synthesis")
 
 let rec to_signature env = function
@@ -145,7 +132,9 @@ let synthesise env _ident mod_ty =
   in
   assert_axioms signature;
   match Solver.solve solver with
-  | None -> Error (`Synth_error (Location.generated, "Unable to synthesise"))
+  | None ->
+    (* FIXME: better location, and try to work out why not *)
+    Error (`Synth_error (Location.generated, "Unable to synthesise"))
   | Some eval ->
     let rec build_struct rev_items = function
       | [] ->
@@ -173,7 +162,7 @@ let synthesise env _ident mod_ty =
 	  RelTable.find table ident |>
             Hashtbl.to_seq |>
             Seq.filter (fun (_,v) -> eval v) |>
-            Seq.map (fun (values, _) -> conjunction (List.map2 (fun x value -> Eq (LocalVar x, Symbol value)) args values)) |>
+            Seq.map (fun (values, _) -> conjunction (List.map2 (fun x value -> Eq (LocalVar x, value)) args values)) |>
             List.of_seq |>
             disjunction
 	in

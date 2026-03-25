@@ -70,6 +70,12 @@ module type MOD_TYPING = sig
 
   module Env : Typing_environment.S with module Mod = Tgt
 
+  module TypingEnv : TYPING_ENV
+       with type val_type = Tgt.Core.val_type
+        and type def_type = Tgt.Core.def_type
+        and type kind     = Tgt.Core.kind
+	and type t = Env.t
+
   type error
 
   val pp_error : Format.formatter -> error -> unit

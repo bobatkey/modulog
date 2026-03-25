@@ -1,0 +1,20 @@
+sort symbol = { A, B, C }
+
+sort product = (symbol * symbol)
+
+pred is_AA : product = (x). x = (A, A)
+
+sort variant = [ X : product, Y : symbol ]
+
+pred is_X : variant = (x). x = X (B, C)
+
+module type synthesis_problem = sig
+
+  pred unknown : variant
+
+  axiom little_bit_known : exists p : product -> unknown (X p)
+
+end
+
+(* This ought to succeed *)
+synth solution : synthesis_problem

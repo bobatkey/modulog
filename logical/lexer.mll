@@ -13,12 +13,13 @@ rule token = parse
 | ":"              { COLON }
 | "*"              { STAR }
 | "."              { DOT }
-| "->"             { ARROW }
 | "="              { EQUALS }
 | '('              { LPAREN }
 | ')'              { RPAREN }
 | '{'              { LBRACE }
 | '}'              { RBRACE }
+| '['              { LSQBRACK }
+| ']'              { RSQBRACK }
 
 | "module"         { MODULE }
 | "type"           { TYPE }
@@ -42,6 +43,7 @@ rule token = parse
 | "¬"              { NEGATE }
 | "forall"         { FORALL }
 | "exists"         { EXISTS }
+| "->"             { ARROW }
 
 | "synth"          { SYNTH }
 | "display"        { DISPLAY }

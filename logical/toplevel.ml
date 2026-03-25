@@ -3,7 +3,8 @@ open Checker
 
 module Env = TypeChecker.Env
 
-(* FIXME: this ought to do something else. *)
+(* FIXME: this ought to do something else: display whatever object is
+   required. *)
 let display env longident =
   match Env.find_module longident env with
   | Ok (path, mod_ty) ->
