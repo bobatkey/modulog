@@ -45,7 +45,8 @@ module type time_line = sig
 
   pred next : instant * instant
 
-  (* FIXME: something to say that instants are linearly ordered? or does it not matter? *)
+  (* FIXME: something to say that instants are linearly ordered? or
+     does it not matter? *)
 
   pred initial : instant
   pred final : instant

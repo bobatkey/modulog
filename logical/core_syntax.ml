@@ -40,7 +40,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   type kind =
     | Sort
     | Predicate of sort_expr list
-  (* Or a function *)
+  (* FIXME: or a function *)
 
   type term =
     | Check of { name : Names.ident; property : formula }

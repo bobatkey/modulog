@@ -28,7 +28,9 @@ module InnerTyping = struct
   module Src = SurfaceInnerSyntax
   module Core = CheckedInnerSyntax
 
-  type error = [`Msg of string | `Lookup_error of Modules.Typing_environment.lookup_error ]
+  type error =
+    [ `Msg of string
+    | `Lookup_error of Modules.Typing_environment.lookup_error ]
 
   let pp_error fmt = function
     | `Msg string ->
@@ -56,14 +58,17 @@ module InnerTyping = struct
     module LocalEnv = Map.Make (String)
 
     let rec eval_expr env ctxt = function
-      | Core.LocalVar var -> LocalEnv.find var ctxt
-      | Core.Variant (lbl, expr) -> Core.Variant (lbl, eval_expr env ctxt expr)
-      | Core.Tuple exprs -> Core.Tuple (List.map (eval_expr env ctxt) exprs)
+      | Core.LocalVar var ->
+	LocalEnv.find var ctxt
+      | Core.Variant (lbl, expr) ->
+	Core.Variant (lbl, eval_expr env ctxt expr)
+      | Core.Tuple exprs ->
+	Core.Tuple (List.map (eval_expr env ctxt) exprs)
 
     open Enum
 
     (* Enumerate all the values of a sort, returning [None] if this sort is
-    not entirely ground. *)
+       not entirely ground. *)
     let rec enumerate_sort env = function
       | SVar ident ->
 	(match Env.lookup_type ident env with
@@ -127,7 +132,6 @@ module InnerTyping = struct
 	(* FIXME: deal with reordering *)
 	List.length variants1 = List.length variants2
         && List.for_all2 (fun (lbl1, s1) (lbl2, s2) -> String.equal lbl1 lbl2 && eqsort env s1 s2) variants1 variants2
-
       | Core.Prod sorts1, Core.Prod sorts2 ->
 	List.length sorts1 = List.length sorts2
 	&& List.for_all2 (eqsort env) sorts1 sorts2
@@ -363,8 +367,9 @@ module InnerTyping = struct
       | Core.True, Core.True -> true
       | Core.False, Core.False -> true
       | Core.Atom (r1, exprs1), Core.Atom (r2, exprs2) ->
-	Modules.Path.equal r1 r2 && (* FIXME: what if they are defined? Should probably expand both sides and
-                                       continue to check. *)
+	Modules.Path.equal r1 r2 &&
+	(* FIXME: what if they are defined? Should probably expand both sides and
+           continue to check. *)
 	List.for_all2 (expr_alpha_equal pairs) exprs1 exprs2
       | Core.Conj (p1, q1), Core.Conj (p2, q2)
       | Core.Disj (p1, q1), Core.Disj (p2, q2)
@@ -378,9 +383,12 @@ module InnerTyping = struct
       | _ ->
 	false
 
+    (**********************************************************************)
+
     let valtype_match env formula1 formula2 =
       alpha_equal env [] (formula1, formula2)
 
+    (* FIXME: ought to be able to disable *)
     let rec_safe_valtype _env _formula =
       false
 
