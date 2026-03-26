@@ -7,7 +7,6 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | SVar of Names.longident
     | Sum of (string * sort_expr) list
     | Prod of sort_expr list
-  (* FIXME: remove 'Enumeration' in favour of sums with no arguments *)
 
   type value_expr =
     | LocalVar of string
