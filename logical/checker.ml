@@ -350,17 +350,25 @@ module InnerTyping = struct
 	let* sorts = check_sorts env sorts in
 	Ok (Core.Predicate sorts)
 
+    (**********************************************************************)
+    (* FIXME: this ought to be in the Evaluation module, and it would be
+       better to be using de Bruijn indicies. *)
     let rec vars_eq x1 x2 = function
       | [] -> x1 = x2
       | (y1, y2) :: pairs ->
 	(x1 = y1 && x2 = y2) || (x1 <> y1 && x2 <> y2 && vars_eq x1 x2 pairs)
 
-    let expr_alpha_equal pairs expr1 expr2 =
+    let rec expr_alpha_equal pairs expr1 expr2 =
       match expr1, expr2 with
       | Core.LocalVar x, Core.LocalVar y ->
 	vars_eq x y pairs
-	(* FIXME: sums and products too *)
-      | _ -> false
+      | Core.Variant (lbl1, expr1), Core.Variant (lbl2, expr2) ->
+	String.equal lbl1 lbl2 && expr_alpha_equal pairs expr1 expr2
+      | Core.Tuple exprs1, Core.Tuple exprs2 ->
+	List.length exprs1 = List.length exprs2
+	&& List.for_all2 (expr_alpha_equal pairs) exprs1 exprs2
+      | _ ->
+	false
 
     (* FIXME: should use de Bruijn indicies instead *)
     let rec alpha_equal env pairs = function
