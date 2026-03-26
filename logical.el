@@ -24,9 +24,9 @@
   (let ((synTable (make-syntax-table)))
 
   ;; multiple lines
-  (modify-syntax-entry ?( ". 1" synTable)
+  (modify-syntax-entry ?\( ". 1" synTable)
   (modify-syntax-entry ?* ". 23" synTable)
-  (modify-syntax-entry ?) ". 4" synTable)
+  (modify-syntax-entry ?\) ". 4" synTable)
 
   synTable))
 
