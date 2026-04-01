@@ -110,6 +110,12 @@ let synthesise env _ident mod_ty =
       (TypeChecker.check_modtype env mod_ty)
   in
   let* signature = to_signature env mod_ty in
+  (* New plan:
+     - Do not rely on adding the signature to the environment
+     - Maintain a local environment that accounts for nesting and shadowing
+     - For each predicate symbol, add it to the environment locally, and build an overall environment with all nesting represented
+     *)
+
   let env = Env.add_signature signature env in
   let table = RelTable.create 128 in
   let solver = Solver.create () in
@@ -127,8 +133,10 @@ let synthesise env _ident mod_ty =
       assert_axioms items
     | {sigitem_loc=_; sigitem_data=Sig_type (_ident, _decl)} :: items ->
       assert_axioms items
-    | {sigitem_loc=_; sigitem_data=Sig_module _} :: _items ->
-      failwith "FIXME: cannot synthesis nested modules yet"
+    | {sigitem_loc=_; sigitem_data=Sig_module (_ident, _modty)} :: items ->
+      (* FIXME: I think this will work "by accident" *)
+      assert_axioms items
+    (* failwith "FIXME: cannot synthesis nested modules yet" *)
     | {sigitem_loc=_; sigitem_data=Sig_modty _} :: items ->
       (* FIXME: just skip these? *)
       assert_axioms items
@@ -136,7 +144,8 @@ let synthesise env _ident mod_ty =
   assert_axioms signature;
   match Solver.solve solver with
   | None ->
-    (* FIXME: better location, and try to work out why not *)
+    (* FIXME: better location, and try to work out why not using an UNSAT
+       core *)
     Error (`Synth_error (Location.generated, "Unable to synthesise"))
   | Some eval ->
     let rec build_struct rev_items = function
@@ -159,7 +168,7 @@ let synthesise env _ident mod_ty =
 	build_struct (item :: rev_items) items
       | {sigitem_loc=_;
            sigitem_data=Sig_type (ident, {kind=Predicate sorts; manifest=None})
-      } :: items ->
+        } :: items ->
 	let args = generate_names sorts in
 	let body =
 	  RelTable.find table ident |>
@@ -176,8 +185,14 @@ let synthesise env _ident mod_ty =
 	}
 	in
 	build_struct (item :: rev_items) items
-      | _ ->
-	failwith "unexpected item in signature"
+      | {sigitem_loc=_; sigitem_data=Sig_module (_ident, _modty)}::items ->
+	(* FIXME: skipping this for now, but ought to recurse into it and construct a synthesised version. *)
+	build_struct rev_items items
+
+      | {sigitem_loc=_; sigitem_data=Sig_type(_, {kind=Sort | Function _; _})}::_ ->
+	failwith "cannot synthesise functions (yet) or sorts"
+      | {sigitem_loc=_; sigitem_data=Sig_modty _}::_ ->
+	failwith "not sure what to do when synthesising module types"
     in
     let modterm = {
       modterm_loc=Location.generated;

@@ -8,7 +8,6 @@ module type package_specification = sig
   pred required  : package
 end
 
-
 module type package_installation = sig
   module spec : package_specification
 
@@ -29,20 +28,22 @@ module type package_installation = sig
 
 end
 
-(*
 sort myPackage = [ ProgA, ProgB, Lib1, Lib2, Lib3 ]
+sort myPackageSet = [ ADeps, BDeps, Lib1Deps ]
 
-pred myDepends : myPackage * myPackage = (p, q).
-  (p = ProgA & q = Lib1) | (p = ProgB & q = Lib2) | (p = Lib1 & q = Lib3)
-
+pred myDepends : myPackage * myPackageSet = (p, qs).
+  (p == ProgA & qs == ADeps) | (p == ProgB & qs == BDeps) | (p == Lib1 & qs == Lib1Deps)
+pred myMember : myPackage * myPackageSet = (p, ps).
+  (p == Lib1 & ps == ADeps) | (p == Lib2 & ps == BDeps) | (p == Lib3 & ps == Lib1Deps)
 pred myConflicts : myPackage * myPackage = (p, q).
-  (p = Lib2 & q = Lib3)
+  false (* (p == Lib2 & q == Lib3) *)
 
-pred myRequirements : myPackage = (p). p = ProgA | p = ProgB
+pred myRequirements : myPackage = (p). p == ProgA | p == ProgB
 
 synth solution : package_installation
-  with sort package = myPackage
-  with pred dependsOn : myPackage * myPackage = (p,q). myDepends(p,q)
-  with pred conflict : myPackage * myPackage = (p, q). myConflicts(p,q)
-  with pred required : myPackage = (p). myRequirements(p)
-*)
+  with sort spec.package = myPackage
+  with sort spec.packageSet = myPackageSet
+  with pred spec.dependsOn : myPackage * myPackageSet = (p,q). myDepends(p,q)
+  with pred spec.member : myPackage * myPackageSet = (p,q). myMember(p,q)
+  with pred spec.conflict : myPackage * myPackage = (p, q). myConflicts(p,q)
+  with pred spec.required : myPackage = (p). myRequirements(p)
