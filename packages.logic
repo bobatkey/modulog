@@ -18,28 +18,32 @@ module type package_installation = sig
 
   axiom dependencies_installed : forall p : spec.package ->
     installed(p) ->
-      (forall s : spec.packageSet ->
-        spec.dependsOn(p,s) ->
-          (forall q : spec.package ->
-            spec.member(q,s) -> installed(q)))
+      exists s : spec.packageSet ->
+        spec.dependsOn(p,s) &
+          (forall q : spec.package -> spec.member(q,s) -> installed(q))
 
   axiom no_conflicts : forall p : spec.package -> forall q : spec.package ->
-    installed(p) -> installed(q) -> ¬spec.conflict(p, q)
-
+    installed(p) -> installed(q) -> ¬(spec.conflict(p, q))
 end
 
 sort myPackage = [ ProgA, ProgB, Lib1, Lib2, Lib3 ]
-sort myPackageSet = [ ADeps, BDeps, Lib1Deps ]
+sort myPackageSet = [ ADeps, BDeps, Lib1Deps, EmptyDeps ]
 
 pred myDepends : myPackage * myPackageSet = (p, qs).
-  (p == ProgA & qs == ADeps) | (p == ProgB & qs == BDeps) | (p == Lib1 & qs == Lib1Deps)
+    (p == ProgA & qs == ADeps)
+  | (p == ProgB & qs == BDeps)
+  | (p == Lib1 & qs == Lib1Deps)
+  | ((p == Lib2 | p == Lib3) & qs == EmptyDeps)
 pred myMember : myPackage * myPackageSet = (p, ps).
-  (p == Lib1 & ps == ADeps) | (p == Lib2 & ps == BDeps) | (p == Lib3 & ps == Lib1Deps)
+    (p == Lib1 & ps == ADeps)
+  | (p == Lib2 & ps == BDeps)
+  | (p == Lib3 & ps == Lib1Deps)
 pred myConflicts : myPackage * myPackage = (p, q).
   false (* (p == Lib2 & q == Lib3) *)
 
 pred myRequirements : myPackage = (p). p == ProgA | p == ProgB
 
+(* FIXME: should be able to say 'with module spec = mySpec' *)
 synth solution : package_installation
   with sort spec.package = myPackage
   with sort spec.packageSet = myPackageSet
