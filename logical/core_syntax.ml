@@ -81,70 +81,71 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 
   let pp_expr =
     let rec formula fmt = function
-      | Forall _ | Exists _ as f ->
-	Format.fprintf fmt "@[<hov2>%a@]" quantifiers f
+      | Forall _ | Exists _ | Impl _ as f ->
+	Format.fprintf fmt "@[<hv2>%a@]" quantifiers f
       | f ->
 	propositional fmt f
     and quantifiers fmt = function
       | Forall (x, sort, p) ->
-	Format.fprintf fmt "forall %s : %a -> %a"
+	Format.fprintf fmt "@[<hv2>forall %s : %a ->@ %a@]"
 	  x
 	  pp_sort sort
 	  quantifiers p
       | Exists (x, sort, p) ->
-	Format.fprintf fmt "exists %s : %a -> %a"
+	Format.fprintf fmt "@[<hv2>exists %s : %a ->@ %a@]"
 	  x
 	  pp_sort sort
 	  quantifiers p
+      | Impl (p, q) ->
+	Format.fprintf fmt "@[<hv2>%a ->@ %a@]" equality p quantifiers q
       | p ->
-	Format.fprintf fmt "@,%a" propositional p
+	Format.fprintf fmt "%a" propositional p
     and propositional fmt = function
-      | Impl _ as f -> Format.fprintf fmt "@[<hov>%a@]" imps f
+      (* | Impl _ as f -> Format.fprintf fmt "@[<hov>%a@]" imps f *)
       | Conj _ as f -> Format.fprintf fmt "@[<hov>%a@]" conj f
       | Disj _ as f -> Format.fprintf fmt "@[<hov>%a@]" disj f
       | f -> equality fmt f
-    and imps fmt = function
-      | Impl (p, q) -> Format.fprintf fmt "%a ->@ %a" equality p imps q
-      | p          -> equality fmt p
+       (* and imps fmt = function *)
+	 (*   | Impl (p, q) -> Format.fprintf fmt "%a ->@ %a" equality p imps q *)
+	 (*   | p          -> equality fmt p *)
     and conj fmt = function
       | Conj (p, q) -> Format.fprintf fmt "%a &@ %a" equality p conj q
       | p -> equality fmt p
     and disj fmt = function
       | Disj (p, q) -> Format.fprintf fmt "%a |@ %a" equality p disj q
       | p -> equality fmt p
-      and equality fmt = function
-	| Eq (e1, e2) ->
-	  Format.fprintf fmt "%a == %a"
-	    application e1
-	    application e2
-	| e -> application fmt e
-	and application fmt = function
-	  | (Variant (_, Tuple []) | App (_, [])) as e ->
-	    base fmt e
-	  | App (relname, exprs) ->
-	    Format.fprintf fmt "%a@[<hv2>(%a)@]"
-	      Names.pp_longident relname
-	      (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
-	  | Variant (lbl, expr) ->
-	    Format.fprintf fmt "%s %a" lbl base expr
-	  | Not p ->
-	    Format.fprintf fmt "¬%a"
-	      base p
-	  | e -> base fmt e
+    and equality fmt = function
+      | Eq (e1, e2) ->
+	Format.fprintf fmt "%a == %a"
+	  application e1
+	  application e2
+      | e ->
+	application fmt e
+    and application fmt = function
+      | (Variant (_, Tuple []) | App (_, [])) as e ->
+	base fmt e
+      | App (relname, exprs) ->
+	Format.fprintf fmt "@[<hv2>%a(%a)@]"
+	  Names.pp_longident relname
+	  (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
+      | Variant (lbl, expr) ->
+	Format.fprintf fmt "%s %a" lbl base expr
+      | Not p ->
+	(* FIXME: lower the precedence of this? *)
+	Format.fprintf fmt "¬%a"
+	  base p
+      | e -> base fmt e
     and base fmt = function
       | True -> Format.fprintf fmt "true"
       | False -> Format.fprintf fmt "false"
       | Var nm -> Format.fprintf fmt "%s" nm
-      | App (relname, []) ->
-	Format.fprintf fmt "%a"
-	  Names.pp_longident relname
-      | Variant (lbl, Tuple []) ->
-	Format.fprintf fmt "%s" lbl
+      | App (relname, []) -> Format.fprintf fmt "%a" Names.pp_longident relname
+      | Variant (lbl, Tuple []) -> Format.fprintf fmt "%s" lbl
       | Tuple exprs ->
 	Format.fprintf fmt "(%a)"
 	  (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
       | ( Forall _ | Exists _ | Impl _ | Conj _ | Disj _
-        | Variant _ | App _ | Eq _ | Not _) as f ->
+        | Variant (_, _) | App (_, _::_) | Eq _ | Not _) as f ->
 	Format.fprintf fmt "(%a)" formula f
     in
     formula

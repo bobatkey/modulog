@@ -10,7 +10,6 @@
 %token<string> SYMBOL
 
 %token RPAREN LPAREN ARROW COLON STAR COMMA
-%token RBRACE LBRACE
 %token LSQBRACK RSQBRACK
 %token CONJ DISJ FORALL EXISTS NEGATE
 %token PRED AXIOM SORT CHECK FUNC
@@ -73,7 +72,7 @@ expr:
     { conjunction (p::ps) }
   | p=equality_expr; DISJ; ps=separated_nonempty_list(DISJ, equality_expr)
     { disjunction (p::ps) }
-  | p=equality_expr; ARROW; q=arrow_expr
+  | p=equality_expr; ARROW; q=expr
     { Impl (p, q) }
   | FORALL; var=IDENT; COLON; sort=sort_expr; ARROW; p=expr
     { Forall (var, sort, p) }
@@ -82,15 +81,19 @@ expr:
   | p=equality_expr
     { p }
 
-arrow_expr:
-  | p=equality_expr; ARROW; q=arrow_expr
-    { Impl (p, q) }
-  | p=equality_expr
-    { p }
-
 equality_expr:
-  | e1=base; EQUALS_EQUALS; e2=base
+  | e1=application_expr; EQUALS_EQUALS; e2=application_expr
     { Eq (e1, e2) }
+  | e=application_expr
+    { e }
+
+application_expr:
+  | name=longident; LPAREN; exprs=separated_list(COMMA,expr); RPAREN
+    { App (name, exprs) }
+  | symbol=SYMBOL; e=base
+    { Variant (symbol, e) }
+  | NEGATE; p=base
+    { Not p }
   | e=base
     { e }
 
@@ -101,14 +104,8 @@ base:
     { False }
   | name=IDENT
     { Var name }
-  | name=longident; LPAREN; exprs=separated_list(COMMA,expr); RPAREN
-    { App (name, exprs) }
   | symbol=SYMBOL
     { Variant (symbol, Tuple []) }
-  | symbol=SYMBOL; e=base (* FIXME: probably don't want to allow A B C to mean A (B (C)) *)
-    { Variant (symbol, e) }
-  | NEGATE; p=base
-    { Not p }
   | LPAREN; p=separated_list(COMMA,expr); RPAREN
     { match p with [e] -> e | es -> Tuple es }
 
@@ -143,7 +140,7 @@ proof:
   | NOTELIM; p=proof
   | REWRITE; d=dir; SEMICOLON; p=proof
   | DONE
-  | STORE; nm=IDENT; p=proof
+  | STORE; nm=IDENT; SEMICOLON; p=proof
 (* AUTO ? Could this do more? E-matching, for instance? *)
 (* CONTRADICTION? *)
 (* Checked comments. *)

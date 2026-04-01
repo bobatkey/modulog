@@ -16,8 +16,6 @@ rule token = parse
 | "="              { EQUALS }
 | '('              { LPAREN }
 | ')'              { RPAREN }
-| '{'              { LBRACE }
-| '}'              { RBRACE }
 | '['              { LSQBRACK }
 | ']'              { RSQBRACK }
 
