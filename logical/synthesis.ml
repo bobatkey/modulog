@@ -10,13 +10,16 @@ module RelTable = Hashtbl.Make (Modules.Ident)
 open Checker.InnerTyping.Evaluation (TypeChecker.TypingEnv)
 
 let rec constraints_of_formula clauses table env local_env = function
+  | Var _ | Variant _ | Tuple _ ->
+    failwith "internal error: ill-formed predicate"
   | True ->
     Solver.add_conj clauses []
   | False ->
     Solver.add_disj clauses []
-  | Atom (rel, exprs) ->
+  | App (rel, exprs) ->
     (match Env.lookup_type rel env with
     | Sort, _ -> failwith "internal error: sort where a relation should be"
+    | Function _, _ -> failwith "internal error: function where a relation should be"
     | Predicate _, None ->
       (match rel with
       | Modules.Path.Pident ident ->
@@ -39,15 +42,15 @@ let rec constraints_of_formula clauses table env local_env = function
       | Modules.Path.Pdot _ ->
 	failwith "FIXME: implement synthesis for nested modules")
 
-(* For a defined predicate, evaluate it in the current environment *)
-    | Predicate _, Some (PredDefn { args; predicate }) ->
+   (* For a defined predicate, evaluate it in the current environment *)
+    | Predicate _, Some (ExprDefn { args; body }) ->
       let local_env =
 	List.fold_left2
 	  (fun le x e -> LocalEnv.add x (eval_expr env local_env e) le)
 	  LocalEnv.empty
 	  args exprs
       in
-      constraints_of_formula clauses table env local_env predicate
+      constraints_of_formula clauses table env local_env body
     | Predicate _, Some (SortDefn _) ->
       failwith "internal error: predicate with a sort definition")
   | Eq (e1, e2) ->
@@ -113,7 +116,7 @@ let synthesise env _ident mod_ty =
   let rec assert_axioms = function
     | [] ->
       ()
-    | {sigitem_loc=_; sigitem_data=Sig_value (_, formula)} :: items ->
+    | {sigitem_loc=_; sigitem_data=Sig_value (_, Property formula)} :: items ->
       let v = constraints_of_formula solver table env LocalEnv.empty formula in
       Solver.add_assert solver v;
       assert_axioms items
@@ -139,7 +142,7 @@ let synthesise env _ident mod_ty =
     let rec build_struct rev_items = function
       | [] ->
 	List.rev rev_items
-      | {sigitem_loc=_; sigitem_data=Sig_value (name, property)} :: items ->
+      | {sigitem_loc=_; sigitem_data=Sig_value (name, Property property)} :: items ->
 	(* FIXME: is it okay to reuse the identifiers? *)
 	let item = {
 	  stritem_loc=Location.generated;
@@ -158,18 +161,18 @@ let synthesise env _ident mod_ty =
            sigitem_data=Sig_type (ident, {kind=Predicate sorts; manifest=None})
       } :: items ->
 	let args = generate_names sorts in
-	let predicate =
+	let body =
 	  RelTable.find table ident |>
             Hashtbl.to_seq |>
             Seq.filter (fun (_,v) -> eval v) |>
-            Seq.map (fun (values, _) -> conjunction (List.map2 (fun x value -> Eq (LocalVar x, value)) args values)) |>
+            Seq.map (fun (values, _) -> conjunction (List.map2 (fun x value -> Eq (Var x, expr_of_value value)) args values)) |>
             List.of_seq |>
             disjunction
 	in
 	let item = {
 	  stritem_loc = Location.generated;
 	  (* FIXME: I think this ought to be a fresh identifier with the same name *)
-	  stritem_data = Str_type (ident, Predicate sorts, PredDefn { args; predicate })
+	  stritem_data = Str_type (ident, Predicate sorts, ExprDefn { args; body })
 	}
 	in
 	build_struct (item :: rev_items) items

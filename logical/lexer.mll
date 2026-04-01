@@ -2,8 +2,8 @@
 open Parser
 }
 
-let ident = ['a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'']*
-let symbol = ['A'-'Z']['A'-'Z''a'-'z''_''0'-'9''\'']*
+let ident = ['a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'''-']*
+let symbol = ['A'-'Z']['A'-'Z''a'-'z''_''0'-'9''\'''-']*
 
 rule token = parse
   [' ''\t']        { token lexbuf }
@@ -32,6 +32,7 @@ rule token = parse
 | "with"           { WITH }
 
 | "pred"           { PRED }
+| "func"           { FUNC }
 | "axiom"          { AXIOM }
 | "sort"           { SORT }
 | "check"          { CHECK }
@@ -44,6 +45,7 @@ rule token = parse
 | "forall"         { FORALL }
 | "exists"         { EXISTS }
 | "->"             { ARROW }
+| "=="             { EQUALS_EQUALS }
 
 | "synth"          { SYNTH }
 | "display"        { DISPLAY }

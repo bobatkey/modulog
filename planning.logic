@@ -27,15 +27,15 @@ module route_finding (m : map) = struct
   pred requires : action * variable * setting =
     (act, var, setting).
       exists to : m.location -> exists from : m.location ->
-        act = StepTo (from, to) ->
-        (var = Occupied from & setting = On & m.step(from,to))
+        act == StepTo (from, to) ->
+        (var == Occupied from & setting == On & m.step(from,to))
 
   pred changesTo : action * variable * setting =
     (act, var, setting).
       exists to : m.location -> exists from : m.location ->
-        act = StepTo (from, to) ->
-	(  (var = Occupied from -> setting = Off)
-	 & (var = Occupied to -> setting = On))
+        act == StepTo (from, to) ->
+	(  (var == Occupied from -> setting == Off)
+	 & (var == Occupied to -> setting == On))
 end
 
 
@@ -58,12 +58,12 @@ end
 module five_steps = struct
   sort instant = [ T0, T1, T2, T2, T3, T4 ]
   pred next : instant * instant = (now, then).
-      (now = T0 & then = T1)
-    | (now = T1 & then = T2)
-    | (now = T2 & then = T3)
-    | (now = T3 & then = T4)
-  pred initial : instant = (i). i = T0
-  pred final : instant = (i). i = T4
+      (now == T0 & then == T1)
+    | (now == T1 & then == T2)
+    | (now == T2 & then == T3)
+    | (now == T3 & then == T4)
+  pred initial : instant = (i). i == T0
+  pred final : instant = (i). i == T4
 end
 
 module type plan = sig
@@ -100,7 +100,7 @@ module type plan = sig
       forall a1 : scenario.action ->
         forall a2 : scenario.action ->
 	  actionAt(t,a1) -> actionAt(t,a2) ->
-	  a1 = a2
+	  a1 == a2
 
   (* An action's preconditions must hold before firing. *)
   axiom action_pre :

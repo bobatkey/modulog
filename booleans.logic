@@ -1,0 +1,20 @@
+sort bool = [ T, F ]
+
+(*
+func logand : (bool * bool) -> bool =
+  (x, y). match x with T -> y; F -> F
+*)
+
+module type monoid = sig
+  sort carrier
+
+  func unit : carrier
+  func mult : carrier * carrier -> carrier
+
+  axiom left-unit : forall x : carrier -> mult(unit,x) == x
+
+  axiom right-unit : forall x : carrier -> mult(x,unit) == x
+
+  axiom assoc : forall x : carrier -> forall y : carrier -> forall z : carrier ->
+    mult(x,mult(y,z)) == mult(mult(x,y),z)
+end

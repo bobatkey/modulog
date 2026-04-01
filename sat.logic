@@ -4,11 +4,11 @@ module type sat_problem = sig
   pred c :
   pred d :
 
-  axiom constraint1 : ¬a() | b() | c()
-  axiom constraint2 : ¬c() | d()
-  axiom constraint3 : ¬b() | c()
-  axiom constraint4 : ¬b()
-  axiom constraint5 : a()
+  axiom constraint1 : ¬a | b | c
+  axiom constraint2 : ¬c | d
+  axiom constraint3 : ¬b | c
+  axiom constraint4 : ¬b
+  axiom constraint5 : a
 end
 
 synth solution : sat_problem

@@ -1,0 +1,27 @@
+module type machine = sig
+  sort input
+  sort output
+
+  sort state
+
+  func transition : state * input -> state
+  func out : state -> output
+end
+
+module type bisimulation = sig
+
+  sort input
+  sort output
+
+  module machine1 : machine with sort input = input with sort output = output
+  module machine2 : machine with sort input = input with sort output = output
+
+  pred r : machine1.state * machine2.state
+
+  axiom isBisimulation : forall s1 : machine1.state -> forall s2 : machine2.state ->
+    r(s1,s2) ->
+      (machine1.out(s1) == machine2.out(s2)
+       &
+       (forall i : input -> r(machine1.transition(s1,i), machine2.transition(s2,i))))
+
+end

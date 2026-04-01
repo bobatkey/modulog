@@ -1,0 +1,24 @@
+module type cospan = sig
+  sort apex
+  sort src
+  sort tgt
+
+  func left : src -> apex
+  func right : tgt -> apex
+end
+
+module type graph = sig
+  sort node
+  pred edge : node * node
+end
+
+module compose (g1 : graph) (g2 : graph) (c : cospan with sort src = g1.node with sort tgt = g2.node) = struct
+
+  sort node = c.apex
+
+  pred edge : node * node = (m, n).
+    (exists m' : g1.node -> exists n' : g1.node -> c.left(m') == m & c.left(n') == n & g1.edge(m',n'))
+    |
+    (exists m' : g2.node -> exists n' : g2.node -> c.right(m') == m & c.right(n') == n & g2.edge(m',n'))
+
+end

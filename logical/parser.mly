@@ -13,8 +13,9 @@
 %token RBRACE LBRACE
 %token LSQBRACK RSQBRACK
 %token CONJ DISJ FORALL EXISTS NEGATE
-%token PRED AXIOM SORT CHECK
+%token PRED AXIOM SORT CHECK FUNC
 %token TRUE FALSE
+%token EQUALS_EQUALS
 
 %token SYNTH DISPLAY
 
@@ -65,67 +66,107 @@ variant:
   | lbl=SYMBOL
     { lbl, Prod [] }
 
-/* value expressions */
+/* value and formula expressions */
 
-value_expr:
-  | var=IDENT
-    { LocalVar var }
-  | symbol=SYMBOL
-    { Variant (symbol, Tuple []) }
-  | symbol=SYMBOL; e=value_expr
-    { Variant (symbol, e) }
-  | LPAREN; e=separated_list(COMMA, value_expr); RPAREN
-    { Tuple e }
-
-formula:
-  | p=base_formula; CONJ; ps=separated_nonempty_list(CONJ, base_formula)
+expr:
+  | p=equality_expr; CONJ; ps=separated_nonempty_list(CONJ, equality_expr)
     { conjunction (p::ps) }
-  | p=base_formula; DISJ; ps=separated_nonempty_list(DISJ, base_formula)
+  | p=equality_expr; DISJ; ps=separated_nonempty_list(DISJ, equality_expr)
     { disjunction (p::ps) }
-  | p=base_formula; ARROW; q=arrow_formula
+  | p=equality_expr; ARROW; q=arrow_expr
     { Impl (p, q) }
-  | FORALL; var=IDENT; COLON; sort=sort_expr; ARROW; p=formula
+  | FORALL; var=IDENT; COLON; sort=sort_expr; ARROW; p=expr
     { Forall (var, sort, p) }
-  | EXISTS; var=IDENT; COLON; sort=sort_expr; ARROW; p=formula
+  | EXISTS; var=IDENT; COLON; sort=sort_expr; ARROW; p=expr
     { Exists (var, sort, p) }
-  | p=base_formula
+  | p=equality_expr
     { p }
 
-arrow_formula:
-  | p=base_formula; ARROW; q=arrow_formula { Impl (p, q) }
-  | p=base_formula { p }
+arrow_expr:
+  | p=equality_expr; ARROW; q=arrow_expr
+    { Impl (p, q) }
+  | p=equality_expr
+    { p }
 
-base_formula:
+equality_expr:
+  | e1=base; EQUALS_EQUALS; e2=base
+    { Eq (e1, e2) }
+  | e=base
+    { e }
+
+base:
   | TRUE
     { True }
   | FALSE
     { False }
-  | pred=longident; LPAREN; exprs=separated_list(COMMA,value_expr); RPAREN
-    { Atom (pred, exprs) }
-  | e1=value_expr; EQUALS; e2=value_expr
-    { Eq (e1, e2) }
-  | NEGATE; p=base_formula
+  | name=IDENT
+    { Var name }
+  | name=longident; LPAREN; exprs=separated_list(COMMA,expr); RPAREN
+    { App (name, exprs) }
+  | symbol=SYMBOL
+    { Variant (symbol, Tuple []) }
+  | symbol=SYMBOL; e=base (* FIXME: probably don't want to allow A B C to mean A (B (C)) *)
+    { Variant (symbol, e) }
+  | NEGATE; p=base
     { Not p }
-  | LPAREN; p=formula; RPAREN
-    { p }
+  | LPAREN; p=separated_list(COMMA,expr); RPAREN
+    { match p with [e] -> e | es -> Tuple es }
 
 %public
 str_value:
-  | CHECK; name=IDENT; COLON; property=formula
+  | CHECK; name=IDENT; COLON; property=expr
     { Check { name; property } }
+(*
+  | PROVE; name=IDENT; COLON; property=formula; BY; p=proof
+    { Proof { name; property; proof } }
+*)
+
+(*
+(* Ooft, that's a lot of keywords! *)
+proof:
+  | INTRODUCE; n=IDENT; SEMICOLON; p=proof
+  | TRUE; DOT
+  | SPLIT; LBRACE; DASH; p1=proof; DASH; p2=proof; RBRACE
+  | LEFT; SEMICOLON; p=proof
+  | RIGHT; SEMICOLON; p=proof
+  | EXISTS; v=value_expr; SEMICOLON; p=proof
+  | NOTINTRO; nm=IDENT; SEMICOLON; p=proof
+  | REFL
+  | USE; nm=longident; SEMICOLON; p=proof
+  | APPLY; LPAREN; p=proof; RPAREN; SEMICOLON; q=proof
+  | INST; v=value_expr; SEMICOLON; p=proof
+  | FIRST; SEMICOLON; p=proof
+  | SECOND; SEMICOLON; p=proof
+  | CASES; nm1=IDENT; nm2=IDENT; LBRACE; DASH; p1=proof; DASH; p2=proof; RBRACE
+  | UNPACK; x=IDENT; h=IDENT; SEMICOLON; p=proof
+  | FALSE
+  | NOTELIM; p=proof
+  | REWRITE; d=dir; SEMICOLON; p=proof
+  | DONE
+  | STORE; nm=IDENT; p=proof
+(* AUTO ? Could this do more? E-matching, for instance? *)
+(* CONTRADICTION? *)
+(* Checked comments. *)
+*)
 
 %public
 str_type(NAME):
   | SORT; id=NAME; EQUALS; expr=sort_expr
     { (id, Sort, SortDefn expr) }
   | PRED; id=NAME; COLON; sorts=separated_list(STAR, sort_expr); EQUALS;
-    LPAREN; args=separated_list(COMMA, IDENT); RPAREN; DOT; predicate=formula
-    { (id, Predicate sorts, PredDefn { args; predicate }) }
+    LPAREN; args=separated_list(COMMA, IDENT); RPAREN; DOT; body=expr
+    { (id, Predicate sorts, ExprDefn { args; body }) }
+  | FUNC; id=NAME; COLON; sorts=separated_list(STAR, sort_expr); ARROW; s=sort_expr; EQUALS;
+    LPAREN; args=separated_list(COMMA, IDENT); RPAREN; DOT; body=expr
+    { (id, Function (sorts, s), ExprDefn { args; body }) }
+  | FUNC; id=NAME; COLON; s=sort_expr; EQUALS;
+    LPAREN; args=separated_list(COMMA, IDENT); RPAREN; DOT; body=expr
+    { (id, Function ([], s), ExprDefn { args; body }) }
 
 %public
 sig_value:
-  | AXIOM; id=IDENT; COLON; p=formula
-    { (id, p) }
+  | AXIOM; id=IDENT; COLON; p=expr
+    { (id, Property p) }
 
 %public
 sig_type:
@@ -133,5 +174,9 @@ sig_type:
     { (id, Sort, None) }
   | PRED; id=IDENT; COLON; sorts=separated_list(STAR, sort_expr)
     { (id, Predicate sorts, None) }
+  | FUNC; id=IDENT; COLON; sorts=separated_list(STAR, sort_expr); ARROW; s=sort_expr
+    { (id, Function (sorts, s), None) }
+  | FUNC; id=IDENT; COLON; s=sort_expr
+    { (id, Function ([], s), None) }
   | manifest=str_type(IDENT)
     { let id, kind, decl = manifest in id, kind, Some decl }

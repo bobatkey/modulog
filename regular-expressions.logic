@@ -23,8 +23,8 @@ module null (s : asort) (* <: nfa *) = struct
   sort state = [ S ]
   pred transition : state * symbol * state =
     (q, s, q'). false
-  pred initial : state = (q). q = S
-  pred accepting : state = (q). q = S
+  pred initial : state = (q). q == S
+  pred accepting : state = (q). q == S
 end
 
 module sym (p : predicate) = struct
@@ -33,20 +33,20 @@ module sym (p : predicate) = struct
   sort state = [ Waiting, Got ]
 
   pred transition : state * symbol * state =
-    (q, s, q'). q = Waiting & p.accepts(s) & q = Got
+    (q, s, q'). q == Waiting & p.accepts(s) & q == Got
 
   pred jump : state * state = (q, q'). false
 
-  pred initial : state = (q). q = Waiting
+  pred initial : state = (q). q == Waiting
 
-  pred accepting : state = (q). q = Got
+  pred accepting : state = (q). q == Got
 end
 
 sort symbol = [ A, B, C ]
 
-module predA = struct sort s = symbol pred accepts : symbol = (s). s = A end
-module predB = struct sort s = symbol pred accepts : symbol = (s). s = B end
-module predC = struct sort s = symbol pred accepts : symbol = (s). s = C end
+module predA = struct sort s = symbol pred accepts : symbol = (s). s == A end
+module predB = struct sort s = symbol pred accepts : symbol = (s). s == B end
+module predC = struct sort s = symbol pred accepts : symbol = (s). s == C end
 
 module symA = sym (predA)
 module symB = sym (predB)
@@ -61,26 +61,26 @@ module seq (m1 : nfa) (m2 : nfa with sort symbol = m1.symbol) = struct
   pred transition : state * symbol * state =
     (q, s, q').
        (exists q1 : m1.state -> exists q1' : m1.state ->
-         (q = Part1 q1 & q' = Part1 q1' & m1.transition(q1, s, q1')))
+         (q == Part1 q1 & q' == Part1 q1' & m1.transition(q1, s, q1')))
        |
        (exists q2 : m2.state -> exists q2' : m2.state ->
-         (q = Part2 q2 & q' = Part2 q2' & m2.transition(q2, s, q2')))
+         (q == Part2 q2 & q' == Part2 q2' & m2.transition(q2, s, q2')))
 
   pred jump : state * state =
     (q, q').
        (exists q1 : m1.state -> exists q1' : m1.state ->
-         (q = Part1 q1 & q' = Part1 q1' & m1.jump(q1, q1')))
+         (q == Part1 q1 & q' == Part1 q1' & m1.jump(q1, q1')))
        |
        (exists q2 : m2.state -> exists q2' : m2.state ->
-         (q = Part2 q2 & q' = Part2 q2' & m2.jump(q2, q2')))
+         (q == Part2 q2 & q' == Part2 q2' & m2.jump(q2, q2')))
        |
        (exists q1 : m1.state -> exists q2' : m2.state ->
-         (q = Part1 q1 & q' = Part2 q2' & m1.accepting(q1) & m2.initial(q2')))
+         (q == Part1 q1 & q' == Part2 q2' & m1.accepting(q1) & m2.initial(q2')))
 
   pred initial : state = (q).
-    exists q1 : m1.state -> (q = Part1 q1 & m1.initial(q1))
+    exists q1 : m1.state -> (q == Part1 q1 & m1.initial(q1))
   pred accepting : state = (q).
-    exists q2 : m2.state -> (q = Part2 q2 & m2.accepting(q2))
+    exists q2 : m2.state -> (q == Part2 q2 & m2.accepting(q2))
 
 end
 
@@ -92,28 +92,28 @@ module or (m1 : nfa) (m2 : nfa with sort symbol = m1.symbol) = struct
   pred transition : state * symbol * state =
     (q, s, q').
       ((exists q1 : m1.state -> exists q1' : m1.state ->
-         (q = Left q1 & q' = Left q1' & m1.transition(q1, s, q1')))
+         (q == Left q1 & q' == Left q1' & m1.transition(q1, s, q1')))
        |
        (exists q2 : m2.state -> exists q2' : m2.state ->
-         (q = Right q2 & q' = Right q2' & m2.transition(q2, s, q2'))))
+         (q == Right q2 & q' == Right q2' & m2.transition(q2, s, q2'))))
 
    pred jump : state * state =
      (q, q').
        ((exists q1 : m1.state -> exists q1' : m1.state ->
-         (q = Left q1 & q' = Left q1' & m1.jump(q1, q1')))
+         (q == Left q1 & q' == Left q1' & m1.jump(q1, q1')))
        |
        (exists q2 : m2.state -> exists q2' : m2.state ->
-         (q = Right q2 & q' = Right q2' & m2.jump(q2, q2'))))
+         (q == Right q2 & q' == Right q2' & m2.jump(q2, q2'))))
 
    pred initial : state = (q).
-     (exists q1 : m1.state -> (q = Left q1 & m1.initial(q1)))
+     (exists q1 : m1.state -> (q == Left q1 & m1.initial(q1)))
      |
-     (exists q2 : m2.state -> (q = Right q2 & m2.initial(q2)))
+     (exists q2 : m2.state -> (q == Right q2 & m2.initial(q2)))
 
    pred accepting : state = (q).
-     (exists q1 : m1.state -> (q = Left q1 & m1.accepting(q1)))
+     (exists q1 : m1.state -> (q == Left q1 & m1.accepting(q1)))
      |
-     (exists q2 : m2.state -> (q = Right q2 & m2.accepting(q2)))
+     (exists q2 : m2.state -> (q == Right q2 & m2.accepting(q2)))
 end
 
 module star (m : nfa) = struct

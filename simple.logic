@@ -1,10 +1,10 @@
 sort entity = [ Socrates, Zeus, Wuffles ]
 
 pred human : entity =
-  (x). x = Socrates
+  (x). x == Socrates
 
 pred mortal : entity =
-  (x). x = Wuffles | x = Socrates
+  (x). x == Wuffles | x == Socrates
 
 check all_humans_are_mortal : forall x : entity -> human(x) -> mortal(x)
 

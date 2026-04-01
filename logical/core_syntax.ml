@@ -6,25 +6,25 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   type sort_expr =
     | SVar of Names.longident
     | Sum of (string * sort_expr) list
-    | Prod of sort_expr list
+    | Prod of sort_expr list (* invariant: 1-tuples do not exist *)
 
-  type value_expr =
-    | LocalVar of string
-    | Variant  of string * value_expr
-    | Tuple    of value_expr list
-  (* FIXME: and function symbols, when we have them. *)
+  type symbol = string
 
-  type formula =
+  type expr =
+    | Var      of string
+    | Variant  of symbol * expr
+    | Tuple    of expr list
+    | App      of Names.longident * expr list
+    (* TODO: case trees etc. *)
     | True
     | False
-    | Atom of Names.longident * value_expr list
-    | Eq   of value_expr * value_expr
-    | Conj of formula * formula
-    | Disj of formula * formula
-    | Impl of formula * formula
-    | Not of formula
-    | Forall of string * sort_expr * formula
-    | Exists of string * sort_expr * formula
+    | Eq       of expr * expr
+    | Conj     of expr * expr
+    | Disj     of expr * expr
+    | Impl     of expr * expr
+    | Not      of expr
+    | Forall   of string * sort_expr * expr
+    | Exists   of string * sort_expr * expr
 
   let rec conjunction = function
     | [] -> True
@@ -39,19 +39,21 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   type kind =
     | Sort
     | Predicate of sort_expr list
-  (* FIXME: or a function *)
+    | Function of sort_expr list * sort_expr
 
   type term =
-    | Check of { name : Names.ident; property : formula }
+    | Check of { name : Names.ident; property : expr }
   (* FIXME: also proofs *)
 
-  type val_type = formula
+  type val_type =
+    | Property of expr
 
   type def_type =
     | SortDefn of sort_expr
-    | PredDefn of { args : string list; predicate : formula  }
-  (* Or function, defined by pattern matching on the input sort *)
+    | ExprDefn of { args : string list; body : expr }
 
+  (**********************************************************************)
+  (* Pretty printing *)
   let pp_comma fmt () =
     Format.fprintf fmt ",@ "
 
@@ -77,18 +79,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       Format.fprintf fmt "@[<hov2>%a@]"
 	(Format.pp_print_list ~pp_sep:pp_star pp_sort) sorts
 
-  let rec pp_expr fmt = function
-    | LocalVar varname ->
-      Format.fprintf fmt "%s" varname
-    | Variant (symbol, Tuple []) ->
-      Format.fprintf fmt "%a" pp_symbol symbol
-    | Variant (symbol, expr) ->
-      Format.fprintf fmt "%a %a" pp_symbol symbol pp_expr expr
-    | Tuple exprs ->
-      Format.fprintf fmt "(%a)"
-	(Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
-
-  let pp_formula =
+  let pp_expr =
     let rec formula fmt = function
       | Forall _ | Exists _ as f ->
 	Format.fprintf fmt "@[<hov2>%a@]" quantifiers f
@@ -111,31 +102,49 @@ module Make (Names : Modules.Syntax.NAMES) = struct
       | Impl _ as f -> Format.fprintf fmt "@[<hov>%a@]" imps f
       | Conj _ as f -> Format.fprintf fmt "@[<hov>%a@]" conj f
       | Disj _ as f -> Format.fprintf fmt "@[<hov>%a@]" disj f
-      | f -> base fmt f
+      | f -> equality fmt f
     and imps fmt = function
-      | Impl (p, q) -> Format.fprintf fmt "%a ->@ %a" base p imps q
-      | p          -> base fmt p
+      | Impl (p, q) -> Format.fprintf fmt "%a ->@ %a" equality p imps q
+      | p          -> equality fmt p
     and conj fmt = function
-      | Conj (p, q) -> Format.fprintf fmt "%a &@ %a" base p conj q
-      | p -> base fmt p
+      | Conj (p, q) -> Format.fprintf fmt "%a &@ %a" equality p conj q
+      | p -> equality fmt p
     and disj fmt = function
-      | Disj (p, q) -> Format.fprintf fmt "%a |@ %a" base p disj q
-      | p -> base fmt p
+      | Disj (p, q) -> Format.fprintf fmt "%a |@ %a" equality p disj q
+      | p -> equality fmt p
+      and equality fmt = function
+	| Eq (e1, e2) ->
+	  Format.fprintf fmt "%a == %a"
+	    application e1
+	    application e2
+	| e -> application fmt e
+	and application fmt = function
+	  | (Variant (_, Tuple []) | App (_, [])) as e ->
+	    base fmt e
+	  | App (relname, exprs) ->
+	    Format.fprintf fmt "%a@[<hv2>(%a)@]"
+	      Names.pp_longident relname
+	      (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
+	  | Variant (lbl, expr) ->
+	    Format.fprintf fmt "%s %a" lbl base expr
+	  | Not p ->
+	    Format.fprintf fmt "¬%a"
+	      base p
+	  | e -> base fmt e
     and base fmt = function
       | True -> Format.fprintf fmt "true"
       | False -> Format.fprintf fmt "false"
-      | Atom (relname, exprs) ->
-	Format.fprintf fmt "%a@[<hv2>(%a)@]"
+      | Var nm -> Format.fprintf fmt "%s" nm
+      | App (relname, []) ->
+	Format.fprintf fmt "%a"
 	  Names.pp_longident relname
-	  (Format.pp_print_list ~pp_sep:pp_comma pp_expr) exprs
-      | Eq (e1, e2) ->
-	Format.fprintf fmt "%a = %a"
-	  pp_expr e1
-	  pp_expr e2
-      | Not p ->
-	Format.fprintf fmt "¬%a"
-	  base p
-      | (Forall _ | Exists _ | Impl _ | Conj _ | Disj _) as f ->
+      | Variant (lbl, Tuple []) ->
+	Format.fprintf fmt "%s" lbl
+      | Tuple exprs ->
+	Format.fprintf fmt "(%a)"
+	  (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
+      | ( Forall _ | Exists _ | Impl _ | Conj _ | Disj _
+        | Variant _ | App _ | Eq _ | Not _) as f ->
 	Format.fprintf fmt "(%a)" formula f
     in
     formula
@@ -144,24 +153,25 @@ module Make (Names : Modules.Syntax.NAMES) = struct
   let pp_term fmt (Check { name; property }) =
     Format.fprintf fmt "@[<hov2>check %a :@ %a@]"
       Names.pp_ident name
-      pp_formula property
+      pp_expr property
 
   (* Value declarations: which are declarations that certain properties
      hold. *)
-  let pp_val_decl fmt (ident, formula) =
+  let pp_val_decl fmt (ident, Property formula) =
     Format.fprintf fmt "@[<hov2>axiom %a :@ %a@]"
       Names.pp_ident ident
-      pp_formula     formula
+      pp_expr        formula
 
   let pp_var fmt =
     Format.pp_print_string fmt
 
   let pp_def fmt = function
-    | SortDefn sort_expr -> pp_sort fmt sort_expr
-    | PredDefn { args; predicate } ->
+    | SortDefn sort_expr ->
+      pp_sort fmt sort_expr
+    | ExprDefn { args; body } ->
       Format.fprintf fmt "@[<hov2>(%a).@ %a@]"
         (Format.pp_print_list ~pp_sep:pp_comma pp_var) args
-        pp_formula predicate
+        pp_expr body
 
   let pp_def_decl fmt = function
     | ident, Sort, None ->
@@ -179,6 +189,17 @@ module Make (Names : Modules.Syntax.NAMES) = struct
         Names.pp_ident ident
         (Format.pp_print_list ~pp_sep:pp_star pp_sort) sorts
         pp_def def
+    | ident, Function (sorts, rsort), None ->
+      Format.fprintf fmt "func %a : (%a) -> %a"
+        Names.pp_ident ident
+        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+	pp_sort rsort
+    | ident, Function (sorts, rsort), Some def ->
+      Format.fprintf fmt "@[<hov2>func %a : (%a) -> %a =@ %a@]"
+        Names.pp_ident ident
+        (Format.pp_print_list ~pp_sep:pp_star pp_sort) sorts
+	pp_sort rsort
+        pp_def def
 
   let pp_type_constraint fmt (path, kind, def) =
     match kind with
@@ -191,6 +212,12 @@ module Make (Names : Modules.Syntax.NAMES) = struct
         (String.concat "." path)
         (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
         pp_def def
+    | Function (sorts, rsort) ->
+      Format.fprintf fmt "@[<hov2>func %s : (%a) -> %a =@ %a@]"
+        (String.concat "." path)
+        (Format.pp_print_list ~pp_sep:pp_comma pp_sort) sorts
+	pp_sort rsort
+        pp_def def
 end
 
 module SurfaceInnerSyntax = struct
@@ -202,8 +229,6 @@ module CheckedInnerSyntax  = struct
 
   module Subst = Modules.Subst
 
-  let subst_expr _subst e = e
-
   let rec subst_sort subst = function
     | SVar ident ->
       SVar (Subst.path subst ident)
@@ -212,35 +237,45 @@ module CheckedInnerSyntax  = struct
     | Prod sorts ->
       Prod (List.map (subst_sort subst) sorts)
 
-  let rec subst_formula subst = function
+  let rec subst_expr subst = function
+    | Var _ as e -> e
+    | Variant (lbl, expr) ->
+      Variant (lbl, subst_expr subst expr)
+    | Tuple exprs ->
+      Tuple (List.map (subst_expr subst) exprs)
     | True | False as f -> f
-    | Atom (relname, tms) ->
-      Atom (Subst.path subst relname, List.map (subst_expr subst) tms)
+    | App (relname, tms) ->
+      App (Subst.path subst relname, List.map (subst_expr subst) tms)
     | Eq (e1, e2) ->
       Eq (subst_expr subst e1, subst_expr subst e2)
     | Conj (p, q) ->
-      Conj (subst_formula subst p, subst_formula subst q)
+      Conj (subst_expr subst p, subst_expr subst q)
     | Disj (p, q) ->
-      Disj (subst_formula subst p, subst_formula subst q)
+      Disj (subst_expr subst p, subst_expr subst q)
     | Impl (p, q) ->
-      Impl (subst_formula subst p, subst_formula subst q)
+      Impl (subst_expr subst p, subst_expr subst q)
     | Not p ->
-      Not (subst_formula subst p)
+      Not (subst_expr subst p)
     | Forall (v, sort, p) ->
-      Forall (v, subst_sort subst sort, subst_formula subst p)
+      Forall (v, subst_sort subst sort, subst_expr subst p)
     | Exists (v, sort, p) ->
-      Exists (v, subst_sort subst sort, subst_formula subst p)
+      Exists (v, subst_sort subst sort, subst_expr subst p)
 
-  let subst_valtype = subst_formula
+  let subst_valtype subst (Property fmla) =
+    Property (subst_expr subst fmla)
 
   let subst_deftype subst = function
     | SortDefn sort -> SortDefn (subst_sort subst sort)
-    | PredDefn { args; predicate } ->
-      PredDefn { args; predicate = subst_formula subst predicate }
+    | ExprDefn { args; body } ->
+      ExprDefn { args; body = subst_expr subst body }
 
   let subst_kind subst = function
-    | Sort -> Sort
-    | Predicate sorts -> Predicate (List.map (subst_sort subst) sorts)
+    | Sort ->
+      Sort
+    | Predicate sorts ->
+      Predicate (List.map (subst_sort subst) sorts)
+    | Function (sorts, rsort) ->
+      Function (List.map (subst_sort subst) sorts, subst_sort subst rsort)
 end
 
 module SurfaceSyntax = Modules.Syntax.Mod_Syntax_Raw (SurfaceInnerSyntax)
