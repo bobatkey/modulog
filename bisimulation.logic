@@ -8,6 +8,33 @@ module type machine = sig
   func out : state -> output
 end
 
+module type lens = sig
+  sort input1
+  sort output1
+
+  sort input2
+  sort output2
+
+  func output-map : output1 -> output2
+  func input-map  : output1 * input2 -> input1
+end
+
+module compose
+  (m : machine)
+  (l : lens with sort output1 = m.output with sort input1 = m.input) =
+struct
+  sort input = l.input2
+  sort output = l.output2
+
+  sort state = m.state
+
+  func transition : state * input -> state = (s, i).
+    m.transition(s, l.input-map(m.out(s), i))
+  func out : state -> output = (s).
+    l.output-map(m.out(s))
+
+end
+
 module type bisimulation = sig
 
   sort input
