@@ -1,0 +1,29 @@
+
+module type ode = sig
+
+  sort coefficient
+  sort exponent
+
+  sort variable
+  sort summand
+
+  func s : variable * summand -> coefficient
+  func f : summand * variable -> exponent
+
+  (* dy/dt = a * x * y + b * x * x
+     dx/dt = c * y
+
+     summands are "x * y", "x * x" and "y"
+
+     variables can be extended by means of lenses!?
+
+     ODEs over the same set of variables can be summed by combining
+     their summand types.  *)
+
+end
+
+(* should be able to add two ODEs, and scale an ODE, and relabel the
+   variables.
+
+   Is it possible to generate the mass-action semantics compositionally?
+*)
