@@ -10,8 +10,9 @@
 %token<string> SYMBOL
 
 %token RPAREN LPAREN ARROW COLON STAR COMMA
+%token LBRACE RBRACE SEMICOLON
 %token LSQBRACK RSQBRACK
-%token CONJ DISJ FORALL EXISTS NEGATE
+%token CONJ DISJ FORALL EXISTS NEGATE CASE
 %token PRED AXIOM SORT CHECK FUNC
 %token TRUE FALSE
 %token EQUALS_EQUALS
@@ -106,8 +107,16 @@ base:
     { Var name }
   | symbol=SYMBOL
     { Variant (symbol, Tuple []) }
+  | CASE; e=expr; LBRACE; cases=clauses; RBRACE
+    { Case (e, cases) }
   | LPAREN; p=separated_list(COMMA,expr); RPAREN
     { match p with [e] -> e | es -> Tuple es }
+
+clauses:
+  |
+    { [] }
+  | s=SYMBOL; x=IDENT; ARROW; e=expr; SEMICOLON; c=clauses
+    { (s, (x, e)) :: c }
 
 %public
 str_value:

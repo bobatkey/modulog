@@ -15,6 +15,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | Variant  of symbol * expr
     | Tuple    of expr list
     | App      of Names.longident * expr list
+    | Case     of expr * (symbol * (string * expr)) list
     (* TODO: case trees etc. *)
     | True
     | False
@@ -136,6 +137,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	  base p
       | e -> base fmt e
     and base fmt = function
+      | Case _ -> failwith "FIXME: pretty print case expressions"
       | True -> Format.fprintf fmt "true"
       | False -> Format.fprintf fmt "false"
       | Var nm -> Format.fprintf fmt "%s" nm
@@ -244,6 +246,9 @@ module CheckedInnerSyntax  = struct
       Variant (lbl, subst_expr subst expr)
     | Tuple exprs ->
       Tuple (List.map (subst_expr subst) exprs)
+    | Case (e, cases) ->
+      Case (subst_expr subst e,
+            List.map (fun (symb, (var, e)) -> (symb, (var, subst_expr subst e))) cases)
     | True | False as f -> f
     | App (relname, tms) ->
       App (Subst.path subst relname, List.map (subst_expr subst) tms)

@@ -108,6 +108,14 @@ module InnerTyping = struct
 	VVariant (lbl, eval_expr env ctxt expr)
       | Core.Tuple exprs ->
 	VTuple (List.map (eval_expr env ctxt) exprs)
+      | Core.Case (expr, cases) ->
+	(match eval_expr env ctxt expr with
+	| VVariant (lbl, value) ->
+	  let var, body = List.assoc lbl cases in
+	  let ctxt = LocalEnv.add var value ctxt in
+	  eval_expr env ctxt body
+	| _ ->
+	  failwith "internal error: type error in expression evaluation")
       | Core.App (nm, exprs) ->
 	(match Env.lookup_type nm env with
 	| (Predicate _ | Function _), Some (ExprDefn { args; body }) ->
@@ -192,6 +200,8 @@ module InnerTyping = struct
 	| Ok (_ident, (Predicate _ | Function _)) ->
 	  Error (`Msg "expecting a sort"))
       | Src.Sum variants ->
+	(* FIXME: check for duplicates *)
+	let variants = List.stable_sort (fun (l1,_) (l2,_) -> String.compare l1 l2) variants in
 	let* variants =
 	  map_result (fun (lbl, sort) ->
 	    let* sort = wf_sort env sort in
@@ -260,6 +270,8 @@ module InnerTyping = struct
 	infer_application env ctxt (Modules.Syntax.String_names.Lid_ident var) [])
     | Src.Variant _ ->
       Error (`Msg "cannot infer type of variant expression")
+    | Src.Case _ ->
+      Error (`Msg "cannot infer type of case expression")
     | Src.Tuple exprs ->
       let* exprs, sorts = infer_sorts env ctxt exprs in
       let* sorts = all_sorts sorts in
@@ -346,6 +358,35 @@ module InnerTyping = struct
 	    Ok (Core.Variant (lbl, expr)))
 	| _ ->
 	  Error (`Msg "not expecting a value of sum sort")))
+    | Src.Case (expr, cases) ->
+      (let* expr, csort = infer_sort env ctxt expr in
+      match csort with
+      | Prop ->
+	(* But maybe we should be able to? *)
+	Error (`Msg "cannot analyse a Prop by cases")
+      | Sort csort ->
+	(match expand_sort env csort with
+	| Sum variants ->
+	  let cases = List.stable_sort (fun (l1,_) (l2,_) -> String.compare l1 l2) cases in
+	  let rec match_cases variants cases =
+	    match variants, cases with
+	    | [], [] ->
+	      Ok []
+	    | (vlbl, vsort)::variants, (clbl, (v, expr))::cases ->
+	      if String.equal vlbl clbl then
+		let ctxt = Ctxt.add v vsort ctxt in
+		let* expr = check_sort env ctxt expr sort in
+		let* cases = match_cases variants cases in
+		Ok ((clbl, (v, expr))::cases)
+	      else
+		Error (`Msg "incorrect cases")
+	    | _ ->
+	      Error (`Msg "incorrect cases")
+	  in
+	  let* cases = match_cases variants cases in
+	  Ok (Core.Case (expr, cases))
+	| _ ->
+	  Error (`Msg "")))
     | expr ->
       let* expr, sort' = infer_sort env ctxt expr in
       if eq_extended_sort env sort sort' then

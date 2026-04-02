@@ -18,6 +18,9 @@ rule token = parse
 | ')'              { RPAREN }
 | '['              { LSQBRACK }
 | ']'              { RSQBRACK }
+| '{'              { LBRACE }
+| '}'              { RBRACE }
+| ';'              { SEMICOLON }
 
 | "module"         { MODULE }
 | "type"           { TYPE }
@@ -44,6 +47,7 @@ rule token = parse
 | "exists"         { EXISTS }
 | "->"             { ARROW }
 | "=="             { EQUALS_EQUALS }
+| "case"           { CASE }
 
 | "synth"          { SYNTH }
 | "display"        { DISPLAY }

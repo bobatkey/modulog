@@ -1,7 +1,7 @@
 ;; Classes of tokens
 (setq logical-mode-keywords
       '("module" "type" "struct" "sig" "end" "functor" "and" "rec"
-	"with" "pred" "func" "axiom" "sort" "check" "synth" "display"))
+	"with" "pred" "func" "axiom" "sort" "check" "synth" "display" "case"))
 (setq logical-mode-logic-keywords
       '("true" "false" "forall" "exists"))
 (setq logical-mode-logic-operators

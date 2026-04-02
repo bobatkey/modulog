@@ -12,6 +12,8 @@ open Checker.InnerTyping.Evaluation (TypeChecker.TypingEnv)
 let rec constraints_of_formula clauses table env local_env = function
   | Var _ | Variant _ | Tuple _ ->
     failwith "internal error: ill-formed predicate"
+  | Case _ ->
+    failwith "internal error: synthesis of propsitions defined by cases not yet implemented"
   | True ->
     Solver.add_conj clauses []
   | False ->
