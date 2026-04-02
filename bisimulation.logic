@@ -32,7 +32,6 @@ struct
     m.transition(s, l.input-map(m.out(s), i))
   func out : state -> output = (s).
     l.output-map(m.out(s))
-
 end
 
 module type bisimulation = sig
@@ -45,10 +44,11 @@ module type bisimulation = sig
 
   pred r : machine1.state * machine2.state
 
-  axiom isBisimulation : forall s1 : machine1.state -> forall s2 : machine2.state ->
-    r(s1,s2) ->
-      (machine1.out(s1) == machine2.out(s2)
-       &
-       (forall i : input -> r(machine1.transition(s1,i), machine2.transition(s2,i))))
-
+  axiom isBisimulation :
+    forall s1 : machine1.state -> forall s2 : machine2.state ->
+      r(s1,s2) ->
+        (machine1.out(s1) == machine2.out(s2)
+         &
+         (forall i : input ->
+            r(machine1.transition(s1,i), machine2.transition(s2,i))))
 end
