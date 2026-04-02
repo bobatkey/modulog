@@ -110,7 +110,7 @@ module type plan = sig
         actionAt(t, a) ->
           ((scenario.requires(a, v, On) -> state(t, v))
            &
-           (scenario.requires(a, v, Off) -> ¬state(t, v)))
+           (scenario.requires(a, v, Off) -> ¬(state(t, v))))
 
   (* An action's effect is applied to the state. *)
   axiom action_effect :
@@ -121,7 +121,7 @@ module type plan = sig
           actionAt(t1,a) ->
           ((scenario.changesTo(a, v, On) -> state(t2, v))
            &
-           (scenario.changesTo(a, v, Off) -> ¬state(t2, v))
+           (scenario.changesTo(a, v, Off) -> ¬(state(t2, v)))
            &
            (¬(exists s : setting -> scenario.changesTo(a, v, s)) ->
              ((state(t1, v) -> state(t2, v)) & (state(t2,v) -> state(t1,v)))) )
