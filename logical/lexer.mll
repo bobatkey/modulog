@@ -4,6 +4,7 @@ open Parser
 
 let ident = ['a'-'z']['A'-'Z''a'-'z''_''0'-'9''\'''-']*
 let symbol = ['A'-'Z']['A'-'Z''a'-'z''_''0'-'9''\'''-']*
+let integer = '-'?['0'-'9']+
 
 rule token = parse
   [' ''\t']        { token lexbuf }
@@ -21,6 +22,7 @@ rule token = parse
 | '{'              { LBRACE }
 | '}'              { RBRACE }
 | ';'              { SEMICOLON }
+| '#'              { HASH }
 
 | "module"         { MODULE }
 | "type"           { TYPE }
@@ -54,6 +56,7 @@ rule token = parse
 
 | ident as x       { IDENT x }
 | symbol as x      { SYMBOL x }
+| integer as x     { INT_LITERAL (int_of_string x) }
 | _                { UNKNOWN }
 | eof              { EOF }
 

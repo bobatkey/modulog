@@ -16,7 +16,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | Tuple    of expr list
     | App      of Names.longident * expr list
     | Case     of expr * (symbol * (string * expr)) list
-    (* TODO: case trees etc. *)
+    | Project  of expr * int
     | True
     | False
     | Eq       of expr * expr
@@ -135,6 +135,8 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	(* FIXME: lower the precedence of this? *)
 	Format.fprintf fmt "¬%a"
 	  base p
+      | Project (e, idx) ->
+	Format.fprintf fmt "%a #%d" base e idx
       | e -> base fmt e
     and base fmt = function
       | Case _ -> failwith "FIXME: pretty print case expressions"
@@ -147,7 +149,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	Format.fprintf fmt "(%a)"
 	  (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
       | ( Forall _ | Exists _ | Impl _ | Conj _ | Disj _
-        | Variant (_, _) | App (_, _::_) | Eq _ | Not _) as f ->
+        | Variant (_, _) | App (_, _::_) | Eq _ | Not _ | Project _) as f ->
 	Format.fprintf fmt "(%a)" formula f
     in
     formula
@@ -249,6 +251,8 @@ module CheckedInnerSyntax  = struct
     | Case (e, cases) ->
       Case (subst_expr subst e,
             List.map (fun (symb, (var, e)) -> (symb, (var, subst_expr subst e))) cases)
+    | Project (e, idx) ->
+      Project (subst_expr subst e, idx)
     | True | False as f -> f
     | App (relname, tms) ->
       App (Subst.path subst relname, List.map (subst_expr subst) tms)

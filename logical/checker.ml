@@ -116,6 +116,12 @@ module InnerTyping = struct
 	  eval_expr env ctxt body
 	| _ ->
 	  failwith "internal error: type error in expression evaluation")
+      | Core.Project (expr, idx) ->
+	(match eval_expr env ctxt expr with
+	| VTuple values ->
+	  List.nth values idx
+	| _ ->
+	  failwith "internal error: type error in expression evaluation")
       | Core.App (nm, exprs) ->
 	(match Env.lookup_type nm env with
 	| (Predicate _ | Function _), Some (ExprDefn { args; body }) ->
@@ -261,67 +267,81 @@ module InnerTyping = struct
       let* sorts = all_sorts sorts in
       Ok (s::sorts)
 
-  let rec infer_sort env ctxt = function
-    | Src.Var var ->
-      (match Ctxt.find_opt var ctxt with
-      | Some var_sort ->
-	Ok (Core.Var var, Sort var_sort)
-      | None ->
-	infer_application env ctxt (Modules.Syntax.String_names.Lid_ident var) [])
-    | Src.Variant _ ->
-      Error (`Msg "cannot infer type of variant expression")
-    | Src.Case _ ->
-      Error (`Msg "cannot infer type of case expression")
-    | Src.Tuple exprs ->
-      let* exprs, sorts = infer_sorts env ctxt exprs in
-      let* sorts = all_sorts sorts in
-      Ok (Core.Tuple exprs, Sort (Core.Prod sorts))
-    | Src.App (relname, exprs) ->
-      infer_application env ctxt relname exprs
-    | Src.True ->
-      Ok (Core.True, Prop)
-    | Src.False ->
-      Ok (Core.False, Prop)
-    | Src.Eq (expr1, expr2) ->
-      (match infer_sort env ctxt expr1, infer_sort env ctxt expr2 with
-      | Ok (expr1, sort1), Ok (expr2, sort2) ->
-	if eq_extended_sort env sort1 sort2 then
+    let rec infer_sort env ctxt = function
+      | Src.Var var ->
+	(match Ctxt.find_opt var ctxt with
+	| Some var_sort ->
+	  Ok (Core.Var var, Sort var_sort)
+	| None ->
+	  infer_application env ctxt (Modules.Syntax.String_names.Lid_ident var) [])
+      | Src.Variant _ ->
+	Error (`Msg "cannot infer type of variant expression")
+      | Src.Case _ ->
+	Error (`Msg "cannot infer type of case expression")
+      | Src.Project (expr, idx) ->
+	(let* expr, sort = infer_sort env ctxt expr in
+	match sort with
+	| Sort sort ->
+	  (match expand_sort env sort with
+	  | Core.Prod sorts ->
+	    if 0 <= idx && idx < List.length sorts then
+	      Ok (Core.Project (expr, idx), Sort (List.nth sorts idx))
+	    else
+	      Error (`Msg "index out of range")
+	  | _ ->
+	    Error (`Msg "attempt to project out of non tuple"))
+	| Prop ->
+	  Error (`Msg "attempt to project out of Prop"))
+      | Src.Tuple exprs ->
+	let* exprs, sorts = infer_sorts env ctxt exprs in
+	let* sorts = all_sorts sorts in
+	Ok (Core.Tuple exprs, Sort (Core.Prod sorts))
+      | Src.App (relname, exprs) ->
+	infer_application env ctxt relname exprs
+      | Src.True ->
+	Ok (Core.True, Prop)
+      | Src.False ->
+	Ok (Core.False, Prop)
+      | Src.Eq (expr1, expr2) ->
+	(match infer_sort env ctxt expr1, infer_sort env ctxt expr2 with
+	| Ok (expr1, sort1), Ok (expr2, sort2) ->
+	  if eq_extended_sort env sort1 sort2 then
+	    Ok (Core.Eq (expr1, expr2), Prop)
+	  else
+	    Error (`Msg "sort mismatch in equality")
+	| Ok (expr1, sort), Error _ ->
+	  let* expr2 = check_sort env ctxt expr2 sort in
 	  Ok (Core.Eq (expr1, expr2), Prop)
-	else
-	  Error (`Msg "sort mismatch in equality")
-      | Ok (expr1, sort), Error _ ->
-	let* expr2 = check_sort env ctxt expr2 sort in
-	Ok (Core.Eq (expr1, expr2), Prop)
-      | Error _, Ok (expr2, sort) ->
-	let* expr1 = check_sort env ctxt expr1 sort in
-	Ok (Core.Eq (expr1, expr2), Prop)
-      | Error _ as e, _ ->
-	e)
-    | Src.Conj (e1, e2) ->
-      let* e1 = check_sort env ctxt e1 Prop in
-      let* e2 = check_sort env ctxt e2 Prop in
-      Ok (Core.Conj (e1, e2), Prop)
-    | Src.Disj (e1, e2) ->
-      let* e1 = check_sort env ctxt e1 Prop in
-      let* e2 = check_sort env ctxt e2 Prop in
-      Ok (Core.Disj (e1, e2), Prop)
-    | Src.Impl (e1, e2) ->
-      let* e1 = check_sort env ctxt e1 Prop in
-      let* e2 = check_sort env ctxt e2 Prop in
-      Ok (Core.Impl (e1, e2), Prop)
-    | Src.Not e ->
-      let* e = check_sort env ctxt e Prop in
-      Ok (Core.Not e, Prop)
-    | Src.Forall (var, sort, e) ->
-      let* sort = wf_sort env sort in
-      let ctxt = Ctxt.add var sort ctxt in
-      let* e = check_sort env ctxt e Prop in
-      Ok (Core.Forall (var, sort, e), Prop)
-    | Src.Exists (var, sort, e) ->
-      let* sort = wf_sort env sort in
-      let ctxt = Ctxt.add var sort ctxt in
-      let* e = check_sort env ctxt e Prop in
-      Ok (Core.Exists (var, sort, e), Prop)
+	| Error _, Ok (expr2, sort) ->
+	  let* expr1 = check_sort env ctxt expr1 sort in
+	  Ok (Core.Eq (expr1, expr2), Prop)
+	| Error _ as e, _ ->
+	  e)
+      | Src.Conj (e1, e2) ->
+	let* e1 = check_sort env ctxt e1 Prop in
+	let* e2 = check_sort env ctxt e2 Prop in
+	Ok (Core.Conj (e1, e2), Prop)
+      | Src.Disj (e1, e2) ->
+	let* e1 = check_sort env ctxt e1 Prop in
+	let* e2 = check_sort env ctxt e2 Prop in
+	Ok (Core.Disj (e1, e2), Prop)
+      | Src.Impl (e1, e2) ->
+	let* e1 = check_sort env ctxt e1 Prop in
+	let* e2 = check_sort env ctxt e2 Prop in
+	Ok (Core.Impl (e1, e2), Prop)
+      | Src.Not e ->
+	let* e = check_sort env ctxt e Prop in
+	Ok (Core.Not e, Prop)
+      | Src.Forall (var, sort, e) ->
+	let* sort = wf_sort env sort in
+	let ctxt = Ctxt.add var sort ctxt in
+	let* e = check_sort env ctxt e Prop in
+	Ok (Core.Forall (var, sort, e), Prop)
+      | Src.Exists (var, sort, e) ->
+	let* sort = wf_sort env sort in
+	let ctxt = Ctxt.add var sort ctxt in
+	let* e = check_sort env ctxt e Prop in
+	Ok (Core.Exists (var, sort, e), Prop)
 
   and infer_sorts env ctxt = function
     | [] -> Ok ([], [])
@@ -358,6 +378,17 @@ module InnerTyping = struct
 	    Ok (Core.Variant (lbl, expr)))
 	| _ ->
 	  Error (`Msg "not expecting a value of sum sort")))
+    | Src.Tuple exprs ->
+      (match sort with
+      | Sort sort ->
+	(match expand_sort env sort with
+	| Prod sorts ->
+	  let* exprs = check_sorts env ctxt exprs sorts in
+	  Ok (Core.Tuple exprs)
+	| _ ->
+	  Error (`Msg "given term is tuple, but not expecting a term of product type"))
+      | Prop ->
+	Error (`Msg "given term is tuple, but not expecting a term of product type"))
     | Src.Case (expr, cases) ->
       (let* expr, csort = infer_sort env ctxt expr in
       match csort with

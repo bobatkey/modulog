@@ -8,6 +8,8 @@
 %token DOT END AND REC
 %token<string> IDENT
 %token<string> SYMBOL
+%token HASH
+%token<int> INT_LITERAL
 
 %token RPAREN LPAREN ARROW COLON STAR COMMA
 %token LBRACE RBRACE SEMICOLON
@@ -95,6 +97,8 @@ application_expr:
     { Variant (symbol, e) }
   | NEGATE; p=base
     { Not p }
+  | e=base; HASH; idx=INT_LITERAL
+    { Project (e, idx) }
   | e=base
     { e }
 
