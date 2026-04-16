@@ -1,0 +1,62 @@
+module type language = sig
+
+  sort operation
+  sort port
+
+  pred op-port : operation * port
+
+end
+
+module type program = sig
+
+  module lang : language
+
+  sort node
+  func op : node -> lang.operation
+
+  pred cfg-edge : node * lang.port * node
+
+  axiom port-unique : forall n : node -> forall p : lang.port -> forall n1 : node -> forall n2 : node ->
+    cfg-edge(n,p,n1) -> cfg-edge(n,p,n2) -> n1 == n2
+
+  axiom port-exists : forall n : node -> forall p : lang.port ->
+    lang.op-port(op(n),p) -> exists n' : node -> cfg-edge(n,p,n')
+
+end
+
+module type program-logic = sig
+
+  module lang : language
+
+  sort assertion
+
+  pred entails : assertion * assertion
+
+  func sp : assertion * lang.operation * lang.port -> assertion
+
+end
+
+module type verified = sig
+
+  module lang : language
+
+  module prog : program
+    with sort lang.operation = lang.operation
+    with sort lang.port = lang.port
+    with pred lang.op-port : lang.operation * lang.port = (o,p). lang.op-port(o,p)
+
+  module logic : program-logic
+    with sort lang.operation = lang.operation
+    with sort lang.port = lang.port
+    with pred lang.op-port : lang.operation * lang.port = (o,p). lang.op-port(o,p)
+
+  func cert : prog.node -> logic.assertion
+
+  axiom cert-ok :
+    forall n : prog.node ->
+      forall p : lang.port ->
+        forall n' : prog.node ->
+	  prog.cfg-edge(n,p,n') ->
+	  logic.entails(logic.sp(cert(n),prog.op(n),p), cert(n'))
+
+end
