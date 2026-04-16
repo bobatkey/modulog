@@ -60,3 +60,88 @@ module type verified = sig
 	  logic.entails(logic.sp(cert(n),prog.op(n),p), cert(n'))
 
 end
+
+
+module lr-lang = struct
+  sort operation = [ Lock, Release, Branch ]
+  sort port = [ Next, Branch ]
+
+  pred op-port : operation * port =
+    (o, p). (o == Lock & p == Next)
+          | (o == Release & p == Next)
+	  | (o == Branch & (p == Next | p == Branch))
+end
+
+module lr-program-logic = struct
+
+  module lang = lr-lang
+
+  sort assertion = [ Locked, NotLocked, Error ]
+
+  pred entails : assertion * assertion =
+    (p, q). p == q | q == Error
+
+  func sp : assertion * lang.operation * lang.port -> assertion =
+    (p, o, e).
+      case o {
+        Lock d -> case p { Locked d -> Error;
+	                   NotLocked d -> Locked;
+			   Error d -> Error; };
+        Release d -> case p { Locked d -> NotLocked;
+	                      NotLocked d -> Error;
+			      Error d -> Error; };
+	Branch d -> p; }
+
+end
+
+module lr-program = struct
+
+  module lang = lr-lang
+
+  sort node = [ N0, N1, N2, N3 ]
+
+  func op : node -> lang.operation =
+    (n). case n { N0 d -> Lock;
+                  N1 d -> Branch;
+		  N2 d -> Release;
+		  N3 d -> Lock;
+		}
+
+  pred cfg-edge : node * lang.port * node =
+    (n, p, m).
+      (n == N0 & p == Next & m == N1)
+    | (n == N1 & p == Next & m == N2)
+    | (n == N1 & p == Branch & m == N3)
+    | (n == N2 & p == Next & m == N0)
+    | (n == N3 & p == Next & m == N3)
+
+  check port-unique : forall n : node -> forall p : lang.port -> forall n1 : node -> forall n2 : node ->
+    cfg-edge(n,p,n1) -> cfg-edge(n,p,n2) -> n1 == n2
+
+  check port-exists : forall n : node -> forall p : lang.port ->
+    lang.op-port(op(n),p) -> exists n' : node -> cfg-edge(n,p,n')
+
+end
+
+module lr-verified = struct
+
+  module lang = lr-lang
+  module prog = lr-program
+  module logic = lr-program-logic
+
+  func cert : prog.node -> logic.assertion =
+    (n). case n {
+      N0 d -> NotLocked;
+      N1 d -> Locked;
+      N2 d -> Locked;
+      N3 d -> Error;
+    }
+
+  check cert-ok :
+    forall n : prog.node ->
+      forall p : lang.port ->
+        forall n' : prog.node ->
+	  prog.cfg-edge(n,p,n') ->
+	  logic.entails(logic.sp(cert(n),prog.op(n),p), cert(n'))
+
+end
