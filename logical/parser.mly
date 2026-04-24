@@ -11,7 +11,7 @@
 %token HASH
 %token<int> INT_LITERAL
 
-%token RPAREN LPAREN ARROW COLON STAR COMMA
+%token RPAREN LPAREN ARROW COLON STAR COMMA DOUBLE_ARROW
 %token LBRACE RBRACE SEMICOLON
 %token LSQBRACK RSQBRACK
 %token CONJ DISJ FORALL EXISTS NEGATE CASE
@@ -87,6 +87,8 @@ expr:
 equality_expr:
   | e1=application_expr; EQUALS_EQUALS; e2=application_expr
     { Eq (e1, e2) }
+  | e1=application_expr; DOUBLE_ARROW; e2=application_expr
+    { Iff (e1, e2) }
   | e=application_expr
     { e }
 

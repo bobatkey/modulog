@@ -76,6 +76,10 @@ let rec constraints_of_formula clauses table env local_env = function
     let v1 = constraints_of_formula clauses table env local_env p in
     let v2 = constraints_of_formula clauses table env local_env q in
     Solver.add_implies clauses v1 v2
+  | Iff (p, q) ->
+    let v1 = constraints_of_formula clauses table env local_env p in
+    let v2 = constraints_of_formula clauses table env local_env q in
+    Solver.add_equal clauses v1 v2
   | Not p ->
     let v = constraints_of_formula clauses table env local_env p in
     Solver.add_not clauses v

@@ -1,0 +1,92 @@
+module type clauses = sig
+  sort literal
+  sort clause
+
+  func negate : literal -> literal
+
+  pred clause-literal : clause * literal
+end
+
+module type unsat-proof = sig
+
+  module problem : clauses
+
+  sort derived-clause
+
+  pred derived-clause-literal : derived-clause * problem.literal
+
+  pred given : derived-clause * problem.clause
+  pred resolved : derived-clause * problem.literal * derived-clause * derived-clause
+
+  pred consequence : derived-clause * derived-clause
+
+  axiom consequence-closed :
+    (forall d : derived-clause ->
+     forall d1 : derived-clause ->
+     forall d2 : derived-clause ->
+     forall l : problem.literal ->
+       resolved(d,l,d1,d2) -> (consequence(d,d1) & consequence(d,d2)))
+    &
+    (forall d : derived-clause -> forall d' : derived-clause -> forall d'' : derived-clause ->
+     consequence(d,d') -> consequence(d',d'') -> consequence(d,d''))
+
+  axiom no-loops :
+    forall d : derived-clause -> forall d' : derived-clause -> consequence(d,d') -> ¬(d == d')
+
+  axiom is-proof : forall c : derived-clause ->
+    ((exists c' : problem.clause ->
+        given(c,c') & (forall l : problem.literal -> problem.clause-literal(c',l) <-> derived-clause-literal(c,l)))
+
+    | (exists c1 : derived-clause ->
+       exists c2 : derived-clause ->
+       exists l  : problem.literal ->
+         resolved(c,l,c1,c2)
+         & derived-clause-literal(c1,l)
+         & derived-clause-literal(c2,problem.negate(l))
+         & (forall l' : problem.literal ->
+              derived-clause-literal(c,l') ->
+               (derived-clause-literal(c1, l') | derived-clause-literal(c2, l')))
+         & (forall l' : problem.literal ->
+             ¬(l' == l) ->
+	     derived-clause-literal(c1,l') -> derived-clause-literal(c,l'))
+	 & (forall l' : problem.literal ->
+             ¬(l' == problem.negate(l)) ->
+	     derived-clause-literal(c2,l') -> derived-clause-literal(c,l'))))
+
+  axiom derived-false : exists c : derived-clause -> forall l : problem.literal -> ¬(derived-clause-literal(c,l))
+
+end
+
+sort pol     = [ T, F ]
+sort literal = (pol * [ A, B, C ])
+sort clause5  = [ C1, C2, C3, C4, C5 ]
+
+check test1 : forall l : literal -> l#0 == T | l#0 == F
+check test2 : forall l : literal -> l#1 == A | l#1 == B | l#1 == C
+check test3 : exists l : literal -> l#0 == F
+
+func negate-pol : pol -> pol = (p). case p { T d -> F; F d -> T; }
+func negate : literal -> literal = (l). (negate-pol(l#0), l#1)
+
+check involutive : forall l : literal -> negate(negate(l)) == l
+
+pred clause-literal : clause5 * literal = (c, l).
+    (c == C1 & (l == (T, A)))
+  | (c == C2 & (l == (F, A) | l == (T, B) | l == (T, C)))
+  | (c == C3 & (l == (F, B) | l == (F, C)))
+  | (c == C4 & (l == (F, B) | l == (T, C)))
+  | (c == C5 & (l == (T, B) | l == (F, C)))
+
+sort clause3 = [ C1, C2, C3 ]
+
+pred clause-literal2 : clause3 * literal = (c, l).
+    (c == C1 & l == (T, A))
+  | (c == C2 & (l == (F, A) | l == (T, B)))
+  | (c == C3 & (l == (F, B)))
+
+synth proof : unsat-proof
+  with sort problem.literal = literal
+  with sort problem.clause = clause5
+  with func problem.negate : literal -> literal = (l). negate(l)
+  with pred problem.clause-literal : clause5 * literal = (c, l). clause-literal(c,l)
+  with sort derived-clause = [ D1, D2, D3, D4, D5, D6, D7, D8, D9 ]

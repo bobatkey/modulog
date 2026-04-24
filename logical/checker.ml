@@ -156,6 +156,10 @@ module InnerTyping = struct
 	let p_value = eval_expr env ctxt p in
 	let q_value = eval_expr env ctxt q in
 	VTruth (not (truth_value p_value) || truth_value q_value)
+      | Core.Iff (p, q) ->
+	let p_value = eval_expr env ctxt p in
+	let q_value = eval_expr env ctxt q in
+	VTruth (truth_value p_value = truth_value q_value)
       | Core.Not p ->
 	let p_value = eval_expr env ctxt p in
 	VTruth (not (truth_value p_value))
@@ -329,6 +333,10 @@ module InnerTyping = struct
 	let* e1 = check_sort env ctxt e1 Prop in
 	let* e2 = check_sort env ctxt e2 Prop in
 	Ok (Core.Impl (e1, e2), Prop)
+      | Src.Iff (e1, e2) ->
+	let* e1 = check_sort env ctxt e1 Prop in
+	let* e2 = check_sort env ctxt e2 Prop in
+	Ok (Core.Iff (e1, e2), Prop)
       | Src.Not e ->
 	let* e = check_sort env ctxt e Prop in
 	Ok (Core.Not e, Prop)
@@ -559,6 +567,8 @@ module InnerTyping = struct
 	true
       | Core.Predicate sorts1, Core.Predicate sorts2 ->
 	List.for_all2 (eqsort env) sorts1 sorts2
+      | Core.Function (sorts1, rsort1), Core.Function (sorts2, rsort2) ->
+	List.for_all2 (eqsort env) sorts1 sorts2 && eqsort env rsort1 rsort2
       | _ ->
 	false
 

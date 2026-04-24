@@ -42,6 +42,11 @@ let add_implies ((solver, _) as t) v1 v2 =
     ();
   x
 
+let add_equal t v1 v2 =
+  let lr = add_implies t v1 v2 in
+  let rl = add_implies t v2 v1 in
+  add_conj t [ lr; rl ]
+
 let add_assert (solver, _) v = Msat_sat.assume solver [ [ v ] ] ()
 
 let solve (solver, _) =

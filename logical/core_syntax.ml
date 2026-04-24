@@ -23,6 +23,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
     | Conj     of expr * expr
     | Disj     of expr * expr
     | Impl     of expr * expr
+    | Iff      of expr * expr
     | Not      of expr
     | Forall   of string * sort_expr * expr
     | Exists   of string * sort_expr * expr
@@ -120,6 +121,10 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	Format.fprintf fmt "%a == %a"
 	  application e1
 	  application e2
+      | Iff (p, q) ->
+	Format.fprintf fmt "%a <-> %a"
+	  application p
+	  application q
       | e ->
 	application fmt e
     and application fmt = function
@@ -139,7 +144,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	Format.fprintf fmt "%a #%d" base e idx
       | e -> base fmt e
     and base fmt = function
-      | Case _ -> failwith "FIXME: pretty print case expressions"
+      | Case _ -> Format.fprintf fmt "FIXME: pretty print case expressions"
       | True -> Format.fprintf fmt "true"
       | False -> Format.fprintf fmt "false"
       | Var nm -> Format.fprintf fmt "%s" nm
@@ -149,7 +154,7 @@ module Make (Names : Modules.Syntax.NAMES) = struct
 	Format.fprintf fmt "(%a)"
 	  (Format.pp_print_list ~pp_sep:pp_comma formula) exprs
       | ( Forall _ | Exists _ | Impl _ | Conj _ | Disj _
-        | Variant (_, _) | App (_, _::_) | Eq _ | Not _ | Project _) as f ->
+        | Variant (_, _) | App (_, _::_) | Eq _ | Not _ | Project _ | Iff _) as f ->
 	Format.fprintf fmt "(%a)" formula f
     in
     formula
@@ -264,6 +269,8 @@ module CheckedInnerSyntax  = struct
       Disj (subst_expr subst p, subst_expr subst q)
     | Impl (p, q) ->
       Impl (subst_expr subst p, subst_expr subst q)
+    | Iff (p, q) ->
+      Iff (subst_expr subst p, subst_expr subst q)
     | Not p ->
       Not (subst_expr subst p)
     | Forall (v, sort, p) ->

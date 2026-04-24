@@ -48,6 +48,7 @@ rule token = parse
 | "forall"         { FORALL }
 | "exists"         { EXISTS }
 | "->"             { ARROW }
+| "<->"            { DOUBLE_ARROW }
 | "=="             { EQUALS_EQUALS }
 | "case"           { CASE }
 
