@@ -210,7 +210,8 @@ module InnerTyping = struct
 	| Ok (_ident, (Predicate _ | Function _)) ->
 	  Error (`Msg "expecting a sort"))
       | Src.Sum variants ->
-	(* FIXME: check for duplicates *)
+	(* FIXME: check for duplicate labels, and normalise to a better internal
+           representations. *)
 	let variants = List.stable_sort (fun (l1,_) (l2,_) -> String.compare l1 l2) variants in
 	let* variants =
 	  map_result (fun (lbl, sort) ->
@@ -526,8 +527,8 @@ module InnerTyping = struct
       | Core.False, Core.False -> true
       | Core.App (r1, exprs1), Core.App (r2, exprs2) ->
 	Modules.Path.equal r1 r2 &&
-	(* FIXME: what if they are defined? Should probably expand both sides and
-           continue to check. *)
+	(* FIXME: what if they are defined? Should expand both sides and continue
+           to check. *)
 	List.for_all2 (alpha_equal env pairs) exprs1 exprs2
       | Core.Conj (p1, q1), Core.Conj (p2, q2)
       | Core.Disj (p1, q1), Core.Disj (p2, q2)
@@ -547,7 +548,7 @@ module InnerTyping = struct
     let valtype_match env (Core.Property formula1) (Core.Property formula2) =
       alpha_equal env [] formula1 formula2
 
-    (* FIXME: ought to be able to disable *)
+    (* FIXME: ought to be able to disable this at the modules level. *)
     let rec_safe_valtype _env _formula =
       false
 
