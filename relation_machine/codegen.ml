@@ -220,6 +220,7 @@ module Gen (IA : Idealised_algol.Syntax.S) () = struct
            indexes
     in
     let module P = struct
+      let name = relvar.Syntax.ident
       let arity = relvar.Syntax.arity and indexes = indexes
     end in
     let module IT = Codegen_indexed_table.Make (IA) (P) () in

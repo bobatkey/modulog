@@ -6,6 +6,7 @@ type relvar =
 module RelVar : sig
   type t = relvar
   val compare : t -> t -> int
+  val pp : t Fmt.t
 end
 
 type attr = string

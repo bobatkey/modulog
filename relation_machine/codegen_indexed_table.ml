@@ -49,6 +49,7 @@ module type S = sig
 end
 
 module type CONFIG = sig
+  val name : string
   val arity : int
   val indexes : int array array  
 end
@@ -85,30 +86,42 @@ struct
     in
     loop 0 []
 
-  let conv_pattern pat =
-    pat
-    |> Array.fold_lefti (fun l i -> function `Fixed _ -> i::l | `Wild -> l) []
-    |> List.rev
-    |> Array.of_list
+  module IntSet = Set.Make (Int)
 
-  let is_prefix ar1 ar2 =
-    if Array.length ar1 > Array.length ar2 then false
-    else
-      let rec loop i =
-        if i = Array.length ar1 then true
-        else if ar1.(i) <> ar2.(i) then false
-        else loop (i+1)
-      in
-      loop 0
+  (** Convert a search pattern to a set of fields that are the keys for the
+      search. *)
+  let conv_pattern =
+    Array.fold_lefti
+      (fun l i -> function `Fixed _ -> IntSet.add i l | `Wild -> l)
+      IntSet.empty
+
+  (** Match a set of search key fields against as storage order to find if
+      the key fields are a permutation of the prefix. *)
+  let match_prefix search_fields index_order =
+    let rec loop required i =
+      if IntSet.is_empty required then
+	true
+      else if i = Array.length index_order then
+	false (* FIXME: this oughtn't happen because all of the field names ought to
+                 appear in each index_order *)
+      else if IntSet.mem index_order.(i) required then
+	loop (IntSet.remove index_order.(i) required) (i+1)
+      else
+	false
+    in
+    loop search_fields 0
 
   let find_handle prefix handles =
     let rec loop i =
       if i = Array.length handles then
-        failwith "Invalid search pattern"
-      else if is_prefix prefix A.indexes.(i) then
-        handles.(i), A.indexes.(i)
+        failwith (Printf.sprintf "Invalid search pattern: [%s] not in [%s] for %s"
+          (String.concat "," (List.map string_of_int (IntSet.to_list prefix)))
+          (String.concat ";" (List.map (fun index -> String.concat "," (List.map string_of_int (Array.to_list index))) (Array.to_list A.indexes)))
+	  A.name)
+      else if match_prefix prefix A.indexes.(i) then
+	handles.(i), A.indexes.(i)
       else
-        loop (i+1)
+	loop (i+1)
     in
     loop 0
 
@@ -117,31 +130,25 @@ struct
     Array.iteri (fun i j -> inv.(j) <- i) perm;
     inv
 
-  let get_fixed = function
-    | `Fixed e -> e
-    | `Wild    -> assert false
-
   let for_pattern h pat k =
-    let prefix_pat   = conv_pattern pat in
-    let handle, perm = find_handle prefix_pat h in
-    let perm_inv     = invert perm in
+    let search_fields = conv_pattern pat in
+    let handle, perm  = find_handle search_fields h in
+    let perm_inv      = invert perm in
     let minimum =
       Key.create
         (Array.init A.arity
-           (fun i ->
-              if i < Array.length prefix_pat then
-                get_fixed (pat.(prefix_pat.(i)))
-              else
-                S.Int32.const 0l))
+          (fun i ->
+	    match pat.(perm.(i)) with
+	    | `Fixed e -> e
+	    | `Wild -> S.Int32.const 0l))
     in
     let maximum =
       Key.create
         (Array.init A.arity
-           (fun i ->
-              if i < Array.length prefix_pat then
-                get_fixed (pat.(prefix_pat.(i)))
-              else
-                S.Int32.maximum))
+          (fun i ->
+	    match pat.(perm.(i)) with
+	    | `Fixed e -> e
+	    | `Wild -> S.Int32.maximum))
     in
     k handle minimum maximum perm_inv
 

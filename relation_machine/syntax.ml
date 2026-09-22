@@ -6,6 +6,8 @@ type relvar =
 module RelVar = struct
   type t = relvar
   let compare = Stdlib.compare
+  let pp fmt { ident; arity } =
+    Format.fprintf fmt "%s/%d" ident arity
 end
 
 type attr = string

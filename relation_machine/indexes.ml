@@ -1,3 +1,5 @@
+[@@@ocaml.warning "-32"]
+
 module PatternSet : sig
   module Pattern : sig
     type t
@@ -14,7 +16,7 @@ module PatternSet : sig
 
   val add : Pattern.t -> t -> t
 
-  (* val pp : t Fmt.t *)
+  val pp : t Fmt.t
 
   include Minimalpathcover.G
     with type t   := t
@@ -31,19 +33,17 @@ end = struct
     let complete n =
       let rec loop pat i = if i = n then pat else loop (add i pat) (i+1) in
       loop empty 0
-(*
+
     let pp =
       Fmt.braces (Fmt.iter ~sep:(Fmt.any ",@ ") iter Fmt.int)
-*)
+
   end
 
   include Set.Make (Pattern)
 
-  (*
   let pp =
     Fmt.braces (Fmt.iter ~sep:(Fmt.any ",@ ") iter Pattern.pp)
-  *)
-      
+
   module V = struct
     type t = Pattern.t
     let equal = Pattern.equal
@@ -74,7 +74,7 @@ module PredicatePats : sig
 
   val map_to_list : (Syntax.relvar -> PatternSet.t -> 'a) -> t -> 'a list
 
-  (*   val pp : Format.formatter -> t -> unit *)
+  val pp : Format.formatter -> t -> unit
 end = struct
   module VarMap = Map.Make (Syntax.RelVar)
 
@@ -94,13 +94,11 @@ end = struct
   let map_to_list f t =
     VarMap.fold (fun p pats -> List.cons (f p pats)) t []
 
-  (*
   let pp =
     Fmt.iter_bindings VarMap.iter
       (Fmt.pair ~sep:(Fmt.any " => ")
          Syntax.pp_relvar
          PatternSet.pp)
-  *)
 end
 
 let rec search_patterns_of_expr pats = function
@@ -164,22 +162,6 @@ let indexes program : (Syntax.relvar * int array array) list =
   PredicatePats.map_to_list
     orderings_of_patterns
     (search_patterns program)
-
-(*
-let pp_indexes =
-  Fmt.(brackets
-         (list ~sep:(any ";@ ")
-            (brackets
-               (list ~sep:(any ";@ ")
-                  PatternSet.Pattern.pp))))
-
-let pp_all_indexes =
-  Fmt.(braces
-         (list ~sep:(any ";@ ")
-            (pair ~sep:(any " =>@ ")
-               Syntax.pp_relvar
-               pp_indexes)))
-*)
 
 let pp_orderings =
   Fmt.(brackets
