@@ -10,3 +10,7 @@ let rec equal p1 p2 =
        equal r1 r2 && field1 = field2
     | _, _ ->
        false
+
+let rec to_string = function
+  | Pident ident -> Ident.full_name ident
+  | Pdot (path, component) -> to_string path ^ "." ^ component

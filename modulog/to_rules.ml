@@ -103,8 +103,10 @@ module Eval = struct
            (match Env.find lid env with
              | Some (`Value (Val_const expr)) ->
                 flatten_expr env expr ty flexprs
-             | Some _ | None ->
-                failwith "internal error: failure looking up constant")
+             | Some _ ->
+                failwith "internal error: failure looking up constant: wrong sort"
+             | None ->
+                failwith (Printf.sprintf "internal error: failure looking up constant %s" (Modules.Path.to_string lid)))
         | _ ->
            failwith "internal error: type mismatch in flatten_expr"
 

@@ -361,8 +361,7 @@ module Core_typing = struct
                                 ; const_type = typ
                                 ; const_expr = expr
                                 })
-            (* FIXME: should this be 'name'? *)
-            , [ Modules.Ident.create const_name, Core.Value typ ]
+            , [ name, Core.Value typ ]
             )
 
       | Src.(Output { output_loc; output_rel; output_filename }) ->
