@@ -9,6 +9,7 @@
  (deps    datalog_grammar.mly parser.messages)
  (action  (chdir %{workspace_root}
            (run %{bin:menhir} --table
+                              --unused-token UNKNOWN
                               --base modulog/parser
                               %{dep:datalog_grammar.mly}
                               %{lib:modules:modules_grammar.mly}))))
@@ -20,6 +21,7 @@
  (action  (with-stdout-to parser_messages.ml
                          (run %{bin:menhir}
                               --table
+                              --unused-token UNKNOWN
                               --base modulog/parser
                               %{dep:datalog_grammar.mly}
                               %{lib:modules:modules_grammar.mly}

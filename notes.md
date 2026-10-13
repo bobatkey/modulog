@@ -131,3 +131,10 @@ existing rules.
   module system and attempts to unify them in a single common
   system. Uses this unification to extend ML modules to include
   recursive modules. Proposes a new form of ML based on this work.
+
+- Comparison to Moggi's two-level systems:
+
+  - Have `values : valtypes` and `deftypes : kinds`, and `deftypes` and `kinds` are the only things that can be compared for equality. We cannot compare `values` for equality. One could think of `valtypes` as being `deftypes` of a certain kind (e.g., `Type`).
+  - This corresponds to the phase separation aspect of modules? We only have to be able to compare `deftypes` and `kinds` for equality.
+  - Can we elaborate into the underlying type theories?
+  - 

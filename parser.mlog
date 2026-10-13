@@ -1,0 +1,56 @@
+module type INPUT = sig
+
+  type index
+
+  type token
+
+  pred is_index : index
+
+  pred token_at : index * token * index
+
+end
+
+module type AST = sig
+  type node
+
+  pred plus_node : node * node * node
+  pred mult_node : node * node * node
+  pred x_var : node
+  pred y_var : node
+end
+
+module Build_ast (I : INPUT with
+       type token = {`Plus | `Times | `X | `Y | `Lparen | `Rparen}) =
+struct
+
+  type node = I.index * I.index
+
+  pred plus_node : node * node * node
+       plus_node((?i,?j), (?i,?i0), (?i1,?j)) :- mul_node(
+
+end
+
+module Parser
+  (I : INPUT with
+       type token = {`Plus | `Times | `X | `Y | `Lparen | `Rparen}) =
+struct
+
+  (* E ::= S + E | S
+     S ::= B * S | B
+     B ::= x | y | ( E )
+  *)
+
+  define expr : I.index * I.index
+         expr(?i,?j) :- summand(?i,?i1), I.token_at(?i1,`Plus,?i2), expr(?i2,?j)
+	 expr(?i,?j) :- summand(?i,?j)
+
+     and summand : I.index * I.index
+         summand(?i,?j) :- base(?i,?i1), I.token_at(?i1,`Times,?i2), summand(?i2,?j)
+	 summand(?i,?j) :- base(?i,?j)
+
+     and base : I.index * I.index
+         base(?i,?j) :- I.token_at(?i,`X,?j)
+	 base(?i,?j) :- I.token_at(?i,`Y,?j)
+	 base(?i,?j) :- I.token_at(?i,`Lparen,?i1), expr(?i1,?i2), I.token_at(?i2,`Rparen,?j)
+
+end

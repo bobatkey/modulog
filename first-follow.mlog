@@ -1,0 +1,71 @@
+module type GRAMMAR = sig
+
+  type tok
+  type nt
+  type rhs
+
+  pred production : nt * rhs
+  pred accept     : rhs
+  pred call       : rhs * nt * rhs
+  pred token      : rhs * tok * rhs
+
+end
+
+module FirstFollow (G : GRAMMAR) = struct
+
+  define nullable : nt
+         nullable(?X) :- production(?X, ?R), nullable_rhs(?R)
+
+     and nullable_rhs : rhs
+         nullable_rhs(?R) :- accept(?R)
+	 nullable_rhs(?R) :- call(?R,?X,_), nullable(?X)
+
+  define first : nt * tok
+         first(?X,?T) :- production(?X,?R), first_rhs(?R,?T)
+
+     and first_rhs : rhs * tok
+         first_rhs(?R,?T) :- token(?R,?T,_)
+	 first_rhs(?R,?T) :- call(?R,?X,_), first(?X,?T)
+	 first_rhs(?R,?T) :- call(?R,?X,?S), nullable(?X), first_rhs(?S,?T)
+
+  define reach : rhs * nt * rhs
+         reach(?R,?X,?S) :- call(?R,?X?,?S)
+         reach(?R,?X,?S) :- call(?R,_,?T), reach(?T,?X,?S)
+         reach(?R,?X,?S) :- token(?R,_,?T), reach(?T,?X,?S)
+
+  define follow : nt * tok
+         follow(?X,?T) :- call(_,?X,?R), first_rhs(?R,?T)   (* Y -> ... X R *)
+         follow(?X,?T) :- production(?Y,?R), reach(?R,?X,?S), nullable(?S), follow(?Y,?T) (* Y -> ....X R, R nullable *)
+
+end
+
+module type INPUT = sig
+
+  type token
+  type state
+
+  pred tokenAt : state * token * state
+
+end
+
+module Parser (G : GRAMMAR) (I : INPUT with type token = I.token) = sig
+
+  define parse : I.state * G.nt * I.state
+         parse(?i,?X,?j) :- production(?X,?R), parse_rhs(?i,?R,?j)
+
+     and parse_rhs : I.state * G.rhs * I.state
+         parse_rhs(?i,?R,?i) :- G.accept(?R)
+	 parse_rhs(?i,?R,?k) :- G.token(?R,?T,?S), I.tokenAt(?i,?T,?j), parse_rhs(?j,?S,?k)
+	 parse_rhs(?i,?R,?k) :- G.call(?R,?X,?S), parse(?i,?X,?j), parse_rhs(?j,?S,?k)
+
+  type node = I.state * I.state
+
+(* This basically reproduces the parse structure, doesn't get to reuse it *)
+
+  define child : node * node
+         child((?i,?j), ?N2) :-
+	    production(?X,?R),
+            parse_rhs(?i,?R,?j),
+	    child_rhs(?i,?j,
+	    *)
+end

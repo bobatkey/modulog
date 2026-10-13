@@ -1,0 +1,140 @@
+module type INPUT = sig
+
+  type index
+  type token
+
+  pred tokenAt : index * token * index
+
+  constant begin  : index
+  constant endIdx : index
+end
+
+(* It would be helpful to be able to define types via partial
+   equivalence relations on existing types. Rules that use these types
+   then get elaborated into ones that use the given relations.
+
+   As an example, we could identify nodes that only differ by parens.
+*)
+
+module type CST = sig
+
+  type node
+
+  type variable_name
+
+  pred plus_node : node * node * node
+  pred mult_node : node * node * node
+  pred paren_node : node * node
+  pred variable_node : node * variable_name
+
+end
+
+
+
+module type SEMANTICS = sig
+
+  type value
+  type variable_name
+
+  pred plus : value * value * value
+  pred mult : value * value * value
+  pred var  : variable_name * value
+
+end
+
+module ZOI_Semantics = struct
+
+  type value = { `Zer | `One | `Inf }
+
+  define is_value : value
+         is_value(`Zer)
+	 is_value(`One)
+	 is_value(`Inf)
+
+  (* FIXME: should values of enumeration type be automatically safe? *)
+  define plus : value * value * value
+         plus(`Zer,?y,?y) :- is_value(?y)
+	 plus(?x,`Zer,?x) :- is_value(?x)
+	 plus(`One,`One,`Inf)
+	 plus(`Inf,?x,`Inf) :- is_value(?x)
+	 plus(?x,`Inf,`Inf) :- is_value(?x)
+end
+
+module EVALUATOR (Tree : CST) (Sem : SEMANTICS with type variable_name = Tree.variable_name) = struct
+
+  define eval : Tree.node * Sem.value
+         eval(?n, ?v) :- Tree.plus_node(?n,?n1,?n2), eval(?n1,?v1), eval(?n2,?v2), Sem.plus(?v1,?v2,?v)
+	 eval(?n, ?v) :- Tree.mult_node(?n,?n1,?n2), eval(?n1,?v1), eval(?n2,?v2), Sem.mult(?v1,?v2,?v)
+	 eval(?n, ?v) :- Tree.paren_node(?n,?n1), eval(?n1,?v)
+	 eval(?n, ?v) :- Tree.variable_node(?n, ?var), Sem.var(?var, ?v)
+
+end
+
+type token = int (* {`X | `Y | `plus | `mult | `Lparen | `Rparen} *)
+
+type index = int
+
+external input : index * token * index
+
+module Parser (I : INPUT with type token = token) = struct
+
+  type node = I.index * I.index
+
+  type variable_name = {`X | `Y}
+
+  constant plus : token = 0
+  constant mult : token = 1
+  constant x    : token = 2
+  constant y    : token = 3
+  constant lparen : token = 4
+  constant rparen : token = 5
+
+  define plus_node : node * node * node
+         plus_node((?i,?j), (?i,?i0), (?i1,?j)) :- summand((?i,?i0)), I.tokenAt(?i0,plus,?i1), expr((?i1,?j))
+
+     and mult_node : node * node * node
+         mult_node((?i,?j), (?i,?i0), (?i1,?j)) :- base((?i,?i0)), I.tokenAt(?i0,mult,?i1), summand((?i1,?j))
+
+     and paren_node : node * node
+         paren_node((?i,?j),(?i0,?i1)) :- I.tokenAt(?i,lparen,?i0),expr((?i0,?i1)),I.tokenAt(?i1,rparen,?j)
+
+     and variable_node : node * variable_name
+         variable_node((?i,?j), `X) :- I.tokenAt(?i, x, ?j)
+	 variable_node((?i,?j), `Y) :- I.tokenAt(?i, y, ?j)
+
+     and expr : node
+         expr(?n) :- plus_node(?n, _, _)
+	 expr(?n) :- summand(?n)
+
+     and summand : node
+         summand(?n) :- mult_node(?n,_,_)
+	 summand(?n) :- base(?n)
+
+     and base : node
+         base(?n) :- variable_node(?n,_)
+	 base(?n) :- paren_node(?n,_)
+
+end
+
+module Input = struct
+  type index = int
+  type token = token
+
+  define tokenAt : index * token * index
+         tokenAt(?i,?t,?j) :- input(?i,?t,?j)
+
+  constant begin : int = 0
+  constant endIdx : int = 12 (* FIXME: need external constants *)
+end
+
+module Tree = Parser (Input)
+
+output Tree.expr "expr.csv"
+
+(*
+module Evaluation (A : AST with type variable_name = {`X | `Y}) = struct
+
+  define
+
+end
+*)
