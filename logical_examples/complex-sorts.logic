@@ -6,6 +6,8 @@ pred is_AA : product = (x). x == (A, A)
 
 pred fst_is_A : product = (x). x#1 == A
 
+pred bad : product = (x). x#0
+
 sort variant = [ X : product, Y : symbol ]
 
 pred is_X : variant = (x). x == X (B, C)

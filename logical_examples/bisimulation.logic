@@ -8,6 +8,29 @@ module type machine = sig
   func out : state -> output
 end
 
+(* Combine two machines into one with independent state sets. *)
+module sum
+  (m1 : machine)
+  (m2 : machine with sort input = m1.input with sort output = m1.output) = struct
+
+  sort input = m1.input
+  sort output = m1.output
+
+  sort state = [ Inl : m1.state, Inr : m2.state ]
+
+  func transition : state * input -> state =
+    (s, i). case s {
+      Inl s -> Inl (m1.transition(s, i));
+      Inr s -> Inr (m2.transition(s, i));
+    }
+
+  func out : state -> output =
+    (s). case s {
+      Inl s -> m1.out(s);
+      Inr s -> m2.out(s);
+    }
+end
+
 module type lens = sig
   sort input1
   sort output1

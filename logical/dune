@@ -7,6 +7,7 @@
  (deps    parser.mly)
  (action  (chdir %{workspace_root}
            (run %{bin:menhir} --table
+                --unused-token UNKNOWN
                 --base logical/parser
                 --explain
                               %{dep:parser.mly}

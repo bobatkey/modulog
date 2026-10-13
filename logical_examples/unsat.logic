@@ -41,17 +41,21 @@ module type unsat-proof = sig
        exists c2 : derived-clause ->
        exists l  : problem.literal ->
          resolved(c,l,c1,c2)
+	 & ¬(c1 == c2)
          & derived-clause-literal(c1,l)
          & derived-clause-literal(c2,problem.negate(l))
+	 & ¬(derived-clause-literal(c,l))
+	 & ¬(derived-clause-literal(c,problem.negate(l)))
          & (forall l' : problem.literal ->
-              derived-clause-literal(c,l') ->
+             (l' == l | l' == problem.negate(l) | derived-clause-literal(c,l')) <->
                (derived-clause-literal(c1, l') | derived-clause-literal(c2, l')))
+	       (*
          & (forall l' : problem.literal ->
              ¬(l' == l) ->
 	     derived-clause-literal(c1,l') -> derived-clause-literal(c,l'))
 	 & (forall l' : problem.literal ->
              ¬(l' == problem.negate(l)) ->
-	     derived-clause-literal(c2,l') -> derived-clause-literal(c,l'))))
+	     derived-clause-literal(c2,l') -> derived-clause-literal(c,l'))) *) ))
 
   axiom derived-false : exists c : derived-clause -> forall l : problem.literal -> ¬(derived-clause-literal(c,l))
 
